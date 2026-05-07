@@ -2,13 +2,11 @@
 Route definitions for the Study-and-Learn MVP.
 """
 import os
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
 from app.utils import allowed_file
 
 bp = Blueprint('main', __name__)
 
-# Configure upload folder
-UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'txt', 'md', 'pdf', 'docx'}
 
 
@@ -52,7 +50,10 @@ def upload_file():
     if file and allowed_file(file.filename):
         # Secure the filename and save file
         filename = file.filename
-        file.save(os.path.join(UPLOAD_FOLDER, filename))
+        upload_folder = current_app.config['UPLOAD_FOLDER']
+        # Ensure upload directory exists
+        os.makedirs(upload_folder, exist_ok=True)
+        file.save(os.path.join(upload_folder, filename))
         flash(f'File {filename} uploaded successfully!', 'success')
         return redirect(url_for('main.index'))
     else:
