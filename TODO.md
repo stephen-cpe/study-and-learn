@@ -19,19 +19,18 @@ Everything else is secondary until this workflow works end-to-end.
 
 ### Must Do
 
-- [ ] Create GitHub repository: `study-and-learn`
-- [ ] Add `README.md` with project overview and setup instructions
-- [ ] Add `docs/SRS.md`
-- [ ] Add `docs/TODO.md`
-- [ ] Add `docs/DESIGN_AND_TESTING.md`
-- [ ] Add `.gitignore`
-- [ ] Add Python virtual environment instructions
-- [ ] Add `requirements.txt`
-- [ ] Create initial Flask app skeleton
-- [ ] Create `tests/` directory
-- [ ] Add first basic pytest test
-- [ ] Add GitHub Actions workflow for tests
-- [ ] Share repository with `quantic-grader` when appropriate
+- [x] Create GitHub repository: `study-and-learn`
+- [x] Add `README.md` with project overview and setup instructions
+- [x] Add `SRS.md`
+- [x] Add `TODO.md`
+- [x] Add `DESIGN_AND_TESTING.md`
+- [x] Add `.gitignore`
+- [x] Add Python virtual environment instructions
+- [x] Add `requirements.txt`
+- [x] Create initial Flask app skeleton
+- [x] Create `tests/` directory
+- [x] Add first basic pytest test
+- [x] Add GitHub Actions workflow for tests
 
 ### Suggested Acceptance Criteria
 
@@ -56,7 +55,7 @@ Everything else is secondary until this workflow works end-to-end.
 - [x] Add task status columns
 - [x] Add capstone deliverables checklist
 - [x] Publish via GitHub Pages
-- [ ] Add public task board link to `README.md`
+- [x] Add public task board link to `README.md`
 
 ### Suggested Acceptance Criteria
 
@@ -383,20 +382,3 @@ Ranked from easiest to hardest. These are not official MVP unless moved into a s
 - [ ] AI tooling explanation
 - [ ] Sprint summaries
 - [ ] Final demo script
-
----
-
-## 9. Capstone Submission Checklist
-
-- [ ] GitHub repository link
-- [ ] Repository shared with `quantic-grader`
-- [ ] Deployed app link
-- [ ] Public task board link
-- [ ] Design and testing document
-- [ ] CI/CD evidence
-- [ ] At least three sprint records
-- [ ] Final recorded demo/presentation link
-- [ ] All group members visible and audible in recording, if group project
-- [ ] All group members speak, if group project
-- [ ] Presentation is 15–20 minutes
-- [ ] Links are stable and accessible
