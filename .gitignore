@@ -1,0 +1,83 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Environment variables / secrets
+.env
+.env.local
+*.key
+*.pem
+secrets/
+config/private.py
+
+# Uploads / user data (never commit user files)
+uploads/
+data/user_*.json
+data/temp/
+
+# AI model caches (Ollama, etc.)
+.ollama/
+models/
+*.bin
+*.gguf
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Documentation build
+docs/_build/
+
+# Task board build artifacts (if any)
+task-board-v1/node_modules/
+task-board-v1/dist/
+
+# Local status / debug
+docs/STATUS.md.local
+*.log
