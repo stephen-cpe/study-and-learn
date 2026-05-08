@@ -27,7 +27,7 @@ def test_index(client):
     """Test that the homepage returns a 200 status and expected message."""
     response = client.get('/')
     assert response.status_code == 200
-    assert b'Study-and-Learn MVP' in response.data
+    assert b'Study-and-Learn' in response.data
 
 
 def test_goal_empty_rejected(client):

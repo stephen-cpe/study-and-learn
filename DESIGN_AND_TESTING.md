@@ -55,18 +55,22 @@ Core workflow:
 
 **Reason:** The capstone MVP depends on end-to-end functionality. Retrieval adds value but also complexity.
 
-### ADR-006: Use Single Small Local Model + Mock Fallback
-**Decision**: All AI services (summary, relevance, study path) will call a single configurable Ollama model (`qwen3:1.7b` by default). CI/testing will use `AI_MOCK=true` to bypass live inference.
+### ADR-006: Implement RAG Pipeline (Chunk → Embed → Retrieve → Generate)
+**Decision:** Replace direct document-to-AI prompting with LangChain chunking + ChromaDB retrieval.
+**Reason:** Prevents context window overflow, enables source-grounded outputs, scales to multiple documents, and aligns with modern AI engineering standards.
+**Tradeoffs:** ✅ Grounded, scalable, traceable • ❌ Adds vector DB dependency, requires embedding strategy
 
-**Reason**: 
-- Capstone MVP prioritizes end-to-end reliability over model routing complexity.
-- 2B–3B quantized models run efficiently on target hardware and free-tier constraints.
-- Mock fallback guarantees deterministic test suites and removes flaky GPU dependencies.
-- Single prompt schema across services reduces maintenance and validation overhead.
+### ADR-007: Use Single Configurable Ollama Model + Mock Fallback
+**Decision:** All AI services call one model via `OLLAMA_MODEL` env var (default: `qwen3:1.7b`). CI/testing uses `AI_MOCK=true`.
+**Reason:** Capstone MVP prioritizes reliability over model routing complexity. 1B–3B models run efficiently on target hardware. Mock fallback guarantees deterministic tests.
 
-**Tradeoffs**: 
-- ✅ Simpler architecture, faster demo response, easier to test
-- ❌ Less specialized per-task optimization (deferred to post-MVP)
+---
+
+## 3. Software & Architectural Patterns
+- Model-View-Controller (MVC): Flask routes (Controller) delegate to `app/services/` (Model/Business Logic) and render Bootstrap templates (View). Separation keeps routing thin and services testable.
+- Service Layer Pattern: All AI, parsing, and RAG logic isolated in `app/services/`. Enables independent unit testing, easy mocking, and future provider swaps.
+- Repository/DAO Pattern: ChromaDB vector storage abstracted behind `vector_store.py`. Decouples ingestion from retrieval logic.
+- Mock Object Pattern: `AI_MOCK=true` and in-memory ChromaDB replace live LLM/vector calls in CI. Guarantees deterministic, zero-cost, GPU-free test execution.
 
 ---
 
@@ -81,6 +85,10 @@ Unit tests will cover isolated logic:
 - prompt construction,
 - relevance label parsing,
 - curriculum output parsing.
+- LangChain text splitter output validation
+- ChromaDB collection creation & persistence checks
+- Similarity search context builder accuracy
+- Multi-file upload session & cookie size limits
 
 ### Integration Tests
 
@@ -144,7 +152,25 @@ The deployed version should be stable enough for capstone demonstration and acce
 
 ---
 
-## 7. Known Risks
+## 7. Deployment Strategy & Cost Analysis
+- Option A: Local-First Demo (Current)
+  - Host: Developer laptop running Ollama + Flask
+  - Cost: $0 (uses existing hardware)
+  - Tradeoff: Not publicly accessible; suitable for sprint demos & local dev
+- Option B: Free-Tier Cloud (Recommended for Submission)
+  - Host: Render or Railway (Flask web service)
+  - Cost: $0/month (free tier supports 512MB–1GB RAM, sufficient for Flask + static assets)
+  - AI Strategy: Swap Ollama for cloud API (OpenRouter/Groq) or keep `AI_MOCK=true` for demo
+  - Vector DB: ChromaDB runs in-memory or uses persistent volume (~50MB free tier storage)
+  - Tradeoff: Requires API key or mocked AI; free tier sleeps after inactivity but wakes on request
+- Option C: VPS (DigitalOcean/AWS)
+  - Cost: ~$6–12/month (4GB RAM droplet)
+  - Tradeoff: Overkill for capstone; adds operational overhead
+Recommendation: Deploy to Render/Railway free tier with `AI_MOCK=true` for grading, document swap path to production API in README.
+
+---
+
+## 8. Known Risks
 
 | Risk | Impact | Mitigation |
 |---|---|---|

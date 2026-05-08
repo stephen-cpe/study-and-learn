@@ -169,8 +169,8 @@ Candidate deployment platforms:
 | Backend | Flask | Simple Python web framework suitable for rapid capstone development |
 | Frontend | Bootstrap 5 | Simple, responsive UI with minimal build tooling |
 | AI serving | Ollama | Local model serving for development |
-| Embeddings / retrieval | pgvector or ChromaDB | Decide during implementation spike |
-| Database | PostgreSQL preferred if using pgvector | Stores uploads, metadata, outputs, and possibly embeddings |
+| Embeddings / retrieval | ChromaDB |
+| Database | SQLite (metadata) + ChromaDB (vectors) | Stores uploads, metadata, outputs, and possibly embeddings |
 | Testing | pytest | Start simple and expand |
 | CI/CD | GitHub Actions | Run tests automatically on push / pull request |
 | Task board | Static GitHub Pages site | Simple public project board without bloated tools |
@@ -220,31 +220,21 @@ study-and-learn/
 ├── README.md
 └── run.py
 ```
-## 4.4 AI Model Specification
-| Parameter
-|Value
-|Notes
-|
-| ---|---|---|
-| Serving framework
-|Ollama
-|Local-first, REST API compatible, easy to swap models
-|
-| Default model
-|`qwen3:1.7b` (via `OLLAMA_MODEL` env var)
-|Balances instruction quality, speed, and VRAM usage
-|
-| Fallback models
-|`gemma4:e2b`, `qwen3.5:2b`
-|Available via Ollama if primary model underperforms
-|
-| Testing mode
-|`AI_MOCK=true` returns structured JSON stubs
-|Ensures deterministic CI/CD and removes GPU dependency
-|
-| Deployment target
-|Free-tier host (Render/Railway) + mocked AI or external API
-|Local VRAM models may be swapped for cloud API keys in production
+### 4.4 AI Model Specification
+| Parameter | Value | Notes |
+|---|---|---|
+| Serving framework | Ollama | Local-first, REST API compatible |
+| Default model | `qwen3:1.7b` (via `OLLAMA_MODEL` env var) | Efficient instruction-following for capstone demo |
+| Supported small models | `qwen3.5:2b`, `gemma4:e2b`, `lfm2.5-thinking:1.2b`, `granite4.1:3b`, `ministral-3:3b` | Swappable via env var for testing/performance tradeoffs |
+| Testing mode | `AI_MOCK=true` returns structured JSON stubs | Ensures deterministic CI/CD without GPU dependency |
+| Multimodal capability | Text + image support deferred to post-MVP | OCR for scanned PDFs remains stretch goal |
+
+### 4.5 RAG & Multi-Document Architecture
+- **Chunking**: `RecursiveCharacterTextSplitter` (LangChain) with configurable size/overlap
+- **Vector Storage**: Persistent ChromaDB (`./data/chroma_db`) for dev; in-memory fallback for CI
+- **Multi-Upload**: Route accepts `request.files.getlist('files')` with max 5 files per submission
+- **Retrieval**: Top-k similarity search against goal-aligned chunks before AI prompt injection
+- **Context Flow**: Goal → Upload → Parse → Chunk → Embed → Store → Retrieve → Generate AI Outputs
 
 ---
 
@@ -262,7 +252,7 @@ study-and-learn/
 
 | ID | Requirement | Priority |
 |---|---|---|
-| FR-004 | The system shall allow the user to upload one or more documents. | Must |
+| FR-004 | The system shall allow the user to upload up to 5 documents simultaneously. | Must |
 | FR-005 | The system shall support `.txt`, `.md`, `.pdf`, `.docx`, `.html`, and `.odt` if feasible. | Must |
 | FR-006 | The system shall reject unsupported file types with a clear message. | Must |
 | FR-007 | The system should show uploaded file names and processing status. | Should |
@@ -271,8 +261,8 @@ study-and-learn/
 
 | ID | Requirement | Priority |
 |---|---|---|
-| FR-008 | The system shall extract readable text from supported documents. | Must |
-| FR-009 | The system shall store extracted text or processed text metadata. | Must |
+| FR-008 | The system shall chunk, embed, and store extracted text in a local vector database. | Must |
+| FR-009 | The system shall retrieve top-k relevant chunks before passing context to AI services. | Must |
 | FR-010 | The system should handle extraction failures gracefully. | Should |
 | FR-011 | The system may support OCR for scanned PDFs. | Could |
 
@@ -409,6 +399,8 @@ study-and-learn/
 | US-012 | As a learner, I want the app to feel simple and guided. | UI has clear step-by-step flow |
 | US-013 | As a learner, I want the product to feel friendly and motivating. | Retro theme is visible and not distracting |
 | US-014 | As a reviewer, I want the demo to show the full workflow. | Demo data and script cover goal input → upload → summary → relevance → study path |
+| US-015 | As a learner, I want to upload up to 5 documents at once so I can analyze related materials together. | Multi-file route accepts max 5 files; chunks stored in ChromaDB |
+| US-016 | As a learner, I want AI analysis based on retrieved document chunks so outputs stay grounded and accurate. | AI prompts use top-k retrieved context; fallback to mock in CI |
 
 ---
 
@@ -431,6 +423,9 @@ study-and-learn/
 - GitHub Actions test workflow.
 - Static public task board.
 - Design and testing document.
+- Retrieval-Augmented Generation (RAG) pipeline.
+- Multi-file upload (≤5)
+- Vector storage (ChromaDB)
 
 ### 8.2 Should-Have MVP Polish
 

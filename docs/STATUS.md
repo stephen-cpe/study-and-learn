@@ -1,8 +1,8 @@
 # STATUS.md
 Last Updated: 2026-05-08
 Sprint: 3
-Last Task Completed: Fixed PDF/DOCX parsing support and session cookie size issue
-Commit Message Suggestion: fix: add PDF/DOCX parser support and prevent session cookie overflow
+Last Task Completed: Applied retro theme from task-board to Flask templates with proper static file organization
+Commit Message Suggestion: feat: apply retro theme with dark cyan color scheme, custom fonts, and scanline effects
 Known Issues: none
 Pending Decisions: none
 Next 3 Tasks:

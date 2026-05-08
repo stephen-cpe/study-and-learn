@@ -36,7 +36,7 @@ def test_full_workflow(mock_curriculum, mock_relevance, mock_summarizer, client)
     # Step 1: Set the learning goal
     response = client.post('/goal', data={'learning_goal': 'Learn about machine learning'}, follow_redirects=True)
     assert response.status_code == 200
-    assert b'Study-and-Learn MVP' in response.data
+    assert b'Study-and-Learn' in response.data
     
     # Step 2: Upload a file
     test_file_content = b'This is a sample text about machine learning algorithms.'

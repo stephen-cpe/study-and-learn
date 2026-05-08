@@ -115,7 +115,7 @@ Create the basic app foundation and let a user enter a learning goal and upload 
 
 ### Goal
 
-Extract text from uploaded documents and generate a useful summary.
+Implement RAG pipeline (chunking, vector storage, retrieval), support multi-file uploads (≤5), and generate AI summaries using retrieved context.
 
 ### User Stories
 
@@ -124,11 +124,20 @@ Extract text from uploaded documents and generate a useful summary.
 - US-009: Learner receives a summary of uploaded materials.
 
 ### Tasks
-
+Note: Parsers run first, then output feeds into chunking pipeline.
+- [ ] Integrate LangChain `RecursiveCharacterTextSplitter` for document chunking
+- [ ] Set up persistent ChromaDB client service (`./data/chroma_db`)
+- [ ] Implement chunk → embed → store pipeline per uploaded file
 - [ ] Implement `.txt` parser
 - [ ] Implement `.md` parser
 - [ ] Implement `.pdf` parser
 - [ ] Implement `.docx` parser
+- [ ] Implement similarity search & context builder for AI prompts
+- [ ] Update `/upload` route to accept `request.files.getlist()` (max 5 files)
+- [ ] Add multi-file session handling & collection naming
+- [ ] Add unit tests for chunking logic & vector storage
+- [ ] Add mocked retrieval tests for CI (`CI=true` env var)
+
 - [ ] Decide whether `.html` and `.odt` are Sprint 2 or later
 - [ ] Create document parser service
 - [ ] Add extracted text preview or processing confirmation
@@ -144,10 +153,12 @@ Extract text from uploaded documents and generate a useful summary.
 
 ### Sprint 2 Definition of Done
 
-- At least three file types can be parsed.
-- Summary generation works with a small sample document.
-- AI failures are handled gracefully.
-- Tests cover parser and summary workflow basics.
+- RAG pipeline processes uploads (chunk → embed → store in ChromaDB)
+- `/upload` accepts up to 5 files with session handling
+- AI services use retrieved top-k context instead of raw full text
+- All core parsers (.txt, .md, .pdf, .docx) functional
+- Mocked RAG/AI tests pass in CI
+- Task board updated
 
 ---
 

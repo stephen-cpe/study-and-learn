@@ -3,8 +3,7 @@
 
 ## Project Brief (Read First)
 - **App:** Study-and-Learn — a Flask web app where a learner uploads study documents and gets an AI-generated summary, relevance check, and study path.
-- **Stack:** Python 3.13, Flask, Bootstrap 5, pytest, SQLite (dev/MVP persistence), Ollama (local AI, default models: qwen3:1.7b, 
-qwen3.5:2b, gemma4:e2b, lfm2.5-thinking:1.2b, granite4.1:3b, ministral-3:3b), GitHub Actions (CI)
+- **Stack:** Python 3.13, Flask, Bootstrap 5, pytest, SQLite (dev), LangChain, ChromaDB, Ollama (local AI, default: qwen3:1.7b), GitHub Actions (CI)
 - **Structure:** See docs/SRS.md for requirements. See docs/TODO.md for sprint tasks. See docs/STATUS.md for current state.
 - **Repo root:** study-and-learn/
 - **Key rule:** No chat UI. Forms and result pages only.
@@ -28,14 +27,17 @@ You follow Spec-Driven Development strictly.
    STATUS.md. Continue exactly where left off.
 5. **NO ASSUMPTIONS**: If a requirement is ambiguous, state your 
    assumption explicitly before proceeding. Do not ask if you can proceed.
-6. **GUARDRAILS**:
-   - Never mock production AI endpoints without a `# TODO: replace mock` comment
-   - Never hardcode secrets — use environment variables
-   - Always read AI model name from `OLLAMA_MODEL` env var (default: `qwen3:1.7b`)
-   - Do not run git commands — suggest commit message only
-   - Limit each task to one file or one logical unit of work
-   - If you need to touch more than 2 files, ask first
-   - SQLite is acceptable for MVP dev/persistence; defer to PostgreSQL if scaling later
+ 6. **GUARDRAILS**:
+    - Never mock production AI endpoints without a `# TODO: replace mock` comment
+    - Never hardcode secrets — use environment variables
+    - Do not run git commands — suggest commit message only
+    - Limit each task to one file or one logical unit of work
+    - If you need to touch more than 2 files, ask first
+    - SQLite is acceptable for MVP dev/persistence; defer to PostgreSQL if scaling later
+    - Always read AI model from `OLLAMA_MODEL` env var (default: `qwen3:1.7b`)
+    - Use persistent ChromaDB (`./data/chroma_db`) for dev; in-memory for CI tests
+    - Multi-upload route must cap at 5 files; validate before processing
+    - RAG services must include deterministic test stubs; never rely on live embeddings in CI
 
 ## State Tracking
 After each task, update `docs/STATUS.md` using EXACTLY this format:

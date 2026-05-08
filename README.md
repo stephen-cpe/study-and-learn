@@ -8,6 +8,17 @@ A guided, form-driven AI web application that converts uploaded study materials 
 - Ollama (local AI serving)
 - pytest + GitHub Actions (CI/CD)
 
+## Ollama Setup
+
+1. Install Ollama from https://ollama.com/download
+2. Pull required models:
+```bash
+ollama pull qwen3.5:0.8b
+ollama pull gemma4:e2b
+ollama pull qwen3.5:2b
+ollama pull gemma4:e4b
+```
+
 ## Quick Start (Local Development)
 ```bash
 # 1. Clone and enter repo
@@ -17,6 +28,7 @@ cd study-and-learn
 # 2. Create virtual environment
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install --upgrade pip
 
 # 3. Install dependencies
 pip install -r requirements.txt
@@ -30,8 +42,8 @@ pytest -v tests/
 
 ## Links
 - [Public Task Board](https://stephen-cpe.github.io/task-board-v1/)
-- [Deployed App](#) *(coming soon)*
 - [Task Board Repository](https://github.com/stephen-cpe/task-board-v1/)
+- [Deployed App](#) *(coming soon)*
 
 ## License
 MIT — for educational purposes only.
