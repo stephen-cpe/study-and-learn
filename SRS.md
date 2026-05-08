@@ -220,6 +220,31 @@ study-and-learn/
 ├── README.md
 └── run.py
 ```
+## 4.4 AI Model Specification
+| Parameter
+|Value
+|Notes
+|
+| ---|---|---|
+| Serving framework
+|Ollama
+|Local-first, REST API compatible, easy to swap models
+|
+| Default model
+|`qwen3:1.7b` (via `OLLAMA_MODEL` env var)
+|Balances instruction quality, speed, and VRAM usage
+|
+| Fallback models
+|`gemma4:e2b`, `qwen3.5:2b`
+|Available via Ollama if primary model underperforms
+|
+| Testing mode
+|`AI_MOCK=true` returns structured JSON stubs
+|Ensures deterministic CI/CD and removes GPU dependency
+|
+| Deployment target
+|Free-tier host (Render/Railway) + mocked AI or external API
+|Local VRAM models may be swapped for cloud API keys in production
 
 ---
 

@@ -55,6 +55,19 @@ Core workflow:
 
 **Reason:** The capstone MVP depends on end-to-end functionality. Retrieval adds value but also complexity.
 
+### ADR-006: Use Single Small Local Model + Mock Fallback
+**Decision**: All AI services (summary, relevance, study path) will call a single configurable Ollama model (`qwen3:1.7b` by default). CI/testing will use `AI_MOCK=true` to bypass live inference.
+
+**Reason**: 
+- Capstone MVP prioritizes end-to-end reliability over model routing complexity.
+- 2B–3B quantized models run efficiently on target hardware and free-tier constraints.
+- Mock fallback guarantees deterministic test suites and removes flaky GPU dependencies.
+- Single prompt schema across services reduces maintenance and validation overhead.
+
+**Tradeoffs**: 
+- ✅ Simpler architecture, faster demo response, easier to test
+- ❌ Less specialized per-task optimization (deferred to post-MVP)
+
 ---
 
 ## 3. Testing Strategy

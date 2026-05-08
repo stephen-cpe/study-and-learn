@@ -1,11 +1,11 @@
 # STATUS.md
-Last Updated: 2026-05-07
-Sprint: 2
-Last Task Completed: Fixed file upload test failure by ensuring upload directory exists before saving
-Commit Message Suggestion: fix: ensure upload directory exists before saving uploaded files
+Last Updated: 2026-05-08
+Sprint: 3
+Last Task Completed: Fixed PDF/DOCX parsing support and session cookie size issue
+Commit Message Suggestion: fix: add PDF/DOCX parser support and prevent session cookie overflow
 Known Issues: none
 Pending Decisions: none
 Next 3 Tasks:
-  1. Add AI client wrapper for Ollama integration
-  2. Implement summary generation prompt template
-  3. Add relevance checking prompt template
+  1. Polish UI and add demo sample documents
+  2. Prepare final demo script
+  3. Deploy web app for capstone demonstration

@@ -50,6 +50,9 @@ def test_goal_valid_accepted(client):
 
 def test_upload_valid_file(client):
     """Test that uploading a valid file is accepted."""
+    # First, set a learning goal (required for processing)
+    client.post('/goal', data={'learning_goal': 'Learn about testing'}, follow_redirects=True)
+    
     # Create a simple text file for testing
     test_file_content = b'This is a test file.'
     
@@ -59,8 +62,8 @@ def test_upload_valid_file(client):
     }
     response = client.post('/upload', data=data, content_type='multipart/form-data', follow_redirects=True)
     assert response.status_code == 200
-    # Should show success message
-    assert b'test.txt uploaded successfully!' in response.data
+    # Should show success message (now on results page due to processing)
+    assert b'File test.txt processed successfully!' in response.data
 
 
 def test_upload_invalid_extension(client):
