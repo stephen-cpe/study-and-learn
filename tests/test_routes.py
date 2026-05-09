@@ -28,14 +28,17 @@ def test_goal_valid_accepted(client):
     assert response.status_code == 200
     assert b'Learning goal saved successfully!' in response.data
 
-def test_upload_valid_file(client):
-    # 1. Set goal first (required by route)
+def test_upload_valid_file(monkeypatch, client):
+    # 1. Mock AI calls to avoid needing Ollama in CI
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+    # 2. Set goal first (required by route)
     client.post('/goal', data={'learning_goal': 'Learn testing'}, follow_redirects=True)
-    # 2. Correct Flask test client syntax for multi-file list
+    # 3. Correct Flask test client syntax for multi-file list
     data = {'files': [(io.BytesIO(b'Test content'), 'test.txt')]}
     response = client.post('/upload', data=data, content_type='multipart/form-data', follow_redirects=True)
     assert response.status_code == 200
-    # 3. Accept either flash wording
+    # 4. Accept either flash wording
     assert b'Processed' in response.data and b'successfully' in response.data
 
 def test_upload_invalid_extension(client):
