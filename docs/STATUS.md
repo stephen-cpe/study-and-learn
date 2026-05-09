@@ -1,8 +1,8 @@
 # STATUS.md
-Last Updated: 2026-05-08
-Sprint: 3
-Last Task Completed: Applied retro theme from task-board to Flask templates with proper static file organization
-Commit Message Suggestion: feat: apply retro theme with dark cyan color scheme, custom fonts, and scanline effects
+Last Updated: 2026-05-09
+Sprint: 2
+Last Task Completed: Implemented RAG pipeline (chunking, vector storage, retrieval) and multi-file upload (≤5)
+Commit Message Suggestion: feat: finalize RAG integration and multi-file upload pipeline
 Known Issues: none
 Pending Decisions: none
 Next 3 Tasks:

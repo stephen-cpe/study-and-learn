@@ -352,3 +352,17 @@ h2, .section-title {
     border-radius: 12px;
   }
 }
+
+/* ===== MARKDOWN RENDERING FIXES ===== */
+.markdown-content p { margin-bottom: 0.8rem; line-height: 1.65; }
+.markdown-content ul, .markdown-content ol { padding-left: 1.5rem; margin-bottom: 1rem; }
+.markdown-content li { margin-bottom: 0.4rem; }
+.markdown-content strong { color: var(--az-cyan-light); }
+.markdown-content h4, .markdown-content h5 { color: var(--az-cyan); margin: 1rem 0 0.5rem; }
+.markdown-content br { display: block; margin: 0.3rem 0; }
+.raw-md { white-space: pre-wrap; } /* Fallback before JS parses */
+
+/* ===== RELEVANCE LABEL COLOR RESTORATION ===== */
+.card-body h3.relevance-strong { color: var(--az-success) !important; text-shadow: 0 0 8px rgba(126, 231, 135, 0.3); }
+.card-body h3.relevance-partial { color: var(--az-warning) !important; text-shadow: 0 0 8px rgba(255, 209, 102, 0.3); }
+.card-body h3.relevance-weak   { color: var(--az-danger) !important; text-shadow: 0 0 8px rgba(255, 107, 107, 0.3); }

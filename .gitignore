@@ -57,6 +57,7 @@ config/private.py
 uploads/
 data/user_*.json
 data/temp/
+data/chroma_db/
 
 # AI model caches (Ollama, etc.)
 .ollama/

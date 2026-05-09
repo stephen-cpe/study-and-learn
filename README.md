@@ -13,10 +13,8 @@ A guided, form-driven AI web application that converts uploaded study materials 
 1. Install Ollama from https://ollama.com/download
 2. Pull required models:
 ```bash
-ollama pull qwen3.5:0.8b
-ollama pull gemma4:e2b
-ollama pull qwen3.5:2b
-ollama pull gemma4:e4b
+ollama pull qwen3:1.7b
+ollama pull gemma3:4b
 ```
 
 ## Quick Start (Local Development)

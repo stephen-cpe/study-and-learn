@@ -2,50 +2,47 @@
 AI client wrapper for interacting with Ollama or mock responses.
 """
 import os
+import logging
 import requests
 
+# Configure logger
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
 def call_ollama(prompt: str, model: str = None) -> str:
-    """Call Ollama API to generate a response from a prompt.
-    
-    If AI_MOCK environment variable is set to 'true', returns a mock response.
-    
-    Args:
-        prompt (str): The prompt to send to the AI model
-        model (str): The model to use (defaults to OLLAMA_MODEL env var or qwen3:1.7b)
-        
-    Returns:
-        str: The AI-generated response text
-        
-    TODO: replace mock with actual Ollama integration and error handling
-    """
-    # Check if we should use mock
+    """Call Ollama API to generate a response from a prompt."""
     if os.environ.get('AI_MOCK', '').lower() == 'true':
-        # Return a mock response for testing
-        return f"Mock response for prompt: {prompt[:50]}..." if len(prompt) > 50 else f"Mock response for prompt: {prompt}"
-    
-    # Get model from environment variable or use default per SRS
+        logger.info("Using MOCK response")
+        return f"Mock response for prompt: {prompt[:50]}..."
+
     if model is None:
         model = os.environ.get('OLLAMA_MODEL', 'qwen3:1.7b')
-    
-    # Get base URL from environment, default to localhost
+        
     base_url = os.environ.get('OLLAMA_BASE_URL', 'http://localhost:11434')
     url = f"{base_url}/api/generate"
-    
-    # Prepare the payload
+    timeout = int(os.environ.get('OLLAMA_TIMEOUT', '180'))  # Default 3 mins
+
     payload = {
         "model": model,
         "prompt": prompt,
-        "stream": False
+        "stream": False,
+        "options": {"num_ctx": 4096}  # Explicit context window
     }
-    
-    # Make the request
+
+    logger.info(f"Calling Ollama model='{model}' timeout={timeout}s")
     try:
-        response = requests.post(url, json=payload, timeout=120)
+        response = requests.post(url, json=payload, timeout=timeout)
         response.raise_for_status()
         result = response.json()
-        return result.get('response', '')
+        response_text = result.get('response', '')
+        logger.info(f"Ollama success: received {len(response_text)} chars")
+        return response_text
+    except requests.exceptions.Timeout:
+        logger.error(f"Ollama TIMEOUT after {timeout}s for model '{model}'")
+        raise RuntimeError(f"Model '{model}' timed out after {timeout}s. Try pulling it first: ollama pull {model}")
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"Ollama HTTP ERROR: {response.status_code} {response.text}")
+        raise RuntimeError(f"Ollama API error {response.status_code}: {response.text}")
     except requests.exceptions.RequestException as e:
-        # In a real app, we might want to log this and raise a custom exception
-        # For now, we'll return an error message
-        return f"Error calling Ollama: {str(e)}"
+        logger.error(f"Ollama REQUEST ERROR: {str(e)}")
+        raise RuntimeError(f"Failed to reach Ollama at {url}: {str(e)}")

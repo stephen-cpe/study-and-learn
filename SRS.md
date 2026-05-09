@@ -225,7 +225,7 @@ study-and-learn/
 |---|---|---|
 | Serving framework | Ollama | Local-first, REST API compatible |
 | Default model | `qwen3:1.7b` (via `OLLAMA_MODEL` env var) | Efficient instruction-following for capstone demo |
-| Supported small models | `qwen3.5:2b`, `gemma4:e2b`, `lfm2.5-thinking:1.2b`, `granite4.1:3b`, `ministral-3:3b` | Swappable via env var for testing/performance tradeoffs |
+| Supported small models | `gemma3:4b`, `lfm2.5-thinking:1.2b`, `granite4.1:3b` | Swappable via env var for testing/performance tradeoffs |
 | Testing mode | `AI_MOCK=true` returns structured JSON stubs | Ensures deterministic CI/CD without GPU dependency |
 | Multimodal capability | Text + image support deferred to post-MVP | OCR for scanned PDFs remains stretch goal |
 

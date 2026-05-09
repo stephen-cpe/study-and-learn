@@ -55,11 +55,11 @@
             <h2 class="section-title mb-3">Upload Study Materials</h2>
             <form action="{{ url_for('main.upload_file') }}" method="POST" enctype="multipart/form-data">
                 <div class="mb-3">
-                    <label for="file" class="form-label">Choose files to upload</label>
-                    <input class="form-control" type="file" id="file" name="file" accept=".txt,.md,.pdf,.docx">
-                    <div class="form-text">Supported formats: TXT, MD, PDF, DOCX</div>
+                    <label for="files" class="form-label">Choose files to upload</label>
+                    <input class="form-control" type="file" id="files" name="files" accept=".txt,.md,.pdf,.docx" multiple>
+                    <div class="form-text">Supported formats: TXT, MD, PDF, DOCX. Upload up to 5 files.</div>
                 </div>
-                <button type="submit" class="btn btn-success">Upload File</button>
+                <button type="submit" class="btn btn-success">Upload Files</button>
             </form>
         </div>
         

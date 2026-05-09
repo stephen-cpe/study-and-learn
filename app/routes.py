@@ -8,10 +8,12 @@ from app.services.document_parser import extract_text
 from app.services.summarizer import generate_summary
 from app.services.relevance_checker import check_relevance
 from app.services.curriculum_generator import generate_study_path
+from app.services.rag_retriever import build_rag_context
 
 bp = Blueprint('main', __name__)
 
 ALLOWED_EXTENSIONS = {'txt', 'md', 'pdf', 'docx'}
+MAX_FILES = 5
 
 
 @bp.route('/')
@@ -37,68 +39,75 @@ def set_goal():
 
 @bp.route('/upload', methods=['POST'])
 def upload_file():
-    """Handle file upload and process the workflow."""
-    # Check if file was included in the request
-    if 'file' not in request.files:
-        flash('No file part', 'error')
+    """Handle multi-file upload and process the workflow with RAG."""
+    files = request.files.getlist('files')
+    
+    if not files or (len(files) == 1 and files[0].filename == ''):
+        flash('No file selected', 'error')
         return redirect(url_for('main.index'))
     
-    file = request.files['file']
-    
-    # If user does not select file, browser also submits an empty part
-    if file.filename == '':
-        flash('No selected file', 'error')
+    if len(files) > MAX_FILES:
+        flash(f'Maximum {MAX_FILES} files allowed', 'error')
         return redirect(url_for('main.index'))
     
-    # Check if file type is allowed
-    if file and allowed_file(file.filename):
-        # Secure the filename and save file
-        filename = file.filename
-        upload_folder = current_app.config['UPLOAD_FOLDER']
-        # Ensure upload directory exists
-        os.makedirs(upload_folder, exist_ok=True)
-        file_path = os.path.join(upload_folder, filename)
-        file.save(file_path)
-        
-        try:
-            # Retrieve learning goal from session
-            learning_goal = session.get('learning_goal', '')
-            if not learning_goal:
-                flash('Please set a learning goal first', 'error')
+    learning_goal = session.get('learning_goal', '')
+    if not learning_goal:
+        flash('Please set a learning goal first', 'error')
+        return redirect(url_for('main.index'))
+    
+    upload_folder = current_app.config['UPLOAD_FOLDER']
+    os.makedirs(upload_folder, exist_ok=True)
+    
+    extracted_texts = []
+    filenames = []
+    
+    for file in files:
+        if file.filename and allowed_file(file.filename):
+            filename = file.filename
+            file_path = os.path.join(upload_folder, filename)
+            file.save(file_path)
+            
+            try:
+                text = extract_text(file_path)
+                extracted_texts.append(text)
+                filenames.append(filename)
+            except ValueError as e:
+                flash(f'Error extracting {filename}: {str(e)}', 'error')
                 return redirect(url_for('main.index'))
-            
-            # Step 1: Extract text from the uploaded file
-            extracted_text = extract_text(file_path)
-            
-            # Step 2: Generate summary
-            summary = generate_summary(extracted_text)
-            
-            # Step 3: Check relevance
-            relevance_result = check_relevance(learning_goal, extracted_text, summary)
-            
-            # Step 4: Generate study path
-            study_path = generate_study_path(learning_goal, extracted_text, summary)
-            
-            # Store results in session for display on results page
-            # Note: Don't store extracted_text - it can exceed session cookie size limits
-            session['summary'] = summary
-            session['relevance_result'] = relevance_result
-            session['study_path'] = study_path
-            session['processed_filename'] = filename
-            
-            flash(f'File {filename} processed successfully!', 'success')
-            return redirect(url_for('main.results'))
-            
-        except ValueError as e:
-            # Handle specific validation errors from our services
-            flash(f'Processing error: {str(e)}', 'error')
-            return redirect(url_for('main.index'))
-        except Exception as e:
-            # Handle any other unexpected errors
-            flash(f'An unexpected error occurred: {str(e)}', 'error')
-            return redirect(url_for('main.index'))
-    else:
-        flash('Allowed file types are: txt, md, pdf, docx', 'error')
+        else:
+            flash(f'Skipping invalid file type: {file.filename}', 'warning')
+    
+    if not extracted_texts:
+        flash('No valid files to process', 'error')
+        return redirect(url_for('main.index'))
+    
+    try:
+        # Use RAG pipeline to get context from all files
+        rag_context = build_rag_context(learning_goal, extracted_texts)
+        
+        # Fall back to concatenated text if RAG fails
+        if not rag_context:
+            rag_context = "\n\n".join(extracted_texts)
+        
+        # Generate summary using RAG context
+        summary = generate_summary(rag_context)
+        
+        # Check relevance using RAG context
+        relevance_result = check_relevance(learning_goal, rag_context, summary)
+        
+        # Generate study path using RAG context
+        study_path = generate_study_path(learning_goal, rag_context, summary)
+        
+        session['summary'] = summary
+        session['relevance_result'] = relevance_result
+        session['study_path'] = study_path
+        session['processed_filename'] = ', '.join(filenames)
+        
+        flash(f'Processed {len(filenames)} file(s) successfully!', 'success')
+        return redirect(url_for('main.results'))
+        
+    except Exception as e:
+        flash(f'Processing error: {str(e)}', 'error')
         return redirect(url_for('main.index'))
 
 
