@@ -225,6 +225,7 @@ study-and-learn/
 |---|---|---|
 | Serving framework | Ollama | Local-first, REST API compatible |
 | Default model | `qwen3:1.7b` (via `OLLAMA_MODEL` env var) | Efficient instruction-following for capstone demo |
+| Embedding Model | `qwen3-embedding:0.6b` (via `OLLAMA_EMBEDDING_MODEL` env var) | Used exclusively for ChromaDB vector embeddings. Swappable via env var. |
 | Supported small models | `gemma3:4b`, `lfm2.5-thinking:1.2b`, `granite4.1:3b` | Swappable via env var for testing/performance tradeoffs |
 | Testing mode | `AI_MOCK=true` returns structured JSON stubs | Ensures deterministic CI/CD without GPU dependency |
 | Multimodal capability | Text + image support deferred to post-MVP | OCR for scanned PDFs remains stretch goal |
@@ -261,8 +262,8 @@ study-and-learn/
 
 | ID | Requirement | Priority |
 |---|---|---|
-| FR-008 | The system shall chunk, embed, and store extracted text in a local vector database. | Must |
-| FR-009 | The system shall retrieve top-k relevant chunks before passing context to AI services. | Must |
+| FR-008 | The system shall chunk, embed, and store extracted text in a local vector database using OllamaEmbeddings. | Must |
+| FR-009 | The system shall retrieve top-k relevant chunks using goal-aligned similarity search before AI prompt injection. | Must |
 | FR-010 | The system should handle extraction failures gracefully. | Should |
 | FR-011 | The system may support OCR for scanned PDFs. | Could |
 

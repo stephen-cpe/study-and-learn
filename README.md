@@ -15,7 +15,15 @@ A guided, form-driven AI web application that converts uploaded study materials 
 ```bash
 ollama pull qwen3:1.7b
 ollama pull gemma3:4b
+ollama pull qwen3-embedding:0.6b
+ollama pull embeddinggemma:latest
 ```
+
+## Environment Variables
+
+Set these environment variables for model configuration:
+- `OLLAMA_MODEL=qwen3:1.7b` (AI generation model)
+- `OLLAMA_EMBEDDING_MODEL=qwen3-embedding:0.6b` (ChromaDB vector embeddings)
 
 ## Quick Start (Local Development)
 ```bash
@@ -25,8 +33,8 @@ cd study-and-learn
 
 # 2. Create virtual environment
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install --upgrade pip
+venv\Scripts\activate
+python.exe -m pip install --upgrade pip
 
 # 3. Install dependencies
 pip install -r requirements.txt

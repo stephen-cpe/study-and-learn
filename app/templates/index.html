@@ -59,6 +59,10 @@
                     <input class="form-control" type="file" id="files" name="files" accept=".txt,.md,.pdf,.docx" multiple>
                     <div class="form-text">Supported formats: TXT, MD, PDF, DOCX. Upload up to 5 files.</div>
                 </div>
+                
+                <!-- Visual File List -->
+                <ul id="selected-files-list" class="list-unstyled mb-3"></ul>
+                
                 <button type="submit" class="btn btn-success">Upload Files</button>
             </form>
         </div>
@@ -90,9 +94,116 @@
     <!-- Bootstrap 5 JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        document.querySelectorAll('form').forEach(form => {
-            form.addEventListener('submit', function() {
+        document.addEventListener('DOMContentLoaded', () => {
+            const fileInput = document.getElementById('files');
+            const fileList = document.getElementById('selected-files-list');
+            const form = fileInput.closest('form');
+            
+            // Accumulate files in a plain array (not DataTransfer)
+            let selectedFiles = [];
+            const MAX_FILES = 5;
+
+            // Handle file selection
+            fileInput.addEventListener('change', (e) => {
+                const newFiles = Array.from(e.target.files);
+                
+                // Add new files, avoiding duplicates by name+size
+                newFiles.forEach(file => {
+                    const exists = selectedFiles.some(f => f.name === file.name && f.size === file.size);
+                    if (!exists && selectedFiles.length < MAX_FILES) {
+                        selectedFiles.push(file);
+                    }
+                });
+                
+                // Enforce max limit visually
+                if (selectedFiles.length >= MAX_FILES) {
+                    fileInput.disabled = true;
+                    fileInput.title = `Maximum ${MAX_FILES} files reached`;
+                }
+                
+                renderFileList();
+                fileInput.value = ''; // Reset to allow re-selecting same file if removed later
+            });
+
+            // Render visual file list with remove buttons
+            function renderFileList() {
+                fileList.innerHTML = '';
+                if (selectedFiles.length === 0) return;
+
+                selectedFiles.forEach((file, index) => {
+                    const li = document.createElement('li');
+                    li.className = 'file-item d-flex justify-content-between align-items-center p-2 mb-2';
+                    li.innerHTML = `
+                        <span class="text-truncate">📄 ${file.name} <small class="text-muted">(${(file.size / 1024).toFixed(1)} KB)</small></span>
+                        <button type="button" class="btn btn-sm btn-outline-danger ms-2 remove-btn" data-index="${index}">✖</button>
+                    `;
+                    fileList.appendChild(li);
+                });
+
+                // Attach remove handlers
+                document.querySelectorAll('.remove-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const idx = parseInt(e.currentTarget.dataset.index);
+                        selectedFiles.splice(idx, 1);
+                        
+                        // Re-enable input if under limit
+                        if (selectedFiles.length < MAX_FILES) {
+                            fileInput.disabled = false;
+                            fileInput.title = '';
+                        }
+                        renderFileList();
+                    });
+                });
+            }
+
+            // Intercept form submission
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                if (selectedFiles.length === 0) {
+                    // Trigger native browser validation or show custom message
+                    fileInput.reportValidity?.();
+                    return;
+                }
+
+                // Show loading spinner
                 document.getElementById('loadingOverlay').classList.add('active');
+
+                try {
+                    // Build FormData manually
+                    const formData = new FormData();
+                    selectedFiles.forEach(file => {
+                        formData.append('files', file);
+                    });
+                    
+                    // Add learning goal if present in session (via hidden input or fetch from page)
+                    const goalInput = document.getElementById('learning_goal');
+                    if (goalInput?.value) {
+                        // We need to ensure goal is set in session first - rely on existing /goal route
+                        // The /upload route checks session['learning_goal'], so we just submit files
+                    }
+
+                    // Submit via fetch
+                    const response = await fetch(form.action, {
+                        method: 'POST',
+                        body: formData,
+                        // Let Flask handle CSRF if enabled; for dev, WTF_CSRF_ENABLED=False in tests
+                    });
+
+                    // Handle redirect: Flask returns 302, check if fetch followed it
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                        return;
+                    }
+                    
+                    // Fallback: reload to show flash messages
+                    window.location.reload();
+                    
+                } catch (error) {
+                    console.error('Upload error:', error);
+                    alert('Upload failed. Please try again.');
+                    document.getElementById('loadingOverlay').classList.remove('active');
+                }
             });
         });
     </script>

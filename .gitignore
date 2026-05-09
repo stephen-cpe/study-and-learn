@@ -82,3 +82,6 @@ task-board-v1/dist/
 # Local status / debug
 docs/STATUS.md.local
 *.log
+
+# Others
+*.bak

@@ -1,10 +1,13 @@
 """
 RAG retriever orchestrator service.
 """
+import logging
 import uuid
 from typing import List
 from app.services.chunker import chunk_text
 from app.services.vector_store import store_chunks, retrieve_context
+
+logger = logging.getLogger(__name__)
 
 
 def build_rag_context(goal: str, files_data: List[str]) -> str:
@@ -32,8 +35,10 @@ def build_rag_context(goal: str, files_data: List[str]) -> str:
     
     collection_name = f"study_{uuid.uuid4().hex[:8]}"
     
-    store_chunks(all_chunks, collection_name)
-    
-    context = retrieve_context(goal, collection_name, top_k=5)
-    
-    return context
+    try:
+        store_chunks(all_chunks, collection_name)
+        context = retrieve_context(goal, collection_name, top_k=5)
+        return context
+    except Exception as e:
+        logger.warning("RAG pipeline failed, falling back to concatenated text: %s", str(e))
+        return ""

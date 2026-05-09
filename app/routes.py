@@ -41,12 +41,15 @@ def set_goal():
 def upload_file():
     """Handle multi-file upload and process the workflow with RAG."""
     files = request.files.getlist('files')
-    
-    if not files or (len(files) == 1 and files[0].filename == ''):
-        flash('No file selected', 'error')
+
+    # Robust empty check: filter out empty filenames
+    valid_files = [f for f in files if f and f.filename and f.filename.strip()]
+
+    if not valid_files:
+        flash('No valid files selected', 'error')
         return redirect(url_for('main.index'))
-    
-    if len(files) > MAX_FILES:
+
+    if len(valid_files) > MAX_FILES:
         flash(f'Maximum {MAX_FILES} files allowed', 'error')
         return redirect(url_for('main.index'))
     

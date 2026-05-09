@@ -64,6 +64,10 @@ Core workflow:
 **Decision:** All AI services call one model via `OLLAMA_MODEL` env var (default: `qwen3:1.7b`). CI/testing uses `AI_MOCK=true`.
 **Reason:** Capstone MVP prioritizes reliability over model routing complexity. 1B–3B models run efficiently on target hardware. Mock fallback guarantees deterministic tests.
 
+### ADR-008: Dual Ollama Model Strategy (Chat + Embeddings)
+**Decision:** Chat uses `OLLAMA_MODEL` (default: qwen3:1.7b), Embeddings use `OLLAMA_EMBEDDING_MODEL` (default: qwen3-embedding:0.6b).
+**Reason:** Chat models don't support /api/embed. Separation prevents 501 errors and allows independent tuning of generation vs retrieval models.
+
 ---
 
 ## 3. Software & Architectural Patterns
@@ -77,18 +81,19 @@ Core workflow:
 ## 3. Testing Strategy
 
 ### Unit Tests
-
-Unit tests will cover isolated logic:
-- allowed file type validation,
-- parser selection,
-- parser error handling,
-- prompt construction,
-- relevance label parsing,
-- curriculum output parsing.
-- LangChain text splitter output validation
-- ChromaDB collection creation & persistence checks
-- Similarity search context builder accuracy
-- Multi-file upload session & cookie size limits
+    Unit tests will cover isolated logic:
+    - allowed file type validation,
+    - parser selection,
+    - parser error handling,
+    - prompt construction,
+    - relevance label parsing,
+    - curriculum output parsing.
+    - LangChain text splitter output validation
+    - ChromaDB collection creation & persistence checks
+    - ChromaDB uses EphemeralClient when CI=true, PersistentClient otherwise
+    - Similarity search context builder accuracy
+    - Multi-file upload session & cookie size limits
+    - AI calls mocked via AI_MOCK=true
 
 ### Integration Tests
 

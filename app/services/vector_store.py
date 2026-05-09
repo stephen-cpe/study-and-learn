@@ -1,8 +1,11 @@
 """
 Vector store service using ChromaDB.
 """
+import logging
 import os
 from typing import List
+
+logger = logging.getLogger(__name__)
 
 
 def get_chroma_client():
@@ -39,8 +42,8 @@ def store_chunks(chunks: List[str], collection_name: str) -> str:
     try:
         collection = client.get_or_create_collection(name=collection_name)
         
-        from langchain_community.embeddings import OllamaEmbeddings
-        embedding_model = OllamaEmbeddings(model=os.environ.get('OLLAMA_MODEL', 'qwen3:1.7b'))
+        from langchain_ollama import OllamaEmbeddings
+        embedding_model = OllamaEmbeddings(model=os.environ.get('OLLAMA_EMBEDDING_MODEL', 'qwen3-embedding:0.6b'))
         
         embeddings = embedding_model.embed_documents(chunks)
         
@@ -49,7 +52,8 @@ def store_chunks(chunks: List[str], collection_name: str) -> str:
         
         return f"Stored {len(chunks)} chunks in collection '{collection_name}'"
     except Exception as e:
-        return f"Error storing chunks: {str(e)}"
+        logger.error("Failed to store chunks: %s", str(e))
+        raise
 
 
 def retrieve_context(query: str, collection_name: str, top_k: int = 5) -> str:
@@ -68,8 +72,8 @@ def retrieve_context(query: str, collection_name: str, top_k: int = 5) -> str:
     try:
         collection = client.get_or_create_collection(name=collection_name)
         
-        from langchain_community.embeddings import OllamaEmbeddings
-        embedding_model = OllamaEmbeddings(model=os.environ.get('OLLAMA_MODEL', 'qwen3:1.7b'))
+        from langchain_ollama import OllamaEmbeddings
+        embedding_model = OllamaEmbeddings(model=os.environ.get('OLLAMA_EMBEDDING_MODEL', 'qwen3-embedding:0.6b'))
         
         query_embedding = embedding_model.embed_query(query)
         
@@ -83,4 +87,5 @@ def retrieve_context(query: str, collection_name: str, top_k: int = 5) -> str:
             return "\n\n".join(retrieved_docs)
         return ""
     except Exception as e:
-        return f"Error retrieving context: {str(e)}"
+        logger.error("Failed to retrieve context: %s", str(e))
+        raise
