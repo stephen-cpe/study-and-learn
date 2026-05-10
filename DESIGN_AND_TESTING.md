@@ -13,30 +13,30 @@ Study-and-Learn is a Flask web application with a Bootstrap-and-retro-CSS fronte
 
 ```mermaid
 flowchart TD
-    A[Unified Form: Goal + Files] --> B[/process Route]
-    B --> C[Document Parser: txt, md, pdf, docx]
-    C --> D[Chunker: RecursiveCharacterTextSplitter]
-    D --> E[Vector Store: ChromaDB + OllamaEmbeddings]
-    E --> F[RAG Retriever: top-k=5 context]
-    F --> G[Summarizer]
-    F --> H[Relevance Checker]
-    F --> I[Curriculum Generator]
-    G --> J[results.html: Summary, Relevance, Study Path]
+    A["Unified Form: Goal + Files"] --> B["POST /process Route"]
+    B --> C["Document Parser: .txt, .md, .pdf, .docx"]
+    C --> D["Chunker: RecursiveCharacterTextSplitter"]
+    D --> E["Vector Store: ChromaDB + OllamaEmbeddings"]
+    E --> F["RAG Retriever: top-k=5 context"]
+    F --> G["Summarizer"]
+    F --> H["Relevance Checker"]
+    F --> I["Curriculum Generator"]
+    G --> J["results.html: Summary, Relevance, Study Path"]
     H --> J
     I --> J
-    J --> K{"Generate Interactive Lessons"}
-    K --> L[Lesson Generator: slides JSON]
-    K --> M[Quiz Generator: questions + checkpoints]
-    L --> N[lessons.html: Module Grid with Gating]
+    J --> K{"Generate Interactive Lessons?"}
+    K --> L["Lesson Generator: slides JSON"]
+    K --> M["Quiz Generator: questions + checkpoints"]
+    L --> N["lessons.html: Module Grid with Gating"]
     M --> N
-    N --> O[lesson_deck.html: Custom Slide Deck]
-    O --> P[Inline Checkpoints: block advance]
-    O --> Q[Final Quiz: 4 question types]
-    Q --> R[POST /grade: AJAX, instant feedback]
-    R --> S[Results Slide: score, pass/fail]
-    S --> T{Passed >= 80%?}
-    T -->|Yes| U[Unlock Next Module]
-    T -->|No| V[Retake: Regenerate Quiz]
+    N --> O["lesson_deck.html: Custom Slide Deck"]
+    O --> P["Inline Checkpoints: block advance"]
+    O --> Q["Final Quiz: 4 question types"]
+    Q --> R["POST /grade: AJAX, instant feedback"]
+    R --> S["Results Slide: score, pass/fail"]
+    S --> T{"Score >= 80%?"}
+    T -->|Yes| U["Unlock Next Module"]
+    T -->|No| V["Retake: Regenerate Quiz"]
     V --> O
 ```
 
