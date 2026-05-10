@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Study-and-Learn Results</title>
+    <title>Analysis Results — Study-and-Learn</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logo-v2.png') }}">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/retro.css') }}">
@@ -19,7 +19,7 @@
         </div>
     </nav>
     <div class="container">
-        <h1 class="mt-4">Study-and-Learn Results</h1>
+        <h1 class="mt-4">Analysis Results</h1>
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
         {% for category, message in messages %}
@@ -31,54 +31,82 @@
         {% endif %}
         {% endwith %}
 
-        <div class="mb-3">
-            <span class="badge filename-badge">Processing: {{ filename }}</span>
+        <div class="results-meta mb-4">
+            <span class="badge filename-badge">Files: {{ filename }}</span>
+            <span class="badge goal-badge">{{ learning_goal }}</span>
         </div>
 
-        <!-- Summary Card -->
-        <div class="card">
-            <div class="card-header"><h2 class="mb-0">Summary</h2></div>
-            <div class="card-body markdown-content">
-                <div id="summary-content" class="raw-md">{{ summary }}</div>
-            </div>
-        </div>
-
-        <!-- Relevance Card -->
-        <div class="card">
-            <div class="card-header"><h2 class="mb-0">Relevance Check</h2></div>
-            <div class="card-body">
-                {% set rel_label = (relevance_result.relevance_label|default('partial')|trim|lower).split(' ')[0] %}
-                <h3 class="relevance-{{ rel_label }}">
-                    {{ relevance_result.relevance_label|capitalize }} Match
-                </h3>
-                <p class="mt-3"><strong>Explanation:</strong></p>
-                <div id="relevance-content" class="raw-md markdown-content">{{ relevance_result.explanation }}</div>
-                {% if relevance_result.missing_material and relevance_result.missing_material|lower != 'none' %}
-                <p class="mt-2"><strong>Missing Material:</strong> {{ relevance_result.missing_material }}</p>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Study Path Card -->
-        <div class="card">
-            <div class="card-header"><h2 class="mb-0">Recommended Study Path</h2></div>
-            <div class="card-body">
-                {% if study_path.modules %}
-                {% for module in study_path.modules %}
-                <div class="module-item">
-                    <h5><span class="module-title raw-md">{{ module.title }}</span></h5>
-                    <p><strong>Estimated Effort:</strong> {{ module.estimated_effort }}</p>
+        <div class="results-grid">
+            <div class="card results-card-summary">
+                <div class="card-header">
+                    <h2 class="mb-0">Document Summary</h2>
                 </div>
-                {% endfor %}
-                {% else %}
-                <p>No study path generated.</p>
-                {% endif %}
+                <div class="card-body markdown-content">
+                    <div id="summary-content" class="raw-md">{{ summary }}</div>
+                </div>
+            </div>
+
+            <div class="card results-card-relevance">
+                <div class="card-header">
+                    <h2 class="mb-0">Relevance Check</h2>
+                </div>
+                <div class="card-body">
+                    {% set rel_label = (relevance_result.relevance_label|default('partial')|trim|lower).split(' ')[0] %}
+                    <div class="relevance-indicator relevance-{{ rel_label }}">
+                        <span class="relevance-dot"></span>
+                        <h3>{{ relevance_result.relevance_label|capitalize }} Match</h3>
+                    </div>
+                    <div class="relevance-details">
+                        <div class="relevance-section">
+                            <h4>Explanation</h4>
+                            <div id="relevance-content" class="raw-md markdown-content">{{ relevance_result.explanation }}</div>
+                        </div>
+                        {% if relevance_result.missing_material and relevance_result.missing_material|lower != 'none' %}
+                        <div class="relevance-section">
+                            <h4>Suggested Materials</h4>
+                            <p>{{ relevance_result.missing_material }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="card results-card-path">
+                <div class="card-header">
+                    <h2 class="mb-0">Recommended Study Path</h2>
+                </div>
+                <div class="card-body">
+                    {% if study_path.modules %}
+                    <div class="module-timeline">
+                    {% for module in study_path.modules %}
+                    <div class="module-timeline-item">
+                        <div class="module-number">{{ loop.index }}</div>
+                        <div class="module-item-enhanced">
+                            <h5><span class="module-title raw-md">{{ module.title }}</span></h5>
+                            <span class="module-effort">{{ module.estimated_effort }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No study path generated.</p>
+                    {% endif %}
+
+                    <div class="generate-lessons-section mt-4">
+                        <div class="d-grid">
+                            <button id="generate-lessons-btn" class="btn btn-accent btn-lg">
+                                Generate Interactive Lessons
+                            </button>
+                        </div>
+                        <div class="generate-info">Creates slide-based lessons with quizzes and checkpoints</div>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <div class="d-grid gap-2 d-md-flex justify-content-md-end mb-4">
+        <div class="action-buttons mb-4">
             <a href="{{ url_for('main.reset') }}" class="btn btn-outline-primary">Start Over</a>
-            <a href="{{ url_for('main.index') }}" class="btn btn-primary">Process Another File</a>
+            <a href="{{ url_for('main.index') }}" class="btn btn-primary">Process New Materials</a>
         </div>
     </div>
 
@@ -86,11 +114,18 @@
         <div class="container"><span>© 2026 Study-and-Learn Capstone Project</span></div>
     </footer>
 
+    <div class="spinner-overlay" id="loadingOverlay">
+        <div class="spinner-border" role="status" style="width: 4rem; height: 4rem;">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <div class="spinner-text">Generating lessons... This may take a few minutes...</div>
+        <div class="spinner-subtext" id="progress-text"></div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Configure marked to handle single newlines as <br> and parse safely
             marked.setOptions({ breaks: true, gfm: true });
 
             function parseMarkdown(elementId) {
@@ -107,6 +142,21 @@
                 el.innerHTML = marked.parse(el.innerText);
                 el.classList.remove('raw-md');
             });
+
+            const generateBtn = document.getElementById('generate-lessons-btn');
+            if (generateBtn) {
+                generateBtn.addEventListener('click', function() {
+                    document.getElementById('loadingOverlay').classList.add('active');
+                    document.getElementById('progress-text').textContent =
+                        'Generating lesson content, quizzes, and checkpoints...';
+
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = "{{ url_for('main.generate_lessons') }}";
+                    document.body.appendChild(form);
+                    form.submit();
+                });
+            }
         });
     </script>
 </body>

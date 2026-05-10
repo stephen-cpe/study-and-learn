@@ -1,11 +1,12 @@
 # Software Requirements Specification (SRS)
 # Study-and-Learn
 
-**Version:** 1.0-draft  
+**Version:** 1.1  
 **Project type:** AI-assisted learning web application  
 **Capstone track:** Software system / AI system  
 **Repository name:** `study-and-learn`  
-**Primary development approach:** Spec-Driven Development with AI tooling support
+**Primary development approach:** Spec-Driven Development with AI tooling support  
+**Last updated:** May 2026
 
 ---
 
@@ -35,16 +36,17 @@ The product should feel simple, fun, addicting, guided, motivating, and approach
 
 The MVP is a web application that allows a learner or admin user to:
 
-1. enter a learning goal,
+1. enter a learning goal and upload documents in a single unified form,
 2. upload one or more supported study documents,
-3. extract text from those documents, if time permits, do an OCR as well for complete understanding of the documents.
-4. generate an AI-assisted lessons with summary at the end,
-5. make sure lessons are properly cited based on the materials and documents so the learner could verify by reading and reviewing the documents.
-5. check whether the uploaded documents match the learning goal.
-6. generate a structured study path.
-7. generate questions, tests, and quizzes to test learner's understanding.
-8. view the results in a guided web interface.
-9. check if learner wants to do the lessons again until they are satisfied with their progress
+3. extract text from those documents, if time permits, do an OCR as well for the documents,
+4. generate an AI-assisted summary, relevance check, and recommended study path,
+5. generate interactive slide-based lessons with inline comprehension checkpoints,
+6. generate mixed-type quizzes (multiple choice, true/false, multi-select, fill-in-the-blank) per module,
+7. take quizzes and receive instant grading with per-question feedback,
+8. retake lessons with freshly regenerated questions to avoid memorization,
+9. progress through gated modules (must pass module N to unlock N+1),
+10. view all results in a retro-themed guided web interface,
+11. check if learner wants to do the lessons again until they are satisfied with their progress
 
 The MVP will **not** use a chat interface. The user interacts primarily through forms, buttons, and structured result pages.
 
@@ -301,10 +303,26 @@ study-and-learn/
 | FR-024 | The system shall provide a web-based UI. | Must |
 | FR-025 | The MVP shall avoid a chat interface. | Must |
 | FR-026 | The UI shall guide the user through goal input, upload, analysis, and results. | Must |
-| FR-027 | The UI should use a retro-inspired visual style. | Should |
-| FR-028 | The UI may include a pixel companion or mascot. | Could |
+| FR-027 | The UI should use a retro-inspired visual style with custom pixel fonts. | Should |
+| FR-028 | The UI may include a pixel companion or mascot with simple idle/waiting/done animations. | Could |
+| FR-032 | The system shall combine learning goal entry and file upload into a single unified form submission. | Must |
+| FR-033 | The system should display processing progress feedback during long-running AI operations. | Should |
 
-### 5.8 Admin / Editing Features
+### 5.8 Interactive Lessons
+
+| ID | Requirement | Priority |
+|---|---|---|
+| FR-034 | The system shall generate structured slide-based lesson content for each module in the study path. | Must |
+| FR-035 | The system shall generate mixed-type quizzes per module supporting mcq, true_false, multi_select, and fill_blank question types. | Must |
+| FR-036 | The system shall insert inline comprehension checkpoints at regular intervals within lesson slides. | Must |
+| FR-037 | The system shall grade quiz answers instantly and return per-question correct/incorrect feedback with explanations. | Must |
+| FR-038 | The system shall regenerate fresh questions on lesson retake to prevent answer memorization. | Must |
+| FR-039 | The system shall gate module progression so the learner must pass module N before accessing module N+1. | Must |
+| FR-040 | The system shall enforce an 80% pass threshold for module completion with a pass/fail verdict. | Must |
+| FR-041 | The system should support a difficulty level selector (Easy/Moderate/Hard) mapped to age-appropriate content complexity. | Should |
+| FR-042 | The system shall present lessons via a custom CSS/JS slide-deck engine styled with retro fonts and cyberpunk visuals. | Must |
+
+### 5.9 Admin / Editing Features
 
 | ID | Requirement | Priority |
 |---|---|---|
@@ -393,15 +411,26 @@ study-and-learn/
 | US-010 | As a learner, I want to know whether my documents match my goal. | App displays strong/partial/weak relevance result with explanation |
 | US-011 | As a learner, I want a structured study path so I know what to study next. | App displays ordered modules/lessons with estimated effort |
 
-### Epic 5: UX and Demo Polish
+### Epic 5: Interactive Lessons
 
 | Story ID | User Story | Acceptance Criteria |
 |---|---|---|
-| US-012 | As a learner, I want the app to feel simple and guided. | UI has clear step-by-step flow |
-| US-013 | As a learner, I want the product to feel friendly and motivating. | Retro theme is visible and not distracting |
-| US-014 | As a reviewer, I want the demo to show the full workflow. | Demo data and script cover goal input → upload → summary → relevance → study path |
-| US-015 | As a learner, I want to upload up to 5 documents at once so I can analyze related materials together. | Multi-file route accepts max 5 files; chunks stored in ChromaDB |
-| US-016 | As a learner, I want AI analysis based on retrieved document chunks so outputs stay grounded and accurate. | AI prompts use top-k retrieved context; fallback to mock in CI |
+| US-012 | As a learner, I want to generate interactive lessons from my study path so I can learn in a structured way. | "Generate Interactive Lessons" button triggers slide + quiz generation; loading indicator shown |
+| US-013 | As a learner, I want lessons presented as slides with retro fonts and visual styling. | Custom slide-deck renders title/content/example/summary slide types with Retrograde Bold and BoldPixels fonts |
+| US-014 | As a learner, I want comprehension checkpoints during my lesson so I stay engaged. | Inline checkpoint slides appear every N slides with a multiple-choice question; advance blocked until answered |
+| US-015 | As a learner, I want a final quiz at the end of each module to test my understanding. | 5 mixed-type questions (mcq, true_false, multi_select, fill_blank); instant grading with per-question feedback |
+| US-016 | As a learner, I want to retake a failed module with fresh questions to improve my score. | Retake regenerates quiz; 80% threshold required to pass and unlock next module |
+| US-017 | As a learner, I want modules gated so I must master one before moving to the next. | Module N+1 locked until module N passed (≥80%); progress bar shown on module listing |
+
+### Epic 6: UX, Polish, and Retro Experience
+
+| Story ID | User Story | Acceptance Criteria |
+|---|---|---|
+| US-018 | As a learner, I want the app to feel simple, guided, and retro-themed. | Unified form; retro fonts applied consistently; cyberpunk visual identity maintained |
+| US-019 | As a learner, I want a retro mascot that provides simple visual feedback during my learning journey. | Mascot image displayed with idle/waiting/done states; animations or frames for key moments |
+| US-020 | As a learner, I want clear progress feedback during long AI operations so I know the app is working. | Background processing with visible progress bar or stage indicator instead of full-screen overlay |
+| US-021 | As a learner, I want the quality of generated lessons and quizzes to be acceptable for high-school to college-level material. | Prompt engineering refined; model research conducted for optimal quality/speed tradeoff on target hardware |
+| US-022 | As a learner, I want a difficulty toggle so content matches my age and skill level. | Easy (10–11), Moderate (12–13), Hard (14–15) difficulty options; prompt adjusted accordingly |
 
 ---
 
@@ -410,73 +439,96 @@ study-and-learn/
 ### 8.1 Must-Have MVP
 
 - Flask app skeleton.
-- Bootstrap UI.
-- Learning goal form.
-- Document upload.
+- Bootstrap UI + custom retro CSS theme.
+- Unified learning goal + document upload form (single submission).
 - File type validation.
-- Text extraction for at least `.txt`, `.md`, `.pdf`, and `.docx`.
-- AI summary generation through Ollama or a replaceable AI client.
-- Relevance check.
-- Study path generation.
-- Results page.
-- Basic persistence for uploaded metadata and generated outputs.
-- pytest test suite.
+- Text extraction for `.txt`, `.md`, `.pdf`, and `.docx`.
+- Retrieval-Augmented Generation (RAG) pipeline (ChromaDB persistent vector store).
+- Multi-file upload (≤5).
+- AI summary generation through Ollama.
+- Relevance check (strong/partial/weak).
+- Study path generation (sequenced modules with effort estimates).
+- Interactive slide-based lesson generation per module.
+- Mixed-type quiz generation per module (mcq, true_false, multi_select, fill_blank).
+- Inline comprehension checkpoints within lessons.
+- Instant quiz grading with per-question feedback.
+- Retake functionality with fresh question regeneration.
+- Gated module progression (80% pass threshold).
+- Results page with improved visual hierarchy.
+- Lesson listing page with progress bar.
+- Server-side session storage (Flask-Session + cachelib).
+- Custom CSS/JS slide-deck engine (retro-themed).
+- pytest test suite (45 tests).
 - GitHub Actions test workflow.
 - Static public task board.
 - Design and testing document.
-- Retrieval-Augmented Generation (RAG) pipeline.
-- Multi-file upload (≤5)
-- Vector storage (ChromaDB)
 
 ### 8.2 Should-Have MVP Polish
 
-- Retro visual theme.
-- Simple mascot/companion graphic or placeholder.
+- Retro mascot/companion with idle/waiting/done animation frames.
+- Loading progress indicators showing current stage during AI operations.
+- Difficulty level selector (Easy/Moderate/Hard) mapped to age groups.
+- Model performance research for optimal quality/speed on target hardware.
 - Upload status messages.
-- Generated output formatting.
+- Generated output formatting and markdown rendering.
 - Demo seed files.
 - Error handling for AI/model unavailable.
-- Basic smoke tests.
+- Responsive mobile layout for slide deck.
 
 ### 8.3 Not Official MVP / Stretch
 
-- Quizzes.
-- Progress tracking.
+- OCR for scanned PDFs.
 - YouTube integration.
-- AI-generated slides.
 - AI-generated TTS narration.
-- Full OCR for scanned PDFs.
-- Adaptive difficulty by age group.
-- Multi-user accounts.
-- Rich companion behavior.
-- Export to PDF or presentation.
+- Export to PDF, PPTX, or SCORM.
+- Short-answer (free-text) AI grading.
+- Adaptive difficulty based on learner performance.
+- Spaced repetition and review scheduling.
+- Multi-user accounts and authentication.
+- Rich companion behavior and interactive mascot.
+- Admin content management workflow.
+- Persistent progress tracking across sessions.
 
 ---
 
 ## 9. Scope-Creep Ladder
 
-Ranked from easier to harder:
+Ranked from easier to harder. Items above the line are implemented; items below are candidates for future sprints.
 
-1. Static mascot image or pixel avatar.
-2. Retro theme improvements.
-3. Better prompt templates.
-4. Editable generated output fields.
-5. Simple quiz generation.
-6. Basic progress checklist.
-7. Export generated plan as Markdown.
-8. Export generated plan as HTML.
-9. Admin review/edit screen.
-10. Simple slide-style lesson pages.
-11. More file formats and robust parsing.
-12. Embeddings/retrieval with pgvector or ChromaDB.
-13. OCR for scanned PDFs.
-14. Learner profile / difficulty level adaptation.
-15. YouTube or external resource integration.
-16. AI-generated presentation deck.
-17. AI-generated subtitles.
-18. AI-generated TTS narration.
-19. Full adaptive study planner.
-20. Multi-user accounts and authentication.
+### ✅ Implemented
+1. Static mascot image or pixel avatar — done
+2. Retro theme improvements — done (Retrograde Bold, BoldPixels fonts, cyberpunk theme)
+3. Better prompt templates — done
+4. Simple quiz generation — done (4 question types: mcq, true_false, multi_select, fill_blank)
+5. Slide-style lesson pages — done (custom CSS/JS deck engine with inline checkpoints)
+6. Retro mascot integration — image placeholder ready (`mascot-robot.png`)
+7. Loading/progress UI — full-screen spinner implemented; needs incremental improvement
+8. Gated module progression with pass/fail — done (80% threshold)
+9. Retake with regenerated questions — done
+10. Server-side session storage — done (Flask-Session + cachelib FileSystemCache)
+
+### Upcoming
+11. Better mascot animation frames (idle/waiting/done states)
+12. Editable generated output fields
+13. Basic progress checklist
+14. Difficulty level selector (Easy/Moderate/Hard)
+15. Export generated plan as Markdown
+16. Export generated plan as HTML
+17. Admin review/edit screen
+18. More file formats and robust parsing (.html, .odt)
+19. Embeddings/retrieval model optimization research
+20. Lesson quality improvement (prompt engineering, model evaluation)
+21. Progressive loading UI (background processing with stage indicators)
+22. OCR for scanned PDFs
+23. Learner profile / difficulty level adaptation
+24. YouTube or external resource integration
+25. AI-generated presentation deck export
+26. AI-generated subtitles
+27. AI-generated TTS narration
+28. Short-answer (free-text) AI grading
+29. Spaced repetition and review scheduling
+30. Full adaptive study planner
+31. Multi-user accounts and authentication
 
 ---
 
@@ -535,13 +587,16 @@ Later additions:
 
 ## 12. Open Questions
 
-1. Should the first prototype use pgvector or ChromaDB?
-2. Which Ollama model gives acceptable local results on the target hardware?
-3. How many file types should be truly supported in the first sprint?
-4. Should OCR be postponed until after the main workflow works?
-5. Should generated outputs be stored as JSON, Markdown, or database records?
-6. Should the companion be purely visual or tied to progress?
-7. Which deployment platform is easiest for the final capstone demo?
+1. ~~Should the first prototype use pgvector or ChromaDB?~~ → **ChromaDB** (chosen, implemented)
+2. ~~Which Ollama model gives acceptable local results on the target hardware?~~ → **qwen3:1.7b (chat) + qwen3-embedding:0.6b (embeddings)** (chosen, implemented)
+3. ~~How many file types should be truly supported in the first sprint?~~ → **txt, md, pdf, docx** (implemented)
+4. ~~Should OCR be postponed until after the main workflow works?~~ → **Postponed** to post-MVP
+5. ~~Should generated outputs be stored as JSON, Markdown, or database records?~~ → **JSON in Flask session (server-side via cachelib)**
+6. Should the companion be purely visual or tied to progress? → Visual feedback with idle/waiting/done states planned for next sprint
+7. ~~Which deployment platform is easiest for the final capstone demo?~~ → Render or Railway free tier TBD in Sprint 4
+8. What is the optimal model for lesson/quiz generation quality vs speed on 6GB VRAM? → Research task for next sprint
+9. Should loading UI use full-screen overlay or background processing with stage indicator? → Background processing with progress bar preferred (next sprint)
+10. How many mascot animation frames are needed for adequate visual feedback? → TBD after frame generation
 
 ---
 

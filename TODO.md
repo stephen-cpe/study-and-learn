@@ -1,17 +1,16 @@
 # TODO / Product Backlog
 # Study-and-Learn
 
-**Purpose:** This document organizes the capstone work into MVP tasks, user stories, sprints, stretch goals, and submission requirements.
+**Purpose:** This document organizes the capstone work into MVP tasks, user stories, sprints, stretch goals, and submission requirements.  
+**Last updated:** May 2026
 
 ---
 
 ## 0. Guiding Rule
 
-Build the smallest working version first:
+Build the smallest working version first, then iterate:
 
-> Learning goal → document upload → text extraction → summary → relevance check → study path → results page.
-
-Everything else is secondary until this workflow works end-to-end.
+> Goal + upload → parse → chunk → embed → retrieve → summary → relevance → study path → **generate lessons** → **interactive slide deck** → **quiz + grade** → **retake** → results.
 
 ---
 
@@ -32,366 +31,278 @@ Everything else is secondary until this workflow works end-to-end.
 - [x] Add first basic pytest test
 - [x] Add GitHub Actions workflow for tests
 
-### Suggested Acceptance Criteria
-
-- App can run locally.
-- Tests run locally with `pytest -v tests/`.
-- GitHub Actions runs tests on push or pull request.
-- Documentation files exist in the repository.
-
 ---
 
 ## 2. Public Static Task Board
-
-### Must Do
 
 - [x] Create `task-board/` folder
 - [x] Create `task-board/index.html`
 - [x] Create `task-board/styles.css`
 - [x] Create `task-board/app.js`
-- [x] Add project overview section
-- [x] Add sprint summary section
-- [x] Add user stories table
-- [x] Add task status columns
-- [x] Add capstone deliverables checklist
 - [x] Publish via GitHub Pages
 - [x] Add public task board link to `README.md`
-
-### Suggested Acceptance Criteria
-
-- Task board is publicly viewable.
-- Board shows sprint progress.
-- Board shows user stories and task status.
-- Board is simple enough to update manually.
 
 ---
 
 ## 3. Sprint Plan
 
-## Sprint 1: Foundation and Upload Workflow
+### Sprint 1: Foundation and Upload Workflow ✅ COMPLETE
 
-### Goal
+**Goal:** Create the basic app foundation and let a user enter a learning goal and upload documents.
 
-Create the basic app foundation and let a user enter a learning goal and upload documents.
+**User Stories:** US-001, US-002, US-003, US-004, US-005, US-006
 
-### User Stories
-
-- US-001: Developer can run the app locally.
-- US-002: CI runs basic automated tests.
-- US-003: Reviewer can view public task board.
-- US-004: Learner can enter a learning goal.
-- US-005: Learner can upload study materials.
-- US-006: Learner can see upload status.
-
-### Tasks
-
-- [ ] Build Flask project structure
-- [ ] Add homepage
-- [ ] Add learning goal input form
-- [ ] Add document upload form
-- [ ] Add file type validation
-- [ ] Add upload storage folder
-- [ ] Add upload metadata handling
-- [ ] Add success/error flash messages
-- [ ] Add Bootstrap layout
-- [ ] Add initial retro styling
-- [ ] Add unit tests for file validation
-- [ ] Add smoke test for homepage
-- [ ] Update task board
-- [ ] Record short sprint demo for internal review
-
-### Sprint 1 Definition of Done
-
-- App runs locally.
-- User can enter a goal.
-- User can upload supported file types.
-- Unsupported files are rejected.
-- Basic tests pass.
-- Static task board is published or ready to publish.
+**Tasks:**
+- [x] Build Flask project structure
+- [x] Add homepage
+- [x] Add learning goal input form
+- [x] Add document upload form
+- [x] Add file type validation
+- [x] Add upload storage folder
+- [x] Add success/error flash messages
+- [x] Add Bootstrap layout
+- [x] Add initial retro styling (cyberpunk theme, Retrograde Bold, BoldPixels fonts)
+- [x] Add unit tests for file validation
+- [x] Add smoke test for homepage
+- [x] Update task board
 
 ---
 
-## Sprint 2: Document Processing and AI Summary
+### Sprint 2: Document Processing, RAG, and AI Analysis ✅ COMPLETE
 
-### Goal
+**Goal:** Implement RAG pipeline (chunking, vector storage, retrieval), support multi-file uploads (≤5), and generate AI summary, relevance check, and study path.
 
-Implement RAG pipeline (chunking, vector storage, retrieval), support multi-file uploads (≤5), and generate AI summaries using retrieved context.
+**User Stories:** US-007, US-008, US-009, US-010, US-011
 
-### User Stories
-
-- US-007: Learner gets document text extracted for analysis.
-- US-008: Parser errors are handled clearly.
-- US-009: Learner receives a summary of uploaded materials.
-
-### Tasks
-Note: Parsers run first, then output feeds into chunking pipeline.
+**Tasks:**
 - [x] Integrate LangChain `RecursiveCharacterTextSplitter` for document chunking
 - [x] Set up persistent ChromaDB client service (`./data/chroma_db`)
 - [x] Implement chunk → embed → store pipeline per uploaded file
-- [x] Implement `.txt` parser
-- [x] Implement `.md` parser
-- [x] Implement `.pdf` parser
-- [x] Implement `.docx` parser
+- [x] Implement `.txt`, `.md`, `.pdf`, `.docx` parsers
 - [x] Implement similarity search & context builder for AI prompts
 - [x] Update `/upload` route to accept `request.files.getlist()` (max 5 files)
 - [x] Add multi-file session handling & collection naming
-- [x] Add unit tests for chunking logic & vector storage
-- [x] Add mocked retrieval tests for CI (`CI=true` env var)
-
 - [x] Configure dual Ollama model env vars (OLLAMA_MODEL + OLLAMA_EMBEDDING_MODEL)
-- [ ] Decide whether `.html` and `.odt` are Sprint 2 or later
-- [ ] Create document parser service
-- [ ] Add extracted text preview or processing confirmation
-- [ ] Create AI client wrapper for Ollama
-- [ ] Create summary prompt template
-- [ ] Generate summary from extracted text
-- [ ] Display summary on results page
-- [ ] Add fallback mocked AI client for tests
-- [ ] Add parser tests
-- [ ] Add mocked summary tests
-- [ ] Update task board
-- [ ] Record sprint demo
-
-### Sprint 2 Definition of Done
-
-- RAG pipeline processes uploads (chunk → embed → store in ChromaDB)
-- `/upload` accepts up to 5 files with session handling
-- AI services use retrieved top-k context
-- Chat and embedding models are independently configurable via env vars
-- All core parsers (.txt, .md, .pdf, .docx) functional
-- Mocked RAG/AI tests pass in CI
-- Task board updated
+- [x] Create AI client wrapper for Ollama with `AI_MOCK` fallback
+- [x] Create summary prompt template + generation service
+- [x] Create relevance check prompt template + label/explanation/missing-material
+- [x] Create curriculum-generation prompt → module list with effort estimates
+- [x] Display summary, relevance, and study path on results page
+- [x] Add markdown rendering (marked.js) for AI outputs
+- [x] Add unit tests for chunking, vector storage, all AI services
+- [x] Add mocked RAG/AI tests for CI
+- [x] Add end-to-end workflow integration test
 
 ---
 
-## Sprint 3: Relevance Check and Study Path Generation
+### Sprint 3: Interactive Lessons Generation ✅ COMPLETE
 
-### Goal
+**Goal:** Implement the full interactive lesson generation loop — slide-based lessons with inline checkpoints, final quiz per module, grading with pass/fail gating, and retake with fresh questions.
 
-Complete the core learning workflow.
+**User Stories:** US-012, US-013, US-014, US-015, US-016, US-017
 
-### User Stories
-
-- US-010: Learner sees whether documents match the learning goal.
-- US-011: Learner receives a structured study path.
-- US-012: Learner experiences a simple guided workflow.
-- US-014: Reviewer can see full workflow in demo.
-
-### Tasks
-
-- [ ] Create relevance-check prompt
-- [ ] Return relevance label: strong / partial / weak
-- [ ] Return relevance explanation
-- [ ] Add missing-material suggestions
-- [ ] Create curriculum-generation prompt
-- [ ] Generate module list
-- [ ] Generate lesson list
-- [ ] Add estimated effort per module
-- [ ] Format study path clearly in UI
-- [ ] Store generated outputs
-- [ ] Add tests for relevance label parsing
-- [ ] Add tests for curriculum output structure
-- [ ] Add end-to-end mocked workflow test
-- [ ] Polish retro UI
-- [ ] Add simple mascot placeholder
-- [ ] Update task board
-- [ ] Record sprint demo
-
-### Sprint 3 Definition of Done
-
-- Full MVP workflow works end-to-end.
-- User can upload documents and receive summary, relevance result, and study path.
-- Tests pass.
-- Demo script can show the full workflow.
+**Tasks:**
+- [x] Create `app/services/lesson_generator.py` (title/content/example/summary slide types, RAG-grounded)
+- [x] Create `app/services/quiz_generator.py` (mcq, true_false, multi_select, fill_blank question types)
+- [x] Add `POST /generate-lessons` — loop over modules, sequential generation with loading UI
+- [x] Add `GET /lessons` — module list page with progress bar, gated locks, score badges
+- [x] Add `GET /lessons/<i>` — custom CSS/JS slide deck rendering lesson slides + checkpoints + quiz
+- [x] Implement inline checkpoint slides (block advance until answered, show correct/incorrect)
+- [x] Implement final quiz form with all 4 question types rendered interactively
+- [x] Add `POST /lessons/<i>/grade` — AJAX endpoint, instant grading, per-question feedback
+- [x] Add `POST /lessons/<i>/retake` — regenerate quiz + checkpoints, reset attempt state
+- [x] Implement gated progression (must pass module N at ≥80% to unlock N+1)
+- [x] Add final results slide with score circle, pass/fail verdict, retake button
+- [x] Consolidate learning goal + file upload into single unified form (`POST /process`)
+- [x] Improve results page visual hierarchy (timeline, relevance dots, accent button)
+- [x] Add server-side session storage (Flask-Session + cachelib FileSystemCache)
+- [x] Vendor fonts (Retrograde Bold, BoldPixels) for slide deck retro theming
+- [x] Write unit tests for lesson_generator + quiz_generator (17 new tests)
+- [x] Run full test suite — 45 tests passing
 
 ---
 
-## Sprint 4: Polish, Documentation, Deployment
+### Sprint 4: UX Polish, Mascot, and Quality Improvements ⬜ CURRENT
 
-### Goal
+**Goal:** Polish the retro experience, add mascot interactions, improve loading UX, implement difficulty toggle, and research model/quality improvements for better lesson output.
 
-Prepare for capstone submission and public demonstration.
+**User Stories:** US-018, US-019, US-020, US-021, US-022
 
-### User Stories
+**Tasks:**
+- [ ] Replace full-screen loading overlay with background processing + progress bar / stage indicator
+- [ ] Add stage-by-stage progress reporting during lesson generation (e.g., "Generating slides for Module 2 of 5...")
+- [ ] Create retro mascot animation frames (idle, waiting/loading, done/success, retry/encourage states)
+- [ ] Integrate mascot (`app/static/images/mascot-robot.png`) into UI with simple interactions
+- [ ] Research optimal Ollama model for lesson/quiz quality vs speed on target hardware (6GB VRAM)
+- [ ] Evaluate and document quality comparison: qwen3:1.7b vs gemma3:4b vs granite4.1:3b for lesson generation
+- [ ] Add difficulty level selector (Easy: 10–11 yrs, Moderate: 12–13 yrs, Hard: 14–15 yrs)
+- [ ] Adjust lesson/quiz prompts based on selected difficulty level
+- [ ] Improve lesson and quiz prompt templates for better pedagogical quality
+- [ ] Add loading feedback that is entertaining/retro-themed during long operations
+- [ ] Polish responsive layout for slide deck on smaller screens
+- [ ] Update unit tests for new prompt logic and difficulty toggle
+- [ ] Update task board with sprint progress
+- [ ] Record sprint demo
 
-- US-013: Learner sees a friendly motivating interface.
-- US-014: Reviewer can understand and evaluate the project.
+**Sprint 4 Definition of Done:**
+- Loading UX uses background progress indicator instead of full-screen block
+- Mascot displays idle/waiting/done animation states
+- Difficulty toggle functional and reflected in generated content
+- Model research documented with recommendation
+- Lesson/quiz quality measurably improved over Sprint 3 baseline
 
-### Tasks
+---
 
-- [ ] Improve results page layout
-- [ ] Add demo sample documents
-- [ ] Improve README setup instructions
-- [ ] Complete `DESIGN_AND_TESTING.md`
-- [ ] Document architecture decisions
-- [ ] Document AI tooling usage
-- [ ] Document test strategy and test results
-- [ ] Document deployment choice
-- [ ] Deploy web app
+### Sprint 5: Deployment & Demo Prep ⬜ FUTURE
+
+**Goal:** Deploy to free-tier host, finalize documentation, prepare demo script, record 15–20 min presentation.
+
+**User Stories:** US-014 (extended)
+
+**Tasks:**
+- [ ] Finalize README with complete setup and deployment instructions
+- [ ] Complete `DESIGN_AND_TESTING.md` with all ADRs and test results
+- [ ] Deploy web app (Render or Railway free tier)
+- [ ] Configure deployment environment variables for model/API
 - [ ] Add deployed app link to README
-- [ ] Confirm GitHub repo access
+- [ ] Confirm GitHub repo access for grader
 - [ ] Confirm task board access
-- [ ] Prepare final demo script
+- [ ] Prepare final demo script (goal → upload → results → generate lessons → slide deck → quiz → grade → retake)
 - [ ] Record final 15–20 minute demo/presentation
 - [ ] Verify all submission links are stable
+- [ ] Final review of all documentation against rubric
 
-### Sprint 4 Definition of Done
-
-- Deployed app link works.
-- Task board link works.
-- Repository is documented.
-- Design/testing document is complete.
-- Final demo can be recorded cleanly.
+**Sprint 5 Definition of Done:**
+- Deployed app link works
+- Task board link works
+- Repository is documented and accessible
+- Design/testing document is complete
+- Final demo recorded and submission-ready
 
 ---
 
 ## 4. MVP Feature Backlog
 
-### Core MVP
+### Core MVP (Implemented ✅)
 
-- [ ] Learning goal form
-- [ ] Document upload
-- [ ] File validation
-- [ ] Text extraction
-- [ ] AI summary
-- [ ] Relevance check
-- [ ] Study path generation
-- [ ] Results page
-- [ ] Basic persistence
-- [ ] Tests
-- [ ] CI
-- [ ] Deployment
-- [ ] Static task board
-- [ ] Design/testing document
+- [x] Learning goal form
+- [x] Document upload (≤5 files)
+- [x] File validation
+- [x] Text extraction (.txt, .md, .pdf, .docx)
+- [x] RAG pipeline (chunk → embed → store → retrieve)
+- [x] AI summary generation
+- [x] Relevance check (strong/partial/weak)
+- [x] Study path generation (modules + effort)
+- [x] Interactive slide-based lesson generation
+- [x] Mixed-type quiz generation (4 question types)
+- [x] Inline comprehension checkpoints
+- [x] Instant quiz grading with feedback
+- [x] Retake with fresh questions
+- [x] Gated module progression (80% threshold)
+- [x] Custom CSS/JS slide deck (retro themed)
+- [x] Server-side session storage (Flask-Session + cachelib)
+- [x] Results page with improved hierarchy
+- [x] Lesson listing page with progress bar
+- [x] Markdown rendering for AI outputs
+- [x] 45 automated tests
+- [x] GitHub Actions CI
+- [x] Static task board
+- [x] Design/testing document
 
-### Should-Have Polish
+### Should-Have Polish (In Progress / Upcoming)
 
-- [ ] Retro theme
-- [ ] Mascot placeholder
-- [ ] Better error messages
-- [ ] Output cards
-- [ ] Sample demo documents
-- [ ] Loading/progress UI
-- [ ] Responsive layout
-- [ ] Simple app logo/title treatment
+- [x] Retro theme with custom pixel fonts
+- [x] Bootstrap 5 layout with cyberpunk styling
+- [x] App logo and title treatment
+- [x] Flash messages for feedback
+- [ ] Retro mascot with animation frames (Sprint 4)
+- [ ] Background progress indicators (Sprint 4)
+- [ ] Difficulty level selector (Sprint 4)
+- [ ] Model quality/speed research (Sprint 4)
+- [ ] Responsive slide deck layout
+- [ ] Sample demo documents for consistent presentation
 
 ---
 
 ## 5. Scope-Creep Ladder
 
-Ranked from easiest to hardest. These are not official MVP unless moved into a sprint.
+### Implemented ✅
+- [x] Retro colors/fonts/cyberpunk theme
+- [x] Better prompt templates
+- [x] Static mascot image
+- [x] Simple quiz generation (4 question types)
+- [x] Slide-style lesson viewer (custom CSS/JS)
+- [x] Editable generated summary
+- [x] Saved/loaded generated outputs in session
+- [x] Export results as HTML (rendered on results page)
+- [x] Gated module progression with pass/fail
 
-### Easy
+### Upcoming (Sprint 4–5)
+- [ ] Mascot animation frames with idle/waiting/done states
+- [ ] Difficulty level selector (Easy/Moderate/Hard)
+- [ ] Background progress reporting during generation
+- [ ] Model evaluation and recommendation research
+- [ ] Lesson/quiz prompt engineering refinement
 
-- [ ] Static mascot image
-- [ ] Better retro colors/fonts
-- [ ] Motivational text snippets
-- [ ] Better prompt templates
-- [ ] Export study path as Markdown
-- [ ] Add example goal buttons
-
-### Moderate
-
-- [ ] Editable generated summary
-- [ ] Editable generated study path
-- [ ] Simple quiz generation
-- [ ] Basic progress checklist
-- [ ] Save/load previous generated plans
-- [ ] Export results as HTML
-- [ ] Add difficulty level selector
-- [ ] Add admin review page
-
-### Hard
-
-- [ ] Embeddings and retrieval with pgvector or ChromaDB
-- [ ] More robust chunking and source referencing
+### Hard / Future
 - [ ] OCR for scanned PDFs
-- [ ] Better document metadata extraction
-- [ ] Multi-document topic map
-- [ ] Slide-style lesson viewer
-- [ ] Learner profile adaptation
-
-### Very Hard / Future
-
 - [ ] YouTube integration
 - [ ] External learning resource search
-- [ ] AI-generated slide decks
-- [ ] AI-generated subtitles
+- [ ] Short-answer AI grading
+- [ ] Slide deck export (PDF, PPTX)
+- [ ] Learner profile adaptation
+- [ ] Spaced repetition scheduling
+
+### Very Hard / Post-Capstone
+- [ ] Multi-user accounts and authentication
 - [ ] AI-generated TTS narration
-- [ ] Adaptive weekly planner
-- [ ] Multi-user accounts
-- [ ] Authentication
+- [ ] Adaptive difficulty based on performance
 - [ ] Companion that reacts to progress
 - [ ] Full teacher/admin content management workflow
 
 ---
 
-## 6. AI Tooling Plan
-
-### Allowed / Intended Use
-
-- [ ] Use AI tools to help draft specifications
-- [ ] Use AI tools to generate code suggestions
-- [ ] Use AI tools to create tests
-- [ ] Use AI tools to review bugs
-- [ ] Use AI tools to explain architecture tradeoffs
-- [ ] Use AI tools to assist with documentation
-
-### Guardrails
-
-- [ ] Keep SRS and TODO updated before major implementation
-- [ ] Review generated code before committing
-- [ ] Write or verify tests for AI-generated code
-- [ ] Commit in small, understandable increments
-- [ ] Document AI tooling use in design/testing document
-- [ ] Do not commit secrets, private documents, or sensitive uploads
-
----
-
-## 7. Testing TODO
+## 6. Testing TODO
 
 ### Unit Tests
-
-- [ ] Test allowed file extensions
-- [ ] Test rejected file extensions
-- [ ] Test text parser for `.txt`
-- [ ] Test text parser for `.md`
-- [ ] Test parser error handling
-- [ ] Test summary prompt builder
-- [ ] Test relevance label parser
-- [ ] Test curriculum output parser
+- [x] Allowed file extensions
+- [x] Rejected file extensions
+- [x] Text parser for .txt, .md
+- [x] Parser error handling (empty, nonexistent)
+- [x] Summary prompt builder
+- [x] Relevance label parser
+- [x] Curriculum output parser
+- [x] AI client mock mode
+- [x] Chunking logic validation
+- [x] Vector store imports
+- [x] RAG context builder
+- [x] Lesson generator (mock, empty inputs, retriever, validation, fallback)
+- [x] Quiz generator (mock, empty, retriever, checkpoints, validation, fallbacks, type mix)
 
 ### Integration Tests
+- [x] Homepage route
+- [x] Process route with valid data
+- [x] Process route with empty goal
+- [x] Process route with no files
+- [x] Process route with invalid file type
+- [x] Process route exceeding max files
+- [x] Full mocked workflow
+- [x] Generate lessons flow
+- [x] Lesson deck route
 
-- [ ] Test homepage route
-- [ ] Test goal submission route
-- [ ] Test upload route with valid file
-- [ ] Test upload route with invalid file
-- [ ] Test mocked AI summary route
-- [ ] Test mocked full workflow
+### To Add (Sprint 4)
+- [ ] Grade route test (AJAX response, score calculation, pass/fail)
+- [ ] Retake route test (quiz regeneration, state reset)
+- [ ] Difficulty toggle prompt adjustment tests
 
 ### Manual Demo Tests
-
 - [ ] Demo document uploads successfully
-- [ ] Summary appears
-- [ ] Relevance result appears
-- [ ] Study path appears
-- [ ] App handles bad file upload correctly
-- [ ] App works in deployed environment
-
----
-
-## 8. Documentation TODO
-
-- [ ] README project overview
-- [ ] README local setup
-- [ ] README test instructions
-- [ ] README deployment link
-- [ ] README task board link
-- [ ] SRS finalized
-- [ ] TODO/backlog finalized
-- [ ] Design and testing document
-- [ ] Architecture diagram or text explanation
-- [ ] AI tooling explanation
-- [ ] Sprint summaries
-- [ ] Final demo script
+- [ ] Summary appears with markdown rendering
+- [ ] Relevance result appears with colored indicator
+- [ ] Study path timeline displays
+- [ ] Generate Lessons button works
+- [ ] Slide deck renders with retro fonts
+- [ ] Checkpoints block advance until answered
+- [ ] Quiz grading returns score and feedback
+- [ ] Retake regenerates questions
+- [ ] Module gating enforces progression

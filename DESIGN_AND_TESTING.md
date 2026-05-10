@@ -1,25 +1,59 @@
 # Design and Testing Document
 # Study-and-Learn
 
-**Version:** 0.1 starter  
-**Status:** Living document
+**Version:** 0.2  
+**Status:** Living document  
+**Last updated:** May 2026
 
 ---
 
 ## 1. Architecture Overview
 
-Study-and-Learn is planned as a Flask web application with a guided Bootstrap frontend and an AI-assisted backend workflow.
+Study-and-Learn is a Flask web application with a Bootstrap-and-retro-CSS frontend and an AI-assisted backend workflow.
+
+```mermaid
+flowchart TD
+    A[Unified Form: Goal + Files] --> B[/process Route]
+    B --> C[Document Parser: txt, md, pdf, docx]
+    C --> D[Chunker: RecursiveCharacterTextSplitter]
+    D --> E[Vector Store: ChromaDB + OllamaEmbeddings]
+    E --> F[RAG Retriever: top-k=5 context]
+    F --> G[Summarizer]
+    F --> H[Relevance Checker]
+    F --> I[Curriculum Generator]
+    G --> J[results.html: Summary, Relevance, Study Path]
+    H --> J
+    I --> J
+    J --> K{"Generate Interactive Lessons"}
+    K --> L[Lesson Generator: slides JSON]
+    K --> M[Quiz Generator: questions + checkpoints]
+    L --> N[lessons.html: Module Grid with Gating]
+    M --> N
+    N --> O[lesson_deck.html: Custom Slide Deck]
+    O --> P[Inline Checkpoints: block advance]
+    O --> Q[Final Quiz: 4 question types]
+    Q --> R[POST /grade: AJAX, instant feedback]
+    R --> S[Results Slide: score, pass/fail]
+    S --> T{Passed >= 80%?}
+    T -->|Yes| U[Unlock Next Module]
+    T -->|No| V[Retake: Regenerate Quiz]
+    V --> O
+```
 
 Core workflow:
 
-1. User enters a learning goal.
-2. User uploads study documents.
-3. Backend validates and stores uploads.
-4. Document parser extracts text.
-5. AI service generates summary.
-6. AI service checks relevance.
-7. AI service generates study path.
-8. UI presents structured results.
+1. User enters a learning goal and uploads study documents in a single unified form.
+2. Backend validates and stores uploads.
+3. Document parser extracts text.
+4. RAG pipeline chunks, embeds, stores, and retrieves relevant context.
+5. AI services generate summary, relevance check, and study path.
+6. Results page displays structured output with improved visual hierarchy.
+7. User clicks "Generate Interactive Lessons" to produce slide-based lessons.
+8. AI generates lesson slides + inline checkpoints + mixed-type quiz per module.
+9. Custom CSS/JS slide deck presents lessons with retro fonts and checkpoint blocking.
+10. Learner completes quiz, receives instant grading with per-question feedback.
+11. Failed modules can be retaken with fresh regenerated questions.
+12. Progression is gated (80% pass threshold required to unlock next module).
 
 ---
 
@@ -68,6 +102,30 @@ Core workflow:
 **Decision:** Chat uses `OLLAMA_MODEL` (default: qwen3:1.7b), Embeddings use `OLLAMA_EMBEDDING_MODEL` (default: qwen3-embedding:0.6b).
 **Reason:** Chat models don't support /api/embed. Separation prevents 501 errors and allows independent tuning of generation vs retrieval models.
 
+### ADR-009: Custom CSS/JS Slide Deck Engine (Replaces reveal.js)
+
+**Decision:** Build a custom CSS/JS slide-deck engine instead of using reveal.js.
+
+**Reason:** reveal.js introduced layout overflow bugs, scaling issues on the constrained viewport, and CSS conflicts with the project's retro theme (custom `@font-face` declarations, cyberpunk body styles). A custom engine gives full control over sizing, font application, checkpoint blocking logic, and responsive breakpoints. The custom engine renders slides from JSON, supports title/content/example/summary slide types, inline checkpoint blocking, and final quiz forms — all with Retrograde Bold and BoldPixels pixel fonts. This aligns with the "thin MVP" philosophy (build only what's needed) and avoids dependency bloat.
+
+### ADR-010: Server-Side Session Storage with Flask-Session + cachelib
+
+**Decision:** Use Flask-Session with cachelib's FileSystemCache for session storage.
+
+**Reason:** Flask's default signed-cookie sessions cap at ~4 KB. Full lesson JSON for 5 modules with slides, checkpoints, and quiz questions far exceeds this limit. Flask-Session's server-side storage keeps the per-request cookie small while storing large session data on disk. FileSystemCache was chosen over the deprecated filesystem backend to match Flask-Session 0.8's recommended pattern. Tradeoffs: ✅ No cookie size limits, transparent to app code • ❌ Requires `data/flask_session/` directory, sessions lost on server restart (acceptable for MVP demo).
+
+### ADR-011: Sequential Lesson Generation with Progress Feedback
+
+**Decision:** Generate lessons sequentially (one module at a time) with a visible progress/loading indicator rather than concurrently.
+
+**Reason:** Sequential execution is simpler to debug, logs clearly, avoids overwhelming the local Ollama server with concurrent requests on limited hardware (6GB VRAM), and enables accurate per-module progress reporting. Concurrency was considered but rejected due to: harder error handling, risk of Ollama request queuing and timeouts, and difficulty showing clean progress. The current full-screen loading spinner is a stepping stone; the next iteration will replace it with a background progress bar showing current stage.
+
+### ADR-012: Retake = Regenerate Fresh Questions
+
+**Decision:** On lesson retake, regenerate entirely new quiz questions and checkpoints rather than reusing the originals.
+
+**Reason:** Reusing the same questions on retake allows learners to memorize answers without understanding the material — the worst pedagogical outcome. Regenerating questions each retake tests real comprehension and is pedagogically strongest. The tradeoff is additional Ollama calls and generation time per retake, but this is acceptable on a per-module basis (5 questions + ~2 checkpoints per retake, < 60 seconds each on qwen3:1.7b).
+
 ---
 
 ## 3. Software & Architectural Patterns
@@ -81,36 +139,55 @@ Core workflow:
 ## 3. Testing Strategy
 
 ### Unit Tests
-    Unit tests will cover isolated logic:
+    Unit tests cover isolated logic:
     - allowed file type validation,
     - parser selection,
     - parser error handling,
     - prompt construction,
     - relevance label parsing,
-    - curriculum output parsing.
-    - LangChain text splitter output validation
-    - ChromaDB collection creation & persistence checks
-    - ChromaDB uses EphemeralClient when CI=true, PersistentClient otherwise
-    - Similarity search context builder accuracy
-    - Multi-file upload session & cookie size limits
-    - AI calls mocked via AI_MOCK=true
+    - curriculum output parsing,
+    - AI client mock mode and live mode,
+    - LangChain text splitter output validation,
+    - ChromaDB collection creation & persistence checks,
+    - ChromaDB uses EphemeralClient when CI=true, PersistentClient otherwise,
+    - Similarity search context builder accuracy,
+    - Multi-file upload session & cookie size limits,
+    - AI calls mocked via AI_MOCK=true,
+    - Lesson generator: mock, empty inputs, retriever, slide validation, fallback behavior,
+    - Quiz generator: mock, empty inputs, retriever, inline checkpoint, question validation, type mix distribution, fallback quiz structure,
+    - Slide validation (only known types accepted),
+    - Question validation (all 4 question types: mcq, true_false, multi_select, fill_blank),
+    - Fallback lesson and quiz generation for error resilience.
 
 ### Integration Tests
 
-Integration tests will cover routes and workflow behavior:
+Integration tests cover routes and workflow behavior:
 - homepage loads,
-- upload route accepts valid files,
-- upload route rejects invalid files,
-- mocked AI workflow returns expected page content.
+- `/process` route with valid data returns results,
+- `/process` route rejects empty goal,
+- `/process` route rejects empty files,
+- `/process` route rejects invalid file types,
+- `/process` route enforces max 5 files,
+- mocked full workflow: goal + upload → summary → relevance → study path,
+- mocked generate-lessons flow: session data → lesson + quiz generation → redirect,
+- lesson deck route with pre-populated session lessons returns 200.
+
+Current test suite: **45 tests, 0 failures**.
 
 ### Smoke Tests
 
-Smoke tests will be run before sprint demos and final recording:
+Smoke tests run before sprint demos and final recording:
 - app starts,
 - sample document uploads,
-- summary appears,
-- relevance appears,
-- study path appears.
+- summary displays with markdown rendering,
+- relevance result displays with colored indicator,
+- study path timeline displays,
+- "Generate Interactive Lessons" button triggers generation,
+- slide deck renders with retro fonts,
+- checkpoints block advance until answered,
+- quiz grading returns score and per-question feedback,
+- retake regenerates questions,
+- module gating enforces 80% pass progression.
 
 ---
 
@@ -184,3 +261,6 @@ Recommendation: Deploy to Render/Railway free tier with `AI_MOCK=true` for gradi
 | Scope creep | Missed MVP | Keep optional features outside official sprint goals |
 | Deployment resource limits | App unavailable | Test deployment early |
 | AI output inconsistency | Poor demo | Use controlled sample documents and structured prompts |
+| Quiz/lesson quality inadequate for learning | Poor pedagogical value | Prompt engineering research in Sprint 4; evaluate alternative models; set appropriate expectations for 1.7B model |
+| Session data loss on server restart | Lost lesson state | Acceptable for MVP demo; document limitation; persistent storage deferred to v2 |
+| Loading UX causes user abandonment | Dropped sessions during long generation | Replace full-screen overlay with background progress UI in Sprint 4 |

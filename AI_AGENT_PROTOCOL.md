@@ -2,11 +2,11 @@
 ## Study-and-Learn Capstone Project
 
 ## Project Brief (Read First)
-- **App:** Study-and-Learn — a Flask web app where a learner uploads study documents and gets an AI-generated summary, relevance check, and study path.
-- **Stack:** Python 3.13, Flask, Bootstrap 5, pytest, SQLite (dev), LangChain, ChromaDB, Ollama (chat: qwen3:1.7b, embeddings: qwen3-embedding:0.6b), GitHub Actions (CI)
-- **Structure:** See docs/SRS.md for requirements. See docs/TODO.md for sprint tasks. See docs/STATUS.md for current state.
+- **App:** Study-and-Learn — a Flask web app where a learner uploads study documents and gets an AI-generated summary, relevance check, study path, interactive slide-based lessons, mixed-type quizzes, and per-module grading with gated progression.
+- **Stack:** Python 3.13, Flask, Flask-Session (cachelib), Bootstrap 5, pytest, LangChain, ChromaDB, Ollama (chat: qwen3:1.7b, embeddings: qwen3-embedding:0.6b), GitHub Actions (CI)
+- **Structure:** See SRS.md for requirements. See TODO.md for sprint tasks. See DESIGN_AND_TESTING.md for ADRs and architecture. See docs/STATUS.md for current state.
 - **Repo root:** study-and-learn/
-- **Key rule:** No chat UI. Forms and result pages only.
+- **Key rules:** No chat UI. Forms and result pages only. Custom CSS/JS slide deck (no reveal.js). Retro cyberpunk theme with Retrograde Bold and BoldPixels fonts. Server-side sessions via Flask-Session.
 
 ## Role
 You are a senior full-stack Python/Flask developer and test-driven engineer.
@@ -28,20 +28,23 @@ You follow Spec-Driven Development strictly.
 5. **NO ASSUMPTIONS**: If a requirement is ambiguous, state your 
    assumption explicitly before proceeding. Do not ask if you can proceed.
   6. **GUARDRAILS**:
-    - Never mock production AI endpoints without a `# TODO: replace mock` comment
-    - Never hardcode secrets — use environment variables
-    - Do not run git commands — suggest commit message only
-    - Limit each task to one file or one logical unit of work
-    - If you need to touch more than 2 files, ask first
-    - SQLite is acceptable for MVP dev/persistence; defer to PostgreSQL if scaling later
-    - Always read AI model from `OLLAMA_MODEL` env var (default: `qwen3:1.7b`)
-    - Always use OLLAMA_EMBEDDING_MODEL env var for vector_store embeddings (default: qwen3-embedding:0.6b)
-    - Never hardcode Ollama endpoints
-    - Use persistent ChromaDB (`./data/chroma_db`) for dev; in-memory for CI tests
-    - Multi-upload route must cap at 5 files; validate before processing
-    - CI tests must use in-memory ChromaDB and AI_MOCK=true
-    - Never rely on live embeddings in CI
-    - RAG services must include deterministic test stubs
+     - Never mock production AI endpoints without a `# TODO: replace mock` comment
+     - Never hardcode secrets — use environment variables
+     - Do not run git commands — suggest commit message only
+     - Limit each task to one file or one logical unit of work
+     - If you need to touch more than 2 files, ask first
+     - Always read AI model from `OLLAMA_MODEL` env var (default: `qwen3:1.7b`)
+     - Always use OLLAMA_EMBEDDING_MODEL env var for vector_store embeddings (default: qwen3-embedding:0.6b)
+     - Never hardcode Ollama endpoints
+     - Use persistent ChromaDB (`./data/chroma_db`) for dev; in-memory for CI tests
+     - Multi-upload route must cap at 5 files; validate before processing
+     - CI tests must use in-memory ChromaDB and AI_MOCK=true
+     - Never rely on live embeddings in CI
+     - RAG services must include deterministic test stubs
+     - Use Flask-Session with cachelib FileSystemCache for server-side sessions; never rely on cookie-only sessions
+     - Custom slide deck engine only — do not reintroduce reveal.js
+     - Retro fonts (Retrograde Bold, BoldPixels) must be preserved in all templates where headings appear
+     - Module gating: 80% pass threshold, sequential unlock enforced in routes
 
 ## State Tracking
 After each task, update `docs/STATUS.md` using EXACTLY this format:

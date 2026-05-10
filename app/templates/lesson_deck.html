@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ lesson.module_title }} — Study-and-Learn</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logo-v2.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/study-and-learn.css') }}">
+</head>
+<body>
+    <div class="deck-container">
+        <div class="slides-wrapper">
+
+            {% set slides = lesson.lesson.slides if lesson.lesson and lesson.lesson.slides else [] %}
+            {% set checkpoints = lesson.checkpoints if lesson.checkpoints else {} %}
+            {% set quiz_questions = lesson.quiz.questions if lesson.quiz and lesson.quiz.questions else [] %}
+
+            {% for slide in slides %}
+            {% set si = loop.index0 %}
+            {% if slide.type == 'title' %}
+            <section class="slide slide-title" data-index="{{ si }}">
+                <div class="slide-content-inner">
+                    <h2>{{ slide.title }}</h2>
+                    {% if slide.subtitle %}
+                    <p class="subtitle">{{ slide.subtitle }}</p>
+                    {% endif %}
+                </div>
+            </section>
+
+            {% elif slide.type == 'content' %}
+            <section class="slide slide-content" data-index="{{ si }}">
+                <div class="slide-content-inner">
+                    <h3>{{ slide.heading }}</h3>
+                    {% if slide.bullets %}
+                    <ul>
+                        {% for bullet in slide.bullets %}
+                        <li>{{ bullet }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                    {% if slide.notes %}
+                    <p class="slide-notes">{{ slide.notes }}</p>
+                    {% endif %}
+                </div>
+            </section>
+
+            {% elif slide.type == 'example' %}
+            <section class="slide slide-example" data-index="{{ si }}">
+                <div class="slide-content-inner">
+                    <h3>{{ slide.heading }}</h3>
+                    <div class="example-body">{{ slide.body }}</div>
+                </div>
+            </section>
+
+            {% elif slide.type == 'summary' %}
+            <section class="slide slide-summary" data-index="{{ si }}">
+                <div class="slide-content-inner">
+                    <h2>Module Summary</h2>
+                    {% if slide.bullets %}
+                    <ul>
+                        {% for bullet in slide.bullets %}
+                        <li>{{ bullet }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                </div>
+            </section>
+            {% endif %}
+
+            {% if checkpoints[si|string] %}
+            <section class="slide scrollable checkpoint-slide" data-checkpoint="{{ si }}" data-state="checkpoint-blocked" data-index="{{ si }}">
+                <div class="slide-content-inner scroll-container">
+                    <h3>Quick Check</h3>
+                    <p class="question-prompt">{{ checkpoints[si|string].prompt }}</p>
+                    <div class="checkpoint-options">
+                        {% for opt in checkpoints[si|string].options %}
+                        <div class="checkpoint-option" data-value="{{ loop.index0 }}">{{ opt }}</div>
+                        {% endfor %}
+                    </div>
+                    <div class="checkpoint-feedback"></div>
+                    <button class="btn-submit-quiz" style="margin-top: 1rem; display: none;" onclick="deck.advanceFromCheckpoint(this)">Continue</button>
+                </div>
+            </section>
+            {% endif %}
+            {% endfor %}
+
+            <section class="slide scrollable quiz-slide" data-state="quiz-blocked" data-index="{{ slides|length }}">
+                <div class="slide-content-inner scroll-container">
+                    <h3>Final Quiz</h3>
+                    <p class="quiz-instructions">Answer all questions and submit for grading</p>
+                    <div class="quiz-container" id="quiz-container">
+                        {% if quiz_questions %}
+                        {% for q in quiz_questions %}
+                        <div class="quiz-question" data-qid="{{ q.id }}" data-qtype="{{ q.type }}"
+                             {% if q.type == 'mcq' %}data-answer="{{ q.answer_index }}"{% endif %}
+                             {% if q.type == 'true_false' %}data-answer="{{ q.answer|lower }}"{% endif %}
+                             {% if q.type == 'multi_select' %}data-answer="{{ q.answer_indices|join(',') }}"{% endif %}
+                             {% if q.type == 'fill_blank' %}data-answer="{{ q.answer }}"{% endif %}>
+                            <div class="q-prompt">{{ loop.index }}. {{ q.prompt }}</div>
+                            {% if q.type == 'mcq' or q.type == 'multi_select' %}
+                            <div class="q-options">
+                                {% for opt in q.options %}
+                                <label class="q-option">
+                                    <input type="{{ 'radio' if q.type == 'mcq' else 'checkbox' }}" name="{{ q.id }}" value="{{ loop.index0 }}">
+                                    {{ opt }}
+                                </label>
+                                {% endfor %}
+                            </div>
+                            {% elif q.type == 'true_false' %}
+                            <div class="q-options">
+                                <label class="q-option"><input type="radio" name="{{ q.id }}" value="true"> True</label>
+                                <label class="q-option"><input type="radio" name="{{ q.id }}" value="false"> False</label>
+                            </div>
+                            {% elif q.type == 'fill_blank' %}
+                            <input type="text" class="q-input" name="{{ q.id }}" placeholder="Type your answer...">
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                        {% else %}
+                        <p style="color: var(--deck-warning); font-size: 0.6em;">No quiz questions available</p>
+                        {% endif %}
+                    </div>
+                    <button class="btn-submit-quiz" onclick="deck.submitFinalQuiz()">Submit Answers</button>
+                    <div id="quiz-error" style="color: var(--deck-danger); margin-top: 0.5rem; display: none;">Please answer all questions before submitting.</div>
+                </div>
+            </section>
+
+            <section class="slide results-slide" data-state="results-slide" data-index="{{ slides|length + 1 }}">
+                <div class="slide-content-inner">
+                    <h2>Your Results</h2>
+                    <div class="score-circle" id="score-circle">--</div>
+                    <div class="verdict" id="verdict-text"></div>
+
+                    <div id="results-detail" class="results-detail" style="display: none;"></div>
+
+                    <div class="results-actions">
+                        <button class="btn-retake" id="btn-retake" onclick="retakeLesson()" style="display: none;">Retake Lesson</button>
+                        <a class="btn-modules" href="{{ url_for('main.lessons') }}">Back to Modules</a>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="deck-controls">
+            <button id="prev-slide" title="Previous slide">
+                <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+            </button>
+            <button id="next-slide" title="Next slide">
+                <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+            </button>
+        </div>
+
+        <div class="deck-progress">Module {{ module_index + 1 }} of {{ total_modules }}</div>
+        <div class="deck-progress-bar"></div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/study-and-learn.js') }}"></script>
+    <script>
+        let checkpointAnswers = {};
+        let quizSubmitted = false;
+        let finalGrade = null;
+
+        let deck;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            deck = new StudyAndLearnDeck({
+                onSlideChange: function(event) {
+                    const state = event.slide.dataset.state;
+                    const isScrollableSlide = state === 'checkpoint-blocked' || state === 'quiz-blocked';
+
+                    if (isScrollableSlide) {
+                        event.slide.querySelector('.scroll-container')?.scrollTo(0, 0);
+                    }
+                }
+            });
+
+            window.gradeCheckpoint = function(slideIndex, userValue, feedbackEl, callback) {
+                fetch(`/lessons/{{ module_index }}/grade`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        answers: [],
+                        checkpoint_answers: { [slideIndex]: userValue }
+                    })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    const cpr = data.checkpoint_results || [];
+                    const result = cpr.find(r => String(r.slide_index) === String(slideIndex));
+                    if (result) {
+                        feedbackEl.style.display = 'block';
+                        if (result.correct) {
+                            feedbackEl.className = 'checkpoint-feedback correct';
+                            feedbackEl.textContent = 'Correct! ' + (result.explanation || '');
+                        } else {
+                            feedbackEl.className = 'checkpoint-feedback incorrect';
+                            feedbackEl.textContent = 'Incorrect. ' + (result.explanation || '');
+                        }
+                    }
+                    checkpointAnswers[slideIndex] = userValue;
+                    callback();
+                })
+                .catch(err => {
+                    console.error('Checkpoint grade error:', err);
+                    checkpointAnswers[slideIndex] = userValue;
+                    callback();
+                });
+            };
+
+            window.gradeQuiz = function(answers) {
+                fetch(`/lessons/{{ module_index }}/grade`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        answers: answers,
+                        checkpoint_answers: checkpointAnswers
+                    })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    deck.showResults(data);
+                })
+                .catch(err => {
+                    console.error('Quiz grade error:', err);
+                    alert('Error grading quiz. Please try again.');
+                });
+            };
+        });
+
+        function retakeLesson() {
+            const btnRetake = document.getElementById('btn-retake');
+            btnRetake.disabled = true;
+            btnRetake.textContent = 'Regenerating...';
+
+            fetch(`/lessons/{{ module_index }}/retake`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert('Error regenerating quiz. Please try again.');
+                    btnRetake.disabled = false;
+                    btnRetake.textContent = 'Retake Lesson';
+                }
+            })
+            .catch(err => {
+                console.error('Retake error:', err);
+                btnRetake.disabled = false;
+                btnRetake.textContent = 'Retake Lesson';
+            });
+        }
+    </script>
+</body>
+</html>

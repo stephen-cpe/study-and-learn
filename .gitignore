@@ -58,6 +58,7 @@ uploads/
 data/user_*.json
 data/temp/
 data/chroma_db/
+data/flask_session/
 
 # AI model caches (Ollama, etc.)
 .ollama/

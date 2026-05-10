@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Lessons — Study-and-Learn</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logo-v2.png') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/retro.css') }}">
+</head>
+<body>
+    <div class="scanlines" aria-hidden="true"></div>
+    <nav class="navbar navbar-expand-lg az-navbar sticky-top">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center gap-2" href="/">
+                <img src="{{ url_for('static', filename='images/logo-v2.png') }}" alt="Logo" class="brand-logo">
+                <span class="brand-title">Study-and-Learn</span>
+            </a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1 class="mt-4">Interactive Lessons</h1>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ 'danger' if category == 'error' else 'success' if category == 'success' else 'info' }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <div class="lessons-progress mb-4">
+            <div class="progress-header d-flex justify-content-between">
+                <span>Overall Progress</span>
+                <span id="progress-percentage">{{ (lessons | selectattr('passed', 'equalto', true) | list | length / lessons|length * 100) | round | int if lessons else 0 }}%</span>
+            </div>
+            <div class="progress progress-enhanced">
+                {% set completed = lessons | selectattr('passed', 'equalto', true) | list | length %}
+                {% set pct = (completed / lessons|length * 100) | round | int if lessons else 0 %}
+                <div class="progress-bar progress-bar-custom" style="width: {{ pct }}%"></div>
+            </div>
+        </div>
+
+        <div class="lessons-grid">
+            {% for lesson in lessons %}
+            <div class="card lesson-card {% if not lesson.unlocked %}lesson-locked{% endif %} {% if lesson.passed %}lesson-completed{% endif %}">
+                <div class="card-body">
+                    <div class="lesson-card-header d-flex align-items-start justify-content-between">
+                        <div class="lesson-module-number">{{ loop.index }}</div>
+                        <div class="lesson-status-badges">
+                            {% if lesson.completed %}
+                                {% if lesson.passed %}
+                                <span class="badge badge-passed">Passed — {{ lesson.score }}%</span>
+                                {% else %}
+                                <span class="badge badge-failed">{{ lesson.score }}% — Retry Available</span>
+                                {% endif %}
+                            {% elif not lesson.unlocked %}
+                                <span class="badge badge-locked">Locked</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <h3 class="lesson-title">{{ lesson.module_title }}</h3>
+                    <p class="lesson-effort">Estimated effort: {{ lesson.estimated_effort }}</p>
+
+                    {% set slide_count = lesson.lesson.slides | length if lesson.lesson and lesson.lesson.slides else 0 %}
+                    {% set check_count = lesson.checkpoints | length if lesson.checkpoints else 0 %}
+                    <div class="lesson-meta">
+                        <span>{{ slide_count }} slides</span>
+                        <span>{{ check_count }} checkpoints</span>
+                        <span>1 final quiz (5 questions)</span>
+                    </div>
+
+                    <div class="lesson-actions">
+                        {% if lesson.unlocked %}
+                        <a href="{{ url_for('main.lesson_deck', module_index=lesson.index) }}" class="btn btn-primary btn-lg w-100">
+                            {% if lesson.completed and not lesson.passed %}
+                            Retake Lesson
+                            {% elif lesson.completed and lesson.passed %}
+                            Review Lesson
+                            {% else %}
+                            Start Lesson
+                            {% endif %}
+                        </a>
+                        {% else %}
+                        <button class="btn btn-outline-primary btn-lg w-100" disabled>
+                            Complete Previous Module First
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="action-buttons mb-4">
+            <a href="{{ url_for('main.results') }}" class="btn btn-outline-primary">Back to Results</a>
+            <a href="{{ url_for('main.index') }}" class="btn btn-primary">Start Over</a>
+        </div>
+    </div>
+
+    <footer class="az-footer">
+        <div class="container"><span>© 2026 Study-and-Learn Capstone Project</span></div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
