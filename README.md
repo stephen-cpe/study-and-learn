@@ -44,6 +44,49 @@ ollama pull qwen3-embedding:0.6b
 | `CI` | — | Set to `true` for in-memory ChromaDB in CI |
 | `SECRET_KEY` | `dev-key-for-testing-only` | Flask session signing key |
 
+### Cloud-only variables (ignored in local mode)
+
+| Variable | Required | Default | Purpose |
+|----------|----------|---------|---------|
+| `OLLAMA_CLOUD_API_KEY` | Yes | — | Ollama Cloud API key |
+| `OLLAMA_CLOUD_BASE_URL` | No | `https://ollama.com` | Ollama Cloud API base URL |
+
+## Switching Between Local and Cloud
+
+The app uses local Ollama by default. To switch to Ollama Cloud:
+
+**1. Uncomment one import** in `app/services/ai_client.py:41`:
+
+```python
+# ── Switch to Ollama Cloud ──────────────────────────────────────────────────
+# Uncomment the line below to route all AI calls through Ollama Cloud
+# from .ai_client_cloud import call_ollama  # noqa: E402
+# ─────────────────────────────────────────────────────────────────────────────
+```
+
+Change to:
+
+```python
+# ── Switch to Ollama Cloud ──────────────────────────────────────────────────
+from .ai_client_cloud import call_ollama  # noqa: E402   # ← uncommented
+# ─────────────────────────────────────────────────────────────────────────────
+```
+
+**2. Create a `.env` file** (already in `.gitignore`):
+
+```env
+OLLAMA_CLOUD_API_KEY=your-api-key-here
+OLLAMA_MODEL=gemma3:27b-cloud
+```
+
+**3. Done** — no other files need changing. The `from .ai_client_cloud import call_ollama` line replaces the local `call_ollama` at the module level, so every service (summarizer, quiz generator, etc.) automatically uses the cloud.
+
+**To switch back**, comment the import line again:
+
+```python
+# from .ai_client_cloud import call_ollama  # noqa: E402
+```
+
 ## Quick Start (Local Development)
 ```bash
 # 1. Clone and enter repo

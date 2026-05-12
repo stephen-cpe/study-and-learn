@@ -128,8 +128,10 @@ html, body {
 }
 
 .slide-title h2 {
-    font-size: 1.5em;
+    font-size: 1.0em;
     margin-bottom: 0.2em;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 .slide-title .subtitle {
@@ -357,14 +359,14 @@ html, body {
 }
 
 .results-slide .score-circle {
-    width: 80px;
-    height: 80px;
+    width: 100px;
+    height: 100px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     margin: 0.3em auto;
-    font-size: 1.4em;
+    font-size: 1.5em;
     font-weight: 900;
     font-family: "BoldPixels", sans-serif;
 }
@@ -399,6 +401,12 @@ html, body {
     margin: 1rem auto;
     max-height: 200px;
     overflow-y: auto;
+    font-size: 0.45em;
+}
+
+.results-detail p {
+    font-size: 1em;
+    line-height: 1.5;
 }
 
 .results-actions {
@@ -504,13 +512,23 @@ html, body {
 /* ── Responsive ── */
 @media (max-width: 768px) {
     html, body { font-size: 28px; }
-    .slide-title h2 { font-size: 1.3em; }
+    .slide-title h2 { font-size: 1.0em; }
     .checkpoint-option { font-size: 0.6em; }
     .quiz-question { padding: 0.3em 0.45em; }
     .quiz-question .q-option { font-size: 0.55em; }
+    .results-slide .score-circle {
+        width: 80px;
+        height: 80px;
+        font-size: 1.3em;
+    }
 }
 
 @media (max-width: 480px) {
     html, body { font-size: 22px; }
-    .slide-title h2 { font-size: 1.1em; }
+    .slide-title h2 { font-size: 1.0em; }
+    .results-slide .score-circle {
+        width: 70px;
+        height: 70px;
+        font-size: 1.1em;
+    }
 }

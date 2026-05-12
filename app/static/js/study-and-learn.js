@@ -178,13 +178,13 @@
                     this.checkpointAnswers[slideIndex] = userValue;
                     slide.dataset.answered = 'true';
                     this.updateControls();
-                    setTimeout(() => this.next(), 1500);
+                    setTimeout(() => this.next(), 3000);
                 });
             } else {
                 this.checkpointAnswers[slideIndex] = userValue;
                 slide.dataset.answered = 'true';
                 this.updateControls();
-                setTimeout(() => this.next(), 1500);
+                setTimeout(() => this.next(), 3000);
             }
         }
 
