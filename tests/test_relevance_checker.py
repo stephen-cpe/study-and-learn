@@ -3,7 +3,7 @@ Unit tests for the relevance checker service.
 """
 import os
 import pytest
-from app.services.relevance_checker import check_relevance
+from src.services.relevance_checker import check_relevance
 
 
 def test_check_relevance_with_mock(monkeypatch):
@@ -39,7 +39,7 @@ def test_check_relevance_prompt_construction(monkeypatch):
 
     # We'll mock the call_ollama function to capture what prompt is passed
     # Since relevance_checker imports call_ollama directly, we need to patch it in the relevance_checker module
-    import app.services.relevance_checker as relevance_checker_module
+    import src.services.relevance_checker as relevance_checker_module
     captured_prompt = {}
     
     def mock_call_ollama(prompt, model="llama3"):

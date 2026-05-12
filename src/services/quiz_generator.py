@@ -3,7 +3,7 @@ Quiz generation service for the Study-and-Learn MVP.
 """
 import json
 import random
-from app.services.ai_client import call_ollama
+from src.services.ai_client import call_ollama
 
 
 def generate_quiz(module_title: str, slides: list, retriever, n_questions: int = 5) -> dict:

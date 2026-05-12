@@ -102,8 +102,8 @@ Build the smallest working version first, then iterate:
 **User Stories:** US-012, US-013, US-014, US-015, US-016, US-017
 
 **Tasks:**
-- [x] Create `app/services/lesson_generator.py` (title/content/example/summary slide types, RAG-grounded)
-- [x] Create `app/services/quiz_generator.py` (mcq, true_false, multi_select, fill_blank question types)
+- [x] Create `src/services/lesson_generator.py` (title/content/example/summary slide types, RAG-grounded)
+- [x] Create `src/services/quiz_generator.py` (mcq, true_false, multi_select, fill_blank question types)
 - [x] Add `POST /generate-lessons` — loop over modules, sequential generation with loading UI
 - [x] Add `GET /lessons` — module list page with progress bar, gated locks, score badges
 - [x] Add `GET /lessons/<i>` — custom CSS/JS slide deck rendering lesson slides + checkpoints + quiz
@@ -132,7 +132,7 @@ Build the smallest working version first, then iterate:
 - [ ] Replace full-screen loading overlay with background processing + progress bar / stage indicator
 - [ ] Add stage-by-stage progress reporting during lesson generation (e.g., "Generating slides for Module 2 of 5...")
 - [ ] Create retro mascot animation frames (idle, waiting/loading, done/success, retry/encourage states)
-- [ ] Integrate mascot (`app/static/images/mascot-robot.png`) into UI with simple interactions
+- [ ] Integrate mascot (`src/static/images/mascot-robot.png`) into UI with simple interactions
 - [ ] Research optimal Ollama model for lesson/quiz quality vs speed on target hardware (6GB VRAM)
 - [ ] Evaluate and document quality comparison: qwen3:1.7b vs gemma3:4b vs granite4.1:3b for lesson generation
 - [ ] Add difficulty level selector (Easy: 10–11 yrs, Moderate: 12–13 yrs, Hard: 14–15 yrs)

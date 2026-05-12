@@ -2,7 +2,7 @@
 Unit tests for the quiz generator service.
 """
 import pytest
-from app.services.quiz_generator import (
+from src.services.quiz_generator import (
     generate_quiz, generate_inline_checkpoint, _validate_questions,
     _fallback_quiz, _summarize_slides, _build_type_mix
 )

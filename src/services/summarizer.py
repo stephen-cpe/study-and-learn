@@ -1,7 +1,7 @@
 """
 Summary generation service for the Study-and-Learn MVP.
 """
-from app.services.ai_client import call_ollama
+from src.services.ai_client import call_ollama
 
 
 def generate_summary(extracted_text: str) -> str:

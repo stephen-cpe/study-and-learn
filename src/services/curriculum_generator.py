@@ -2,7 +2,7 @@
 Curriculum/study path generation service for the Study-and-Learn MVP.
 """
 import json
-from app.services.ai_client import call_ollama
+from src.services.ai_client import call_ollama
 
 
 def generate_study_path(learning_goal: str, extracted_text: str, summary: str) -> dict:

@@ -5,14 +5,14 @@ import os
 import uuid
 from flask import (Blueprint, render_template, request, redirect,
                    url_for, flash, session, current_app, jsonify)
-from app.utils import allowed_file
-from app.services.document_parser import extract_text
-from app.services.summarizer import generate_summary
-from app.services.relevance_checker import check_relevance
-from app.services.curriculum_generator import generate_study_path
-from app.services.rag_retriever import build_rag_context
-from app.services.lesson_generator import generate_lesson
-from app.services.quiz_generator import generate_quiz, generate_inline_checkpoint
+from src.utils import allowed_file
+from src.services.document_parser import extract_text
+from src.services.summarizer import generate_summary
+from src.services.relevance_checker import check_relevance
+from src.services.curriculum_generator import generate_study_path
+from src.services.rag_retriever import build_rag_context
+from src.services.lesson_generator import generate_lesson
+from src.services.quiz_generator import generate_quiz, generate_inline_checkpoint
 
 bp = Blueprint('main', __name__)
 

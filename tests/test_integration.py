@@ -3,7 +3,7 @@ import tempfile
 import pytest
 from unittest.mock import patch
 from cachelib import FileSystemCache
-from app import create_app
+from src import create_app
 
 @pytest.fixture
 def client():
@@ -22,10 +22,10 @@ def client():
             with app.app_context():
                 yield client
 
-@patch('app.services.rag_retriever.build_rag_context')
-@patch('app.services.summarizer.call_ollama')
-@patch('app.services.relevance_checker.call_ollama')
-@patch('app.services.curriculum_generator.call_ollama')
+@patch('src.services.rag_retriever.build_rag_context')
+@patch('src.services.summarizer.call_ollama')
+@patch('src.services.relevance_checker.call_ollama')
+@patch('src.services.curriculum_generator.call_ollama')
 def test_full_workflow(mock_curriculum, mock_relevance, mock_summarizer, mock_rag, client):
     mock_rag.return_value = "RAG context for testing."
     mock_summarizer.return_value = "Main topics: ML, algorithms. Difficulty: intermediate."
@@ -44,8 +44,8 @@ def test_full_workflow(mock_curriculum, mock_relevance, mock_summarizer, mock_ra
     assert b'Strong' in response.data
     assert b'Start Over' in response.data
 
-@patch('app.services.lesson_generator.call_ollama')
-@patch('app.services.quiz_generator.call_ollama')
+@patch('src.services.lesson_generator.call_ollama')
+@patch('src.services.quiz_generator.call_ollama')
 def test_generate_lessons_flow(mock_quiz_ollama, mock_lesson_ollama, client):
     mock_lesson_ollama.return_value = '{"module_title": "Intro to ML", "slides": [{"type": "title", "title": "Intro", "subtitle": "ML Basics"}, {"type": "content", "heading": "Overview", "bullets": ["Point 1", "Point 2"], "notes": ""}]}'
     mock_quiz_ollama.return_value = '{"questions": [{"id": "q1", "type": "mcq", "prompt": "What is ML?", "options": ["A", "B", "C", "D"], "answer_index": 0, "explanation": "ML is AI"}]}'
@@ -63,8 +63,8 @@ def test_generate_lessons_flow(mock_quiz_ollama, mock_lesson_ollama, client):
     assert response.status_code == 200
     assert b'Generated' in response.data or b'successfully' in response.data
 
-@patch('app.services.lesson_generator.call_ollama')
-@patch('app.services.quiz_generator.call_ollama')
+@patch('src.services.lesson_generator.call_ollama')
+@patch('src.services.quiz_generator.call_ollama')
 def test_lesson_deck_route(mock_quiz_ollama, mock_lesson_ollama, client):
     mock_lesson_ollama.return_value = '{"module_title": "Intro", "slides": [{"type": "title", "title": "Hello", "subtitle": "World"}]}'
     mock_quiz_ollama.return_value = '{"questions": [{"id": "q1", "type": "true_false", "prompt": "Test?", "answer": true, "explanation": "Yes"}]}'

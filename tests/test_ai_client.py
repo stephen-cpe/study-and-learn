@@ -3,7 +3,7 @@ Unit tests for the AI client service.
 """
 import os
 import pytest
-from app.services.ai_client import call_ollama
+from src.services.ai_client import call_ollama
 
 
 def test_call_ollama_with_mock(monkeypatch):
@@ -42,7 +42,7 @@ def test_call_ollama_without_mock(monkeypatch):
         return MockResponse()
 
     # We need to patch the requests.post inside the ai_client module
-    import app.services.ai_client as ai_client_module
+    import src.services.ai_client as ai_client_module
     monkeypatch.setattr(ai_client_module.requests, 'post', mock_post)
 
     response = call_ollama("test prompt")

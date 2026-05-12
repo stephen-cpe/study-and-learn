@@ -2,7 +2,7 @@
 Unit tests for the lesson generator service.
 """
 import pytest
-from app.services.lesson_generator import generate_lesson, _validate_slides, _fallback_lesson
+from src.services.lesson_generator import generate_lesson, _validate_slides, _fallback_lesson
 
 
 def test_generate_lesson_with_mock(monkeypatch):
@@ -52,7 +52,7 @@ def test_generate_lesson_prompt_construction(monkeypatch):
     monkeypatch.setenv('AI_MOCK', 'true')
     monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
 
-    import app.services.lesson_generator as lg_module
+    import src.services.lesson_generator as lg_module
     captured_prompt = {}
 
     def mock_call_ollama(prompt, model=None):

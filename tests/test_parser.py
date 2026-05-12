@@ -4,7 +4,7 @@ Unit tests for the document parser service.
 import os
 import tempfile
 import pytest
-from app.services.document_parser import extract_text
+from src.services.document_parser import extract_text
 
 
 def test_extract_valid_txt():

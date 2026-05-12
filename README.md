@@ -44,7 +44,7 @@ pytest -v tests/
 
 The app uses local Ollama by default. To switch to Ollama Cloud:
 
-**1. Uncomment one import** in `app/services/ai_client.py:41`:
+**1. Uncomment one import** in `src/services/ai_client.py:41`:
 
 ```python
 # ── Switch to Ollama Cloud ──────────────────────────────────────────────────

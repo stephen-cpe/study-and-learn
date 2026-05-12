@@ -4,8 +4,8 @@ RAG retriever orchestrator service.
 import logging
 import uuid
 from typing import List
-from app.services.chunker import chunk_text
-from app.services.vector_store import store_chunks, retrieve_context
+from src.services.chunker import chunk_text
+from src.services.vector_store import store_chunks, retrieve_context
 
 logger = logging.getLogger(__name__)
 

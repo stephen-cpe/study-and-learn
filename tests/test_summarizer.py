@@ -3,7 +3,7 @@ Unit tests for the summarizer service.
 """
 import os
 import pytest
-from app.services.summarizer import generate_summary
+from src.services.summarizer import generate_summary
 
 
 def test_generate_summary_with_mock(monkeypatch):
@@ -32,7 +32,7 @@ def test_generate_summary_prompt_construction(monkeypatch):
 
     # We'll mock the call_ollama function to capture what prompt is passed
     # Since summarizer imports call_ollama directly, we need to patch it in the summarizer module
-    import app.services.summarizer as summarizer_module
+    import src.services.summarizer as summarizer_module
     captured_prompt = {}
     
     def mock_call_ollama(prompt, model="llama3"):

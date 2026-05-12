@@ -8,7 +8,7 @@ from unittest.mock import patch, MagicMock
 
 def test_chunk_text_basic():
     """Test that chunk_text splits text correctly."""
-    from app.services.chunker import chunk_text
+    from src.services.chunker import chunk_text
     
     text = "This is sentence one. This is sentence two. This is sentence three."
     chunks = chunk_text(text)
@@ -20,7 +20,7 @@ def test_chunk_text_basic():
 
 def test_chunk_text_empty():
     """Test that chunk_text handles empty text."""
-    from app.services.chunker import chunk_text
+    from src.services.chunker import chunk_text
     
     chunks = chunk_text("")
     assert chunks == []
@@ -31,7 +31,7 @@ def test_chunk_text_empty():
 
 def test_chunk_text_preserves_content():
     """Test that chunked text preserves original content."""
-    from app.services.chunker import chunk_text
+    from src.services.chunker import chunk_text
     
     text = "First paragraph.\n\nSecond paragraph.\n\nThird paragraph."
     chunks = chunk_text(text)
@@ -44,7 +44,7 @@ def test_chunk_text_preserves_content():
 
 def test_vector_store_imports():
     """Test that vector_store module can be imported."""
-    from app.services import vector_store
+    from src.services import vector_store
     assert hasattr(vector_store, 'get_chroma_client')
     assert hasattr(vector_store, 'store_chunks')
     assert hasattr(vector_store, 'retrieve_context')
@@ -52,18 +52,18 @@ def test_vector_store_imports():
 
 def test_build_rag_context_no_files():
     """Test RAG context builder with no files."""
-    from app.services.rag_retriever import build_rag_context
+    from src.services.rag_retriever import build_rag_context
     
     context = build_rag_context("test goal", [])
     assert context == ""
 
 
-@patch('app.services.rag_retriever.chunk_text')
-@patch('app.services.rag_retriever.store_chunks')
-@patch('app.services.rag_retriever.retrieve_context')
+@patch('src.services.rag_retriever.chunk_text')
+@patch('src.services.rag_retriever.store_chunks')
+@patch('src.services.rag_retriever.retrieve_context')
 def test_build_rag_context_single_file(mock_retrieve, mock_store, mock_chunk):
     """Test RAG context builder with single file."""
-    from app.services.rag_retriever import build_rag_context
+    from src.services.rag_retriever import build_rag_context
     
     mock_chunk.return_value = ["chunk1", "chunk2"]
     mock_store.return_value = "stored"

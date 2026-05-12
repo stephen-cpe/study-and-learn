@@ -129,8 +129,8 @@ Core workflow:
 ---
 
 ## 3. Software & Architectural Patterns
-- Model-View-Controller (MVC): Flask routes (Controller) delegate to `app/services/` (Model/Business Logic) and render Bootstrap templates (View). Separation keeps routing thin and services testable.
-- Service Layer Pattern: All AI, parsing, and RAG logic isolated in `app/services/`. Enables independent unit testing, easy mocking, and future provider swaps.
+- Model-View-Controller (MVC): Flask routes (Controller) delegate to `src/services/` (Model/Business Logic) and render Bootstrap templates (View). Separation keeps routing thin and services testable.
+- Service Layer Pattern: All AI, parsing, and RAG logic isolated in `src/services/`. Enables independent unit testing, easy mocking, and future provider swaps.
 - Repository/DAO Pattern: ChromaDB vector storage abstracted behind `vector_store.py`. Decouples ingestion from retrieval logic.
 - Mock Object Pattern: `AI_MOCK=true` and in-memory ChromaDB replace live LLM/vector calls in CI. Guarantees deterministic, zero-cost, GPU-free test execution.
 

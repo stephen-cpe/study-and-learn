@@ -2,7 +2,7 @@
 Lesson generation service for the Study-and-Learn MVP.
 """
 import json
-from app.services.ai_client import call_ollama
+from src.services.ai_client import call_ollama
 
 
 def build_rag_context_for_module(module_title: str, learning_goal: str, retriever) -> str:

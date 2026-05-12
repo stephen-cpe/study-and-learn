@@ -194,7 +194,7 @@ Candidate deployment platforms:
 
 ```text
 study-and-learn/
-├── app/
+├── src/
 │   ├── __init__.py
 │   ├── routes.py
 │   ├── models.py

@@ -3,7 +3,7 @@ Unit tests for the curriculum generator service.
 """
 import os
 import pytest
-from app.services.curriculum_generator import generate_study_path
+from src.services.curriculum_generator import generate_study_path
 
 
 def test_generate_study_path_with_mock(monkeypatch):
@@ -40,7 +40,7 @@ def test_generate_study_path_prompt_construction(monkeypatch):
 
     # We'll mock the call_ollama function to capture what prompt is passed
     # Since curriculum_generator imports call_ollama directly, we need to patch it in the curriculum_generator module
-    import app.services.curriculum_generator as curriculum_generator_module
+    import src.services.curriculum_generator as curriculum_generator_module
     captured_prompt = {}
     
     def mock_call_ollama(prompt, model="llama3"):

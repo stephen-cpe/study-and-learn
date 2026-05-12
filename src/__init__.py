@@ -27,7 +27,7 @@ def create_app():
     from flask_session import Session
     Session(app)
 
-    from app import routes
+    from src import routes
     app.register_blueprint(routes.bp)
 
     return app

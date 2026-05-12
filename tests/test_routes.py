@@ -2,7 +2,7 @@ import io
 import tempfile
 import pytest
 from cachelib import FileSystemCache
-from app import create_app
+from src import create_app
 
 @pytest.fixture
 def client():
