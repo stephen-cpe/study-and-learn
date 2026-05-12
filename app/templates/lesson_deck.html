@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/study-and-learn.css') }}">
 </head>
 <body>
-    <div class="deck-container">
+    <div class="deck-container" data-module-index="{{ module_index }}">
         <div class="slides-wrapper">
 
             {% set slides = lesson.lesson.slides if lesson.lesson and lesson.lesson.slides else [] %}
@@ -78,7 +78,7 @@
                         {% endfor %}
                     </div>
                     <div class="checkpoint-feedback"></div>
-                    <button class="btn-submit-quiz" style="margin-top: 1rem; display: none;" onclick="deck.advanceFromCheckpoint(this)">Continue</button>
+                    <button class="btn-submit-quiz" style="margin-top: 1rem; display: none;">Continue</button>
                 </div>
             </section>
             {% endif %}
@@ -120,7 +120,7 @@
                         <p style="color: var(--deck-warning); font-size: 0.6em;">No quiz questions available</p>
                         {% endif %}
                     </div>
-                    <button class="btn-submit-quiz" onclick="deck.submitFinalQuiz()">Submit Answers</button>
+                    <button class="btn-submit-quiz" id="submit-quiz-btn">Submit Answers</button>
                     <div id="quiz-error" style="color: var(--deck-danger); margin-top: 0.5rem; display: none;">Please answer all questions before submitting.</div>
                 </div>
             </section>
@@ -134,7 +134,7 @@
                     <div id="results-detail" class="results-detail" style="display: none;"></div>
 
                     <div class="results-actions">
-                        <button class="btn-retake" id="btn-retake" onclick="retakeLesson()" style="display: none;">Retake Lesson</button>
+                        <button class="btn-retake" id="btn-retake" style="display: none;">Retake Lesson</button>
                         <a class="btn-modules" href="{{ url_for('main.lessons') }}">Back to Modules</a>
                     </div>
                 </div>
@@ -155,103 +155,6 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/study-and-learn.js') }}"></script>
-    <script>
-        let checkpointAnswers = {};
-        let quizSubmitted = false;
-        let finalGrade = null;
-
-        let deck;
-
-        document.addEventListener('DOMContentLoaded', function() {
-            deck = new StudyAndLearnDeck({
-                onSlideChange: function(event) {
-                    const state = event.slide.dataset.state;
-                    const isScrollableSlide = state === 'checkpoint-blocked' || state === 'quiz-blocked';
-
-                    if (isScrollableSlide) {
-                        event.slide.querySelector('.scroll-container')?.scrollTo(0, 0);
-                    }
-                }
-            });
-
-            window.gradeCheckpoint = function(slideIndex, userValue, feedbackEl, callback) {
-                fetch(`/lessons/{{ module_index }}/grade`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        answers: [],
-                        checkpoint_answers: { [slideIndex]: userValue }
-                    })
-                })
-                .then(r => r.json())
-                .then(data => {
-                    const cpr = data.checkpoint_results || [];
-                    const result = cpr.find(r => String(r.slide_index) === String(slideIndex));
-                    if (result) {
-                        feedbackEl.style.display = 'block';
-                        if (result.correct) {
-                            feedbackEl.className = 'checkpoint-feedback correct';
-                            feedbackEl.textContent = 'Correct! ' + (result.explanation || '');
-                        } else {
-                            feedbackEl.className = 'checkpoint-feedback incorrect';
-                            feedbackEl.textContent = 'Incorrect. ' + (result.explanation || '');
-                        }
-                    }
-                    checkpointAnswers[slideIndex] = userValue;
-                    callback();
-                })
-                .catch(err => {
-                    console.error('Checkpoint grade error:', err);
-                    checkpointAnswers[slideIndex] = userValue;
-                    callback();
-                });
-            };
-
-            window.gradeQuiz = function(answers) {
-                fetch(`/lessons/{{ module_index }}/grade`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        answers: answers,
-                        checkpoint_answers: checkpointAnswers
-                    })
-                })
-                .then(r => r.json())
-                .then(data => {
-                    deck.showResults(data);
-                })
-                .catch(err => {
-                    console.error('Quiz grade error:', err);
-                    alert('Error grading quiz. Please try again.');
-                });
-            };
-        });
-
-        function retakeLesson() {
-            const btnRetake = document.getElementById('btn-retake');
-            btnRetake.disabled = true;
-            btnRetake.textContent = 'Regenerating...';
-
-            fetch(`/lessons/{{ module_index }}/retake`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    window.location.reload();
-                } else {
-                    alert('Error regenerating quiz. Please try again.');
-                    btnRetake.disabled = false;
-                    btnRetake.textContent = 'Retake Lesson';
-                }
-            })
-            .catch(err => {
-                console.error('Retake error:', err);
-                btnRetake.disabled = false;
-                btnRetake.textContent = 'Retake Lesson';
-            });
-        }
-    </script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>

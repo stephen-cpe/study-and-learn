@@ -148,6 +148,7 @@ html, body {
     margin-top: 0.4em;
     font-size: 0.7em;
     font-style: italic;
+    white-space: pre-line;
 }
 
 /* ── Summary slides ── */
@@ -359,16 +360,17 @@ html, body {
 }
 
 .results-slide .score-circle {
-    width: 100px;
-    height: 100px;
+    width: 130px;
+    height: 130px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     margin: 0.3em auto;
-    font-size: 1.5em;
+    font-size: 36px;
     font-weight: 900;
     font-family: "BoldPixels", sans-serif;
+    overflow: hidden;
 }
 
 .results-slide .score-circle.passed {
@@ -517,9 +519,9 @@ html, body {
     .quiz-question { padding: 0.3em 0.45em; }
     .quiz-question .q-option { font-size: 0.55em; }
     .results-slide .score-circle {
-        width: 80px;
-        height: 80px;
-        font-size: 1.3em;
+        width: 100px;
+        height: 100px;
+        font-size: 28px;
     }
 }
 
@@ -527,8 +529,8 @@ html, body {
     html, body { font-size: 22px; }
     .slide-title h2 { font-size: 1.0em; }
     .results-slide .score-circle {
-        width: 70px;
-        height: 70px;
-        font-size: 1.1em;
+        width: 85px;
+        height: 85px;
+        font-size: 22px;
     }
 }

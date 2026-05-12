@@ -83,6 +83,7 @@ def process():
         session['relevance_result'] = relevance_result
         session['study_path'] = study_path
         session['processed_filename'] = ', '.join(filenames)
+        session['uploaded_filenames'] = filenames
         session['extracted_texts'] = extracted_texts
 
         flash(f'Processed {len(filenames)} file(s) successfully!', 'success')
@@ -103,6 +104,7 @@ def results():
     relevance_result = session.get('relevance_result', {})
     study_path = session.get('study_path', {})
     filename = session.get('processed_filename', 'unknown file')
+    filenames = session.get('uploaded_filenames', [])
     learning_goal = session.get('learning_goal', '')
 
     return render_template('results.html',
@@ -110,6 +112,7 @@ def results():
                            relevance_result=relevance_result,
                            study_path=study_path,
                            filename=filename,
+                           filenames=filenames,
                            learning_goal=learning_goal)
 
 

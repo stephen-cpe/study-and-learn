@@ -32,8 +32,16 @@
         {% endwith %}
 
         <div class="results-meta mb-4">
-            <span class="badge filename-badge">Files: {{ filename }}</span>
             <span class="badge goal-badge">{{ learning_goal }}</span>
+            {% if filenames %}
+            <div class="file-list">
+                {% for f in filenames %}
+                <span class="badge filename-badge file-list-item">{{ f }}</span>
+                {% endfor %}
+            </div>
+            {% else %}
+            <span class="badge filename-badge">Files: {{ filename }}</span>
+            {% endif %}
         </div>
 
         <div class="results-grid">
@@ -94,7 +102,7 @@
 
                     <div class="generate-lessons-section mt-4">
                         <div class="d-grid">
-                            <button id="generate-lessons-btn" class="btn btn-accent btn-lg">
+                            <button id="generate-lessons-btn" class="btn btn-accent btn-lg" data-generate-url="{{ url_for('main.generate_lessons') }}">
                                 Generate Interactive Lessons
                             </button>
                         </div>
@@ -124,40 +132,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            marked.setOptions({ breaks: true, gfm: true });
-
-            function parseMarkdown(elementId) {
-                const el = document.getElementById(elementId);
-                if (!el) return;
-                const raw = el.innerText.trim();
-                el.innerHTML = marked.parse(raw);
-                el.classList.remove('raw-md');
-            }
-
-            parseMarkdown('summary-content');
-            parseMarkdown('relevance-content');
-            document.querySelectorAll('.module-title.raw-md').forEach(el => {
-                el.innerHTML = marked.parse(el.innerText);
-                el.classList.remove('raw-md');
-            });
-
-            const generateBtn = document.getElementById('generate-lessons-btn');
-            if (generateBtn) {
-                generateBtn.addEventListener('click', function() {
-                    document.getElementById('loadingOverlay').classList.add('active');
-                    document.getElementById('progress-text').textContent =
-                        'Generating lesson content, quizzes, and checkpoints...';
-
-                    const form = document.createElement('form');
-                    form.method = 'POST';
-                    form.action = "{{ url_for('main.generate_lessons') }}";
-                    document.body.appendChild(form);
-                    form.submit();
-                });
-            }
-        });
-    </script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>

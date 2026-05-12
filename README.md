@@ -35,7 +35,7 @@ python.exe -m pip install --upgrade pip
 pip install -r requirements.txt
 
 # 4. Run the app
-python run.py
+python app.py
 
 # 5. Run tests
 pytest -v tests/

@@ -220,7 +220,7 @@ study-and-learn/
 │       └── tests.yml
 ├── requirements.txt
 ├── README.md
-└── run.py
+└── app.py
 ```
 ### 4.4 AI Model Specification
 | Parameter | Value | Notes |

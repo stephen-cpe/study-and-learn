@@ -231,6 +231,22 @@ h2, .section-title {
   font-weight: 800;
 }
 
+.file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-width: 100%;
+}
+
+.file-list-item {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
 /* Results cards */
 .card {
   background: linear-gradient(135deg, rgba(30, 58, 95, 0.86), rgba(16, 39, 66, 0.72));
@@ -427,9 +443,9 @@ h2, .section-title {
 /* ===== RESULTS META ===== */
 .results-meta {
     display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    align-items: center;
+    flex-direction: column;
+    gap: 0.65rem;
+    align-items: flex-start;
 }
 .goal-badge {
     background: rgba(0, 180, 216, 0.1);
@@ -716,7 +732,6 @@ h2, .section-title {
         grid-template-columns: 1fr;
     }
     .results-meta {
-        flex-direction: column;
         align-items: flex-start;
     }
     .action-buttons {
