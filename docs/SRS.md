@@ -211,10 +211,6 @@ study-and-learn/
 │   ├── SRS.md
 │   ├── TODO.md
 │   └── DESIGN_AND_TESTING.md
-├── task-board/
-│   ├── index.html
-│   ├── styles.css
-│   └── app.js
 ├── .github/
 │   └── workflows/
 │       └── tests.yml
@@ -484,10 +480,10 @@ study-and-learn/
 - Short-answer (free-text) AI grading.
 - Adaptive difficulty based on learner performance.
 - Spaced repetition and review scheduling.
-- Multi-user accounts and authentication.
 - Rich companion behavior and interactive mascot.
 - Admin content management workflow.
-- Persistent progress tracking across sessions.
+- Social features (friends, chat, share lessons).
+- Full offline mode (C/C++ rewrite without Ollama).
 
 ---
 
@@ -496,39 +492,49 @@ study-and-learn/
 Ranked from easier to harder. Items above the line are implemented; items below are candidates for future sprints.
 
 ### ✅ Implemented
-1. Static mascot image or pixel avatar — done
+1. Static mascot image or pixel avatar — done (mascot-robot.png placed bottom-right with click-to-talk)
 2. Retro theme improvements — done (Retrograde Bold, BoldPixels fonts, cyberpunk theme)
 3. Better prompt templates — done
 4. Simple quiz generation — done (4 question types: mcq, true_false, multi_select, fill_blank)
 5. Slide-style lesson pages — done (custom CSS/JS deck engine with inline checkpoints)
-6. Retro mascot integration — image placeholder ready (`mascot-robot.png`)
-7. Loading/progress UI — full-screen spinner implemented; needs incremental improvement
-8. Gated module progression with pass/fail — done (80% threshold)
-9. Retake with regenerated questions — done
-10. Server-side session storage — done (Flask-Session + cachelib FileSystemCache)
+6. Cloud model toggle — done (ai_client_cloud.py with import-override pattern)
+7. JS refactored into external app.js — done
+8. Package renamed app/ → src/ — done
+9. Gated module progression with pass/fail — done (80% threshold)
+10. Retake with regenerated questions — done
+11. Server-side session storage — done (Flask-Session + cachelib FileSystemCache)
+12. Loading/progress UI — full-screen spinner implemented; needs incremental improvement
 
-### Upcoming
-11. Better mascot animation frames (idle/waiting/done states)
-12. Editable generated output fields
-13. Basic progress checklist
+### Sprint 4 (In Progress)
+13. Fill-in-the-blank one-word validation with inline inputs
 14. Difficulty level selector (Easy/Moderate/Hard)
-15. Export generated plan as Markdown
-16. Export generated plan as HTML
-17. Admin review/edit screen
-18. More file formats and robust parsing (.html, .odt)
-19. Embeddings/retrieval model optimization research
-20. Lesson quality improvement (prompt engineering, model evaluation)
-21. Progressive loading UI (background processing with stage indicators)
-22. OCR for scanned PDFs
-23. Learner profile / difficulty level adaptation
-24. YouTube or external resource integration
-25. AI-generated presentation deck export
-26. AI-generated subtitles
-27. AI-generated TTS narration
-28. Short-answer (free-text) AI grading
-29. Spaced repetition and review scheduling
-30. Full adaptive study planner
-31. Multi-user accounts and authentication
+15. Background progress indicator replacing full-screen overlay
+16. Lesson/quiz prompt engineering refinement
+
+### Sprint 5–6 (Planned)
+17. Multi-user accounts (Flask-Login + PostgreSQL)
+18. Learner dashboard with progress tracking
+19. Max 3 active lessons gating
+20. Admin access control for lesson generation
+21. Text-to-speech narration (opt-in)
+22. PDF export for completed lessons
+23. Mascot animation frames (idle/waiting/done)
+24. Session cleanup (remove extracted_texts after lessons generated)
+
+### Sprint 7–8 (Planned)
+25. OCR for scanned PDFs
+26. Badges/trophies for completed lessons
+27. Source document referencing in lessons
+28. Deployment to free-tier host
+29. Final documentation and demo recording
+
+### Post-Capstone / Stretch
+30. YouTube or external resource integration
+31. Short-answer (free-text) AI grading
+32. Spaced repetition and review scheduling
+33. Full adaptive study planner
+34. Social features (friends, chat, share lessons)
+35. Full offline mode (C/C++ rewrite without Ollama)
 
 ---
 
@@ -590,13 +596,13 @@ Later additions:
 1. ~~Should the first prototype use pgvector or ChromaDB?~~ → **ChromaDB** (chosen, implemented)
 2. ~~Which Ollama model gives acceptable local results on the target hardware?~~ → **qwen3:0.6b (chat) + qwen3-embedding:0.6b (embeddings)** (placeholder; upgrade path: `qwen3:1.7b`, `gemma3:4b`, or Ollama Cloud)
 3. ~~How many file types should be truly supported in the first sprint?~~ → **txt, md, pdf, docx** (implemented)
-4. ~~Should OCR be postponed until after the main workflow works?~~ → **Postponed** to post-MVP
+4. ~~Should OCR be postponed until after the main workflow works?~~ → **Postponed** to Sprint 7
 5. ~~Should generated outputs be stored as JSON, Markdown, or database records?~~ → **JSON in Flask session (server-side via cachelib)**
-6. Should the companion be purely visual or tied to progress? → Visual feedback with idle/waiting/done states planned for next sprint
-7. ~~Which deployment platform is easiest for the final capstone demo?~~ → Render or Railway free tier TBD in Sprint 4
-8. What is the optimal model for lesson/quiz generation quality vs speed on 6GB VRAM? → Research task for next sprint
-9. Should loading UI use full-screen overlay or background processing with stage indicator? → Background processing with progress bar preferred (next sprint)
-10. How many mascot animation frames are needed for adequate visual feedback? → TBD after frame generation
+6. ~~Should the companion be purely visual or tied to progress?~~ → Visual feedback with click-to-talk implemented; animation frames deferred to Sprint 6
+7. ~~Which deployment platform is easiest for the final capstone demo?~~ → Render or Railway free tier TBD in Sprint 8
+8. ~~What is the optimal model for lesson/quiz generation quality vs speed on 6GB VRAM?~~ → qwen3:0.6b chosen as placeholder; upgrade guidance documented (Sprint 4 prompt tuning ongoing)
+9. ~~Should loading UI use full-screen overlay or background processing with stage indicator?~~ → Background processing with progress bar preferred (Sprint 4)
+10. ~~How many mascot animation frames are needed for adequate visual feedback?~~ → TBD in Sprint 6
 
 ---
 

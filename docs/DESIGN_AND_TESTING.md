@@ -261,6 +261,6 @@ Recommendation: Deploy to Render/Railway free tier with `AI_MOCK=true` for gradi
 | Scope creep | Missed MVP | Keep optional features outside official sprint goals |
 | Deployment resource limits | App unavailable | Test deployment early |
 | AI output inconsistency | Poor demo | Use controlled sample documents and structured prompts |
-| Quiz/lesson quality inadequate for learning | Poor pedagogical value | Prompt engineering research in Sprint 4; evaluate alternative models; set appropriate expectations for 1.7B model |
+| Quiz/lesson quality inadequate for learning | Poor pedagogical value | Prompt engineering research in Sprint 4; evaluate alternative models; set appropriate expectations for 0.6B model |
 | Session data loss on server restart | Lost lesson state | Acceptable for MVP demo; document limitation; persistent storage deferred to v2 |
 | Loading UX causes user abandonment | Dropped sessions during long generation | Replace full-screen overlay with background progress UI in Sprint 4 |

@@ -124,60 +124,163 @@ Build the smallest working version first, then iterate:
 
 ### Sprint 4: UX Polish, Mascot, and Quality Improvements ⬜ CURRENT
 
-**Goal:** Polish the retro experience, add mascot interactions, improve loading UX, implement difficulty toggle, and research model/quality improvements for better lesson output.
+**Goal:** Polish the retro experience, integrate mascot into UI, improve loading UX, implement difficulty toggle, fix bugs, and tune prompts for better lesson output.
 
-**User Stories:** US-018, US-019, US-020, US-021, US-022
+**User Stories:** US-018, US-019, US-020, US-021, US-022, US-025
 
 **Tasks:**
+- [x] Integrate mascot (`mascot-robot.png`) into bottom-right corner of UI (index + results pages)
+- [x] Add click-to-talk mascot with random encouraging messages
+- [x] Add mascot idle message on interval timer
+- [x] Extract all inline JS from templates into `app.js`
+- [x] Consolidate study-and-learn.js (deck class) + app.js (logic)
+- [x] Rename `run.py` → `app.py` per user convention
+- [x] Rename `app/` package → `src/`
+- [x] Add cloud model toggle via `ai_client_cloud.py` import pattern
+- [x] Fix title slide text overflow (long titles breaking out of card)
+- [x] Fix results-detail font size (inheriting 42px base)
+- [x] Fix score-circle overflow (100% text breaking out of circle)
+- [x] Fix file list overflow (long filenames as single line)
+- [x] Fix markdown rendering (asterisks/bold not rendering in lesson slides + results)
+- [x] Fix suggested materials list (asterisk bullets not rendered)
+- [x] Add console debug dump for lesson answers (F12 testing)
+- [ ] Fix fill-in-the-blank: one-word-only input per blank, inline placement, per-blank grading
 - [ ] Replace full-screen loading overlay with background processing + progress bar / stage indicator
-- [ ] Add stage-by-stage progress reporting during lesson generation (e.g., "Generating slides for Module 2 of 5...")
-- [ ] Create retro mascot animation frames (idle, waiting/loading, done/success, retry/encourage states)
-- [ ] Integrate mascot (`src/static/images/mascot-robot.png`) into UI with simple interactions
-- [ ] Research optimal Ollama model for lesson/quiz quality vs speed on target hardware (6GB VRAM)
-- [ ] Evaluate and document quality comparison: qwen3:0.6b vs gemma3:4b vs granite4.1:3b for lesson generation
+- [ ] Add stage-by-stage progress reporting during lesson generation
 - [ ] Add difficulty level selector (Easy: 10–11 yrs, Moderate: 12–13 yrs, Hard: 14–15 yrs)
 - [ ] Adjust lesson/quiz prompts based on selected difficulty level
 - [ ] Improve lesson and quiz prompt templates for better pedagogical quality
-- [ ] Add loading feedback that is entertaining/retro-themed during long operations
 - [ ] Polish responsive layout for slide deck on smaller screens
 - [ ] Update unit tests for new prompt logic and difficulty toggle
-- [ ] Update task board with sprint progress
-- [ ] Record sprint demo
 
 **Sprint 4 Definition of Done:**
-- Loading UX uses background progress indicator instead of full-screen block
-- Mascot displays idle/waiting/done animation states
+- Fill-in-the-blank uses one-word inline inputs with per-blank validation
+- Loading UX uses background progress indicator
+- Mascot placed and interactive (animation frames deferred)
 - Difficulty toggle functional and reflected in generated content
-- Model research documented with recommendation
 - Lesson/quiz quality measurably improved over Sprint 3 baseline
 
 ---
 
-### Sprint 5: Deployment & Demo Prep ⬜ FUTURE
+### Sprint 5: User Accounts & Session Persistence ⬜ FUTURE
 
-**Goal:** Deploy to free-tier host, finalize documentation, prepare demo script, record 15–20 min presentation.
+**Goal:** Add learner accounts (Flask-Login + PostgreSQL), dashboard with progress tracking, max 3 active lessons gating, admin access control, and demo accounts.
 
-**User Stories:** US-014 (extended)
+**User Stories:** US-027, US-028, US-029, US-030, US-031
 
 **Tasks:**
-- [ ] Finalize README with complete setup and deployment instructions
-- [ ] Complete `DESIGN_AND_TESTING.md` with all ADRs and test results
-- [ ] Deploy web app (Render or Railway free tier)
-- [ ] Configure deployment environment variables for model/API
-- [ ] Add deployed app link to README
-- [ ] Confirm GitHub repo access for grader
-- [ ] Confirm task board access
-- [ ] Prepare final demo script (goal → upload → results → generate lessons → slide deck → quiz → grade → retake)
-- [ ] Record final 15–20 minute demo/presentation
-- [ ] Verify all submission links are stable
-- [ ] Final review of all documentation against rubric
+- [ ] Integrate Flask-Login, Flask-SQLAlchemy, PostgreSQL (SQLite for local demo)
+- [ ] Build sign-up, sign-in, logout routes and templates
+- [ ] Store user credentials securely (hashed passwords)
+- [ ] Build learner dashboard showing active lessons and completion status
+- [ ] Track completed vs abandoned/cancelled lessons
+- [ ] Enforce max 3 active lessons per user
+- [ ] Require abandon/cancel before creating new lesson when at limit
+- [ ] Create super admin role with per-user lesson generation toggle
+- [ ] Deny lesson generation by default for new registrations
+- [ ] Landing page shows access-denied message for unauthorized users
+- [ ] Seed demo accounts (Bob, Alice) with lesson generation access
+- [ ] Allow public registration but auto-deny lesson access
+- [ ] Write unit and integration tests for auth flow
+- [ ] Update task board with sprint progress
 
 **Sprint 5 Definition of Done:**
+- Registration, login, logout working with Flask-Login
+- Dashboard displays active lessons and progress
+- Max 3 lesson limit enforced
+- Admin can toggle user access
+- Demo accounts (Bob, Alice) functional
+- Tests cover auth routes and access control
+
+---
+
+### Sprint 6: Polish, Maintenance & Enhancement ⬜ FUTURE
+
+**Goal:** Stabilize Sprint 5 work, add refinements, fix bugs, and enhance with TTS + PDF export.
+
+**User Stories:** US-032, US-033, US-034, US-035
+
+**Tasks:**
+- [ ] Polish dashboard UI with mascot placeholder
+- [ ] Add mascot basic animation frames (idle/waiting/done) — if feasible
+- [ ] Display mascot state changes during loading operations
+- [ ] Integrate Web Speech API or TTS library for lesson narration
+- [ ] Add TTS toggle button on slide deck (disabled by default)
+- [ ] Generate PDF from completed lesson slides and quiz results
+- [ ] Add PDF export button on completed lesson page
+- [ ] Remove `extracted_texts` from session after lessons generated
+- [ ] Fix bugs discovered during Sprint 5 testing
+- [ ] Run full test suite and maintain 45+ passing tests
+- [ ] Update task board with sprint progress
+
+**Sprint 6 Definition of Done:**
+- Dashboard polished with mascot
+- TTS functional (opt-in)
+- PDF export working for completed lessons
+- Session bloat fixed (extracted_texts cleaned up)
+- All existing tests pass
+
+---
+
+### Sprint 7: Advanced Features & OCR ⬜ FUTURE
+
+**Goal:** OCR for scanned documents, achievement badges, source document references, and cloud deployment preparation.
+
+**User Stories:** US-036, US-037, US-038
+
+**Tasks:**
+- [ ] Integrate OCR engine (Tesseract or similar)
+- [ ] Detect images in uploaded documents and run OCR analysis
+- [ ] Feed OCR output into chunking pipeline after text extraction
+- [ ] Design badge/trophy system for completed modules
+- [ ] Track abandoned lessons separately from completions
+- [ ] Display achievement badges on dashboard
+- [ ] Link generated lesson content back to source PDF/document
+- [ ] Add citations showing which document a slide references
+- [ ] Test cloud ChromaDB (optional parallel track)
+- [ ] Test cloud Ollama models (optional parallel track)
+- [ ] Write tests for OCR integration
+- [ ] Update task board with sprint progress
+
+**Sprint 7 Definition of Done:**
+- OCR pipeline processes scanned PDFs
+- Badges displayed for completed lessons
+- Source document references visible in lessons
+- Cloud deployment dependencies identified and tested
+
+---
+
+### Sprint 8: Final Deployment & Demo ⬜ FUTURE
+
+**Goal:** Deploy to free-tier host (Render or Railway), finalize documentation, prepare demo script, record 15-min presentation, and submit capstone.
+
+**User Stories:** US-040, US-041, US-042, US-043
+
+**Tasks:**
+- [ ] Deploy web app to Render or Railway free tier
+- [ ] Configure production environment variables
+- [ ] Verify all routes and features work in production
+- [ ] Finalize README with complete setup and deployment instructions
+- [ ] Complete `DESIGN_AND_TESTING.md` with all ADRs and test results
+- [ ] Ensure `AI_AGENT_PROTOCOL.md` is current
+- [ ] Update task board to reflect final sprint status
+- [ ] Write demo script covering full workflow (goal → upload → results → lessons → quiz → grade)
+- [ ] Record 15-minute walkthrough of the app
+- [ ] Add demo link to README
+- [ ] Triage and fix any remaining production bugs
+- [ ] Run full CI pipeline one final time
+- [ ] Confirm GitHub repo access for grader
+- [ ] Confirm task board access
+- [ ] Final review of all documentation against rubric
+- [ ] Submit capstone project
+
+**Sprint 8 Definition of Done:**
 - Deployed app link works
 - Task board link works
 - Repository is documented and accessible
 - Design/testing document is complete
 - Final demo recorded and submission-ready
+- Capstone submitted
 
 ---
 
@@ -215,10 +318,13 @@ Build the smallest working version first, then iterate:
 - [x] Bootstrap 5 layout with cyberpunk styling
 - [x] App logo and title treatment
 - [x] Flash messages for feedback
-- [ ] Retro mascot with animation frames (Sprint 4)
+- [x] Mascot placed in bottom-right corner with click-to-talk
+- [x] Cloud model testing infrastructure (`ai_client_cloud.py`)
+- [x] JS refactored into external `app.js`
+- [x] Package renamed `app/` → `src/`
+- [ ] Fill-in-the-blank one-word-per-input fix (Sprint 4)
 - [ ] Background progress indicators (Sprint 4)
 - [ ] Difficulty level selector (Sprint 4)
-- [ ] Model quality/speed research (Sprint 4)
 - [ ] Responsive slide deck layout
 - [ ] Sample demo documents for consistent presentation
 
@@ -237,25 +343,33 @@ Build the smallest working version first, then iterate:
 - [x] Export results as HTML (rendered on results page)
 - [x] Gated module progression with pass/fail
 
-### Upcoming (Sprint 4–5)
-- [ ] Mascot animation frames with idle/waiting/done states
-- [ ] Difficulty level selector (Easy/Moderate/Hard)
-- [ ] Background progress reporting during generation
-- [ ] Model evaluation and recommendation research
-- [ ] Lesson/quiz prompt engineering refinement
+### Upcoming (Sprint 4–8)
+- [ ] One-word fill-in-the-blank inputs with per-blank grading (Sprint 4)
+- [ ] Background progress reporting during generation (Sprint 4)
+- [ ] Difficulty level selector (Easy/Moderate/Hard) (Sprint 4)
+- [ ] Lesson/quiz prompt engineering refinement (Sprint 4)
+- [ ] User accounts (Flask-Login + PostgreSQL) (Sprint 5)
+- [ ] Learner dashboard with progress tracking (Sprint 5)
+- [ ] Max 3 active lessons gating (Sprint 5)
+- [ ] Admin access control (Sprint 5)
+- [ ] TTS narration (opt-in) (Sprint 6)
+- [ ] PDF export for completed lessons (Sprint 6)
+- [ ] Mascot animation frames (Sprint 6)
+- [ ] OCR for scanned PDFs (Sprint 7)
+- [ ] Badges/trophies for completed lessons (Sprint 7)
+- [ ] Source document referencing in lessons (Sprint 7)
+- [ ] Deployment, demo, and capstone submission (Sprint 8)
 
 ### Hard / Future
-- [ ] OCR for scanned PDFs
-- [ ] YouTube integration
+- [ ] YouTube/video transcript integration
 - [ ] External learning resource search
 - [ ] Short-answer AI grading
-- [ ] Slide deck export (PDF, PPTX)
-- [ ] Learner profile adaptation
 - [ ] Spaced repetition scheduling
+- [ ] Learner profile adaptation
 
 ### Very Hard / Post-Capstone
-- [ ] Multi-user accounts and authentication
-- [ ] AI-generated TTS narration
+- [ ] Social features (friends, chat, share lessons)
+- [ ] Full offline mode (C/C++ rewrite without Ollama)
 - [ ] Adaptive difficulty based on performance
 - [ ] Companion that reacts to progress
 - [ ] Full teacher/admin content management workflow
@@ -290,10 +404,12 @@ Build the smallest working version first, then iterate:
 - [x] Generate lessons flow
 - [x] Lesson deck route
 
-### To Add (Sprint 4)
+### To Add (Sprint 4+)
+- [ ] Fill-in-the-blank one-word validation tests
 - [ ] Grade route test (AJAX response, score calculation, pass/fail)
 - [ ] Retake route test (quiz regeneration, state reset)
 - [ ] Difficulty toggle prompt adjustment tests
+- [ ] Auth route tests (Sprint 5)
 
 ### Manual Demo Tests
 - [ ] Demo document uploads successfully
