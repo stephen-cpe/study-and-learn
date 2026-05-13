@@ -226,7 +226,7 @@ study-and-learn/
 | Parameter | Value | Notes |
 |---|---|---|
 | Serving framework | Ollama | Local-first, REST API compatible |
-| Default model | `qwen3:1.7b` (via `OLLAMA_MODEL` env var) | Efficient instruction-following for capstone demo |
+| Default model | `qwen3:0.6b` (via `OLLAMA_MODEL` env var) | Placeholder model. Upgrade to `qwen3:1.7b`, `gemma3:4b`, or Ollama Cloud models on capable machines. |
 | Embedding Model | `qwen3-embedding:0.6b` (via `OLLAMA_EMBEDDING_MODEL` env var) | Used exclusively for ChromaDB vector embeddings. Swappable via env var. |
 | Supported small models | `gemma3:4b`, `lfm2.5-thinking:1.2b`, `granite4.1:3b` | Swappable via env var for testing/performance tradeoffs |
 | Testing mode | `AI_MOCK=true` returns structured JSON stubs | Ensures deterministic CI/CD without GPU dependency |
@@ -588,7 +588,7 @@ Later additions:
 ## 12. Open Questions
 
 1. ~~Should the first prototype use pgvector or ChromaDB?~~ → **ChromaDB** (chosen, implemented)
-2. ~~Which Ollama model gives acceptable local results on the target hardware?~~ → **qwen3:1.7b (chat) + qwen3-embedding:0.6b (embeddings)** (chosen, implemented)
+2. ~~Which Ollama model gives acceptable local results on the target hardware?~~ → **qwen3:0.6b (chat) + qwen3-embedding:0.6b (embeddings)** (placeholder; upgrade path: `qwen3:1.7b`, `gemma3:4b`, or Ollama Cloud)
 3. ~~How many file types should be truly supported in the first sprint?~~ → **txt, md, pdf, docx** (implemented)
 4. ~~Should OCR be postponed until after the main workflow works?~~ → **Postponed** to post-MVP
 5. ~~Should generated outputs be stored as JSON, Markdown, or database records?~~ → **JSON in Flask session (server-side via cachelib)**

@@ -72,7 +72,7 @@
                         {% if relevance_result.missing_material and relevance_result.missing_material|lower != 'none' %}
                         <div class="relevance-section">
                             <h4>Suggested Materials</h4>
-                            <p>{{ relevance_result.missing_material }}</p>
+                            <div id="suggested-materials" class="markdown-content">{{ relevance_result.missing_material }}</div>
                         </div>
                         {% endif %}
                     </div>
@@ -129,6 +129,8 @@
         <div class="spinner-text">Generating lessons... This may take a few minutes...</div>
         <div class="spinner-subtext" id="progress-text"></div>
     </div>
+
+    {% include '_mascot.html' %}
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>

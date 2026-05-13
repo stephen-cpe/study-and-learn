@@ -134,7 +134,7 @@ Build the smallest working version first, then iterate:
 - [ ] Create retro mascot animation frames (idle, waiting/loading, done/success, retry/encourage states)
 - [ ] Integrate mascot (`src/static/images/mascot-robot.png`) into UI with simple interactions
 - [ ] Research optimal Ollama model for lesson/quiz quality vs speed on target hardware (6GB VRAM)
-- [ ] Evaluate and document quality comparison: qwen3:1.7b vs gemma3:4b vs granite4.1:3b for lesson generation
+- [ ] Evaluate and document quality comparison: qwen3:0.6b vs gemma3:4b vs granite4.1:3b for lesson generation
 - [ ] Add difficulty level selector (Easy: 10–11 yrs, Moderate: 12–13 yrs, Hard: 14–15 yrs)
 - [ ] Adjust lesson/quiz prompts based on selected difficulty level
 - [ ] Improve lesson and quiz prompt templates for better pedagogical quality

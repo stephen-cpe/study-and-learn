@@ -726,6 +726,72 @@ h2, .section-title {
     flex-wrap: wrap;
 }
 
+/* ===== ROBOT MASCOT ===== */
+#robot-mascot {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 120px;
+    height: 120px;
+    z-index: 1000;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    filter: drop-shadow(0 10px 20px rgba(0, 180, 216, 0.4));
+}
+
+#robot-mascot:hover {
+    transform: scale(1.08) translateY(-8px);
+}
+
+#speech-bubble {
+    position: fixed;
+    bottom: 170px;
+    right: 80px;
+    background: #0a1628;
+    border: 2px solid #00b4d8;
+    border-radius: 12px;
+    padding: 10px 14px;
+    width: 200px;
+    color: #caf0f8;
+    font-size: 0.85rem;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    pointer-events: none;
+    z-index: 1001;
+}
+
+#speech-bubble.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+#speech-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    right: 30px;
+    border: 6px solid transparent;
+    border-top-color: #00b4d8;
+}
+
+@media (max-width: 768px) {
+    #robot-mascot {
+        width: 80px;
+        height: 80px;
+        bottom: 16px;
+        right: 16px;
+    }
+    #speech-bubble {
+        width: 160px;
+        font-size: 0.75rem;
+        bottom: 110px;
+        right: 50px;
+        padding: 8px 10px;
+    }
+}
+
 /* ===== RESPONSIVE ENHANCEMENTS ===== */
 @media (max-width: 768px) {
     .lessons-grid {

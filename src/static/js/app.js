@@ -205,6 +205,33 @@
         retakeLesson(moduleIndex);
       });
     }
+
+    /* Dump all lesson answers to console for testing */
+    var quizData = [], cpData = [];
+    document.querySelectorAll('.quiz-question').forEach(function (el) {
+      quizData.push({
+        id: el.dataset.qid,
+        type: el.dataset.qtype,
+        answer: el.dataset.answer,
+        prompt: (el.querySelector('.q-prompt') || {}).textContent
+      });
+    });
+    document.querySelectorAll('.checkpoint-slide').forEach(function (el) {
+      var opts = [];
+      el.querySelectorAll('.checkpoint-option').forEach(function (o) { opts.push(o.textContent); });
+      cpData.push({
+        slide: el.dataset.checkpoint,
+        answer: el.dataset.answer,
+        correctText: opts[parseInt(el.dataset.answer)] || null,
+        prompt: (el.querySelector('.question-prompt') || {}).textContent,
+        options: opts
+      });
+    });
+    if (quizData.length || cpData.length) {
+      console.log('%c=== LESSON ANSWERS ===', 'font-size:16px;font-weight:bold;color:#00b4d8');
+      if (quizData.length) { console.log('%cQuiz:', 'font-weight:bold'); console.table(quizData); }
+      if (cpData.length) { console.log('%cCheckpoints:', 'font-weight:bold'); console.table(cpData); }
+    }
   }
 
   function retakeLesson(mIdx) {
@@ -240,6 +267,17 @@
     }
     parseMarkdown('summary-content');
     parseMarkdown('relevance-content');
+
+    var suggestedEl = document.getElementById('suggested-materials');
+    if (suggestedEl) {
+      var t = suggestedEl.innerHTML;
+      t = t.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      t = t.replace(/\*(.+?)\*/g, '<em>$1</em>');
+      t = t.replace(/__(.+?)__/g, '<u>$1</u>');
+      t = t.replace(/`(.+?)`/g, '<code>$1</code>');
+      t = t.replace(/^\s*\*\s+/gm, '\u2022 ');
+      suggestedEl.innerHTML = t;
+    }
     document.querySelectorAll('.module-title.raw-md').forEach(function (el) {
       if (typeof marked !== 'undefined') {
         el.innerHTML = marked.parse(el.innerText);
@@ -262,6 +300,36 @@
     }
   }
 
+  /* ── Mascot ──────────────────────────────────────────── */
+
+  function initMascot() {
+    var mascot = document.getElementById('robot-mascot');
+    var bubble = document.getElementById('speech-bubble');
+    var bubbleText = document.getElementById('bubble-text');
+    if (!mascot || !bubble || !bubbleText) return;
+
+    var messages = [
+      'Ready to learn something cool today?',
+      'Don\'t forget to take breaks!',
+      'I\'m watching your progress...',
+      'Upload some materials and I\'ll help structure your study path!',
+      'You got this!',
+      'Need a hint? Just click me.'
+    ];
+
+    window._mascotTalk = function () {
+      bubbleText.textContent = messages[Math.floor(Math.random() * messages.length)];
+      bubble.classList.add('active');
+      setTimeout(function () { bubble.classList.remove('active'); }, 4000);
+    };
+
+    setInterval(function () {
+      if (Math.random() < 0.25) window._mascotTalk();
+    }, 12000);
+
+    setTimeout(function () { window._mascotTalk(); }, 1500);
+  }
+
   /* ── Boot ────────────────────────────────────────────── */
 
   document.addEventListener('DOMContentLoaded', function () {
@@ -274,6 +342,9 @@
     if (document.querySelector('.deck-container')) {
       formatSlideText();
       initDeckPage();
+    }
+    if (document.getElementById('robot-mascot')) {
+      initMascot();
     }
   });
 

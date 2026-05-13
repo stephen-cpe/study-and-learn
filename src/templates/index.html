@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Study-and-Learn</title>
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logo-v2.png') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logo.png') }}">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/retro.css') }}">
 </head>
@@ -14,7 +14,7 @@
     <nav class="navbar navbar-expand-lg az-navbar sticky-top">
         <div class="container">
             <a class="navbar-brand d-flex align-items-center gap-2" href="/">
-                <img src="{{ url_for('static', filename='images/logo-v2.png') }}" alt="Logo" class="brand-logo">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" class="brand-logo">
                 <span class="brand-title">Study-and-Learn</span>
             </a>
         </div>
@@ -89,6 +89,8 @@
         </div>
         <div class="spinner-text">Processing your files... This may take a minute...</div>
     </div>
+
+    {% include '_mascot.html' %}
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>

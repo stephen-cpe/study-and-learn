@@ -95,11 +95,11 @@ Core workflow:
 **Tradeoffs:** ✅ Grounded, scalable, traceable • ❌ Adds vector DB dependency, requires embedding strategy
 
 ### ADR-007: Use Single Configurable Ollama Model + Mock Fallback
-**Decision:** All AI services call one model via `OLLAMA_MODEL` env var (default: `qwen3:1.7b`). CI/testing uses `AI_MOCK=true`.
+**Decision:** All AI services call one model via `OLLAMA_MODEL` env var (default: `qwen3:0.6b`). CI/testing uses `AI_MOCK=true`.
 **Reason:** Capstone MVP prioritizes reliability over model routing complexity. 1B–3B models run efficiently on target hardware. Mock fallback guarantees deterministic tests.
 
 ### ADR-008: Dual Ollama Model Strategy (Chat + Embeddings)
-**Decision:** Chat uses `OLLAMA_MODEL` (default: qwen3:1.7b), Embeddings use `OLLAMA_EMBEDDING_MODEL` (default: qwen3-embedding:0.6b).
+**Decision:** Chat uses `OLLAMA_MODEL` (default: qwen3:0.6b), Embeddings use `OLLAMA_EMBEDDING_MODEL` (default: qwen3-embedding:0.6b).
 **Reason:** Chat models don't support /api/embed. Separation prevents 501 errors and allows independent tuning of generation vs retrieval models.
 
 ### ADR-009: Custom CSS/JS Slide Deck Engine (Replaces reveal.js)
@@ -124,7 +124,7 @@ Core workflow:
 
 **Decision:** On lesson retake, regenerate entirely new quiz questions and checkpoints rather than reusing the originals.
 
-**Reason:** Reusing the same questions on retake allows learners to memorize answers without understanding the material — the worst pedagogical outcome. Regenerating questions each retake tests real comprehension and is pedagogically strongest. The tradeoff is additional Ollama calls and generation time per retake, but this is acceptable on a per-module basis (5 questions + ~2 checkpoints per retake, < 60 seconds each on qwen3:1.7b).
+**Reason:** Reusing the same questions on retake allows learners to memorize answers without understanding the material — the worst pedagogical outcome. Regenerating questions each retake tests real comprehension and is pedagogically strongest. The tradeoff is additional Ollama calls and generation time per retake, but this is acceptable on a per-module basis (5 questions + ~2 checkpoints per retake, < 60 seconds each on qwen3:0.6b).
 
 ---
 

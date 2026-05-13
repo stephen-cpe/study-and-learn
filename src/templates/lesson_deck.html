@@ -68,7 +68,7 @@
             {% endif %}
 
             {% if checkpoints[si|string] %}
-            <section class="slide scrollable checkpoint-slide" data-checkpoint="{{ si }}" data-state="checkpoint-blocked" data-index="{{ si }}">
+            <section class="slide scrollable checkpoint-slide" data-checkpoint="{{ si }}" data-state="checkpoint-blocked" data-index="{{ si }}" data-answer="{{ checkpoints[si|string].answer_index }}">
                 <div class="slide-content-inner scroll-container">
                     <h3>Quick Check</h3>
                     <p class="question-prompt">{{ checkpoints[si|string].prompt }}</p>

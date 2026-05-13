@@ -3,7 +3,7 @@
 
 ## Project Brief (Read First)
 - **App:** Study-and-Learn — a Flask web app where a learner uploads study documents and gets an AI-generated summary, relevance check, study path, interactive slide-based lessons, mixed-type quizzes, and per-module grading with gated progression.
-- **Stack:** Python 3.13, Flask, Flask-Session (cachelib), Bootstrap 5, pytest, LangChain, ChromaDB, Ollama (chat: qwen3:1.7b, embeddings: qwen3-embedding:0.6b), GitHub Actions (CI)
+- **Stack:** Python 3.13, Flask, Flask-Session (cachelib), Bootstrap 5, pytest, LangChain, ChromaDB, Ollama (chat: qwen3:0.6b, embeddings: qwen3-embedding:0.6b), GitHub Actions (CI)
 - **Structure:** See SRS.md for requirements. See TODO.md for sprint tasks. See DESIGN_AND_TESTING.md for ADRs and architecture. See docs/STATUS.md for current state.
 - **Repo root:** study-and-learn/
 - **Key rules:** No chat UI. Forms and result pages only. Custom CSS/JS slide deck (no reveal.js). Retro cyberpunk theme with Retrograde Bold and BoldPixels fonts. Server-side sessions via Flask-Session.
@@ -33,7 +33,7 @@ You follow Spec-Driven Development strictly.
      - Do not run git commands — suggest commit message only
      - Limit each task to one file or one logical unit of work
      - If you need to touch more than 2 files, ask first
-     - Always read AI model from `OLLAMA_MODEL` env var (default: `qwen3:1.7b`)
+     - Always read AI model from `OLLAMA_MODEL` env var (default: `qwen3:0.6b`)
      - Always use OLLAMA_EMBEDDING_MODEL env var for vector_store embeddings (default: qwen3-embedding:0.6b)
      - Never hardcode Ollama endpoints
      - Use persistent ChromaDB (`./data/chroma_db`) for dev; in-memory for CI tests

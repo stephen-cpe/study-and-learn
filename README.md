@@ -8,7 +8,7 @@ A guided, form-driven AI web application that converts uploaded study materials 
 |-------|-----------|
 | Backend | Python 3.13, Flask, Flask-Session (cachelib) |
 | Frontend | Bootstrap 5, custom CSS/JS slide deck, retro pixel fonts |
-| AI / RAG | Ollama (qwen3:1.7b + qwen3-embedding:0.6b), LangChain, ChromaDB |
+| AI / RAG | Ollama (qwen3:0.6b + qwen3-embedding:0.6b), LangChain, ChromaDB |
 | Testing | pytest, GitHub Actions CI |
 
 ## Ollama Setup
@@ -16,9 +16,10 @@ A guided, form-driven AI web application that converts uploaded study materials 
 1. Install Ollama from https://ollama.com/download
 2. Pull required models:
 ```bash
-ollama pull qwen3:1.7b
+ollama pull qwen3:0.6b
 ollama pull qwen3-embedding:0.6b
 ```
+> `qwen3:0.6b` is a placeholder model. If your machine can handle it, upgrade to `qwen3:1.7b`, `gemma3:4b`, or use [Ollama Cloud models](README.md#switching-between-local-and-cloud) for better results.
 
 ## Quick Start (Local Development)
 ```bash
@@ -80,7 +81,7 @@ OLLAMA_MODEL=gemma3:27b-cloud
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `OLLAMA_MODEL` | `qwen3:1.7b` | Chat generation model |
+| `OLLAMA_MODEL` | `qwen3:0.6b` | Chat generation model |
 | `OLLAMA_EMBEDDING_MODEL` | `qwen3-embedding:0.6b` | Vector embeddings model |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server address |
 | `OLLAMA_TIMEOUT` | `180` | Request timeout in seconds |

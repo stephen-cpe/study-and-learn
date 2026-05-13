@@ -19,7 +19,7 @@ def call_ollama(prompt: str, model: str = None) -> str:
         return f"Mock response for prompt: {prompt[:50]}..."
 
     if model is None:
-        model = os.environ.get('OLLAMA_MODEL', 'qwen3:1.7b')
+        model = os.environ.get('OLLAMA_MODEL', 'qwen3:0.6b')
 
     base_url = os.environ.get('OLLAMA_BASE_URL', 'http://localhost:11434')
     url = f"{base_url}/api/generate"
