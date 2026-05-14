@@ -14,7 +14,7 @@ Study-and-Learn is a Flask web application with a Bootstrap-and-retro-CSS fronte
 ```mermaid
 flowchart TD
     A["Unified Form: Goal + Files"] --> B["POST /process Route"]
-    B --> C["Document Parser: .txt, .md, .pdf, .docx"]
+    B --> C["Document Parser: .txt, .md, .pdf"]
     C --> D["Chunker: RecursiveCharacterTextSplitter"]
     D --> E["Vector Store: ChromaDB + OllamaEmbeddings"]
     E --> F["RAG Retriever: top-k=5 context"]
@@ -118,7 +118,19 @@ Core workflow:
 
 **Decision:** Generate lessons sequentially (one module at a time) with a visible progress/loading indicator rather than concurrently.
 
-**Reason:** Sequential execution is simpler to debug, logs clearly, avoids overwhelming the local Ollama server with concurrent requests on limited hardware (6GB VRAM), and enables accurate per-module progress reporting. Concurrency was considered but rejected due to: harder error handling, risk of Ollama request queuing and timeouts, and difficulty showing clean progress. The current full-screen loading spinner is a stepping stone; the next iteration will replace it with a background progress bar showing current stage.
+**Reason:** Sequential execution is simpler to debug, logs clearly, avoids overwhelming the local Ollama server with concurrent requests on limited hardware (6GB VRAM), and enables accurate per-module progress reporting. Concurrency was considered but rejected due to: harder error handling, risk of Ollama request queuing and timeouts, and difficulty showing clean progress.
+
+### ADR-013: Cachelib-Backed Progress Tracking (Replaces In-Memory Dict)
+
+**Decision:** Use cachelib's `FileSystemCache` for progress tracking between long-running POST requests and concurrent polling GET requests. The progress key is a client-generated UUID passed as a POST body field and GET query parameter.
+
+**Reason:** Flask-Session only persists data at request-end, making it invisible to concurrent polling. A module-level Python dict is unreliable across threads in Flask's threaded debug server. cachelib's FileSystemCache provides file-backed, thread-safe read/write with immediate visibility to all concurrent requests. Tradeoffs: ✅ Thread-safe, immediate visibility, simple API • ❌ Small disk writes every 2s during generation (acceptable for MVP).
+
+### ADR-014: Mascot Speech Bubble as Progress Indicator
+
+**Decision:** Merge the progress indicator into the existing mascot speech bubble rather than maintaining a separate DOM element.
+
+**Reason:** Eliminates visual overlap between two fixed-position elements (speech bubble and progress indicator both positioned bottom-right). The mascot "speaking" the progress stage is more intuitive and engaging than a separate progress bar. The speech bubble stays persistently visible during generation (no 4-second auto-hide) and reverts to idle chatter after completion. Tradeoffs: ✅ Cleaner UI, no overlap, more engaging • ❌ Speech bubble width increased from 200px to 240px to accommodate progress bar.
 
 ### ADR-012: Retake = Regenerate Fresh Questions
 
@@ -172,7 +184,7 @@ Integration tests cover routes and workflow behavior:
 - mocked generate-lessons flow: session data → lesson + quiz generation → redirect,
 - lesson deck route with pre-populated session lessons returns 200.
 
-Current test suite: **45 tests, 0 failures**.
+Current test suite: **60 tests, 0 failures**.
 
 ### Smoke Tests
 
@@ -263,4 +275,5 @@ Recommendation: Deploy to Render/Railway free tier with `AI_MOCK=true` for gradi
 | AI output inconsistency | Poor demo | Use controlled sample documents and structured prompts |
 | Quiz/lesson quality inadequate for learning | Poor pedagogical value | Prompt engineering research in Sprint 4; evaluate alternative models; set appropriate expectations for 0.6B model |
 | Session data loss on server restart | Lost lesson state | Acceptable for MVP demo; document limitation; persistent storage deferred to v2 |
-| Loading UX causes user abandonment | Dropped sessions during long generation | Replace full-screen overlay with background progress UI in Sprint 4 |
+| Loading UX causes user abandonment | Dropped sessions during long generation | Background progress bar in mascot speech bubble (implemented Sprint 4) |
+| `/process` route still uses full-screen spinner | Blocks interaction during document processing | Replace with non-blocking progress indicator (Sprint 4) |

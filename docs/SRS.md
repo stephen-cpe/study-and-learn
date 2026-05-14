@@ -222,10 +222,10 @@ study-and-learn/
 | Parameter | Value | Notes |
 |---|---|---|
 | Serving framework | Ollama | Local-first, REST API compatible |
-| Default model | `qwen3:0.6b` (via `OLLAMA_MODEL` env var) | Placeholder model. Upgrade to `gemma3:4b` or better on capable machines, or use Ollama Cloud models. |
+| Default model | `qwen3:0.6b` (via `OLLAMA_MODEL` env var) | **Placeholder only** — minimal viability for testing. Replace with `gemma3:12b-cloud` (cloud) or `gemma3:4b` (local) for production-quality output. |
 | Embedding Model | `qwen3-embedding:0.6b` (via `OLLAMA_EMBEDDING_MODEL` env var) | Used exclusively for ChromaDB vector embeddings. Swappable via env var. |
-| Supported cloud models | `gemma3:12b-cloud`, `nemotron-3-nano:30b-cloud`, `rnj-1:8b-cloud` | Swappable via env var for testing/performance tradeoffs |
-| Testing mode | `AI_MOCK=true` returns structured JSON stubs | Ensures deterministic CI/CD without GPU dependency |
+| Supported cloud models | `gemma3:12b-cloud`, `nemotron-3-nano:30b-cloud`, `rnj-1:8b-cloud` | Production-ready options; set via `OLLAMA_MODEL` env var. `gemma3:12b-cloud` recommended for best lesson/quiz quality. |
+| Testing mode | `AI_MOCK=true` returns structured JSON stubs | Ensures deterministic CI/CD without GPU or cloud dependency |
 | Multimodal capability | Text + image support deferred to post-MVP | OCR for scanned PDFs remains stretch goal |
 
 ### 4.5 RAG & Multi-Document Architecture
@@ -252,7 +252,7 @@ study-and-learn/
 | ID | Requirement | Priority |
 |---|---|---|
 | FR-004 | The system shall allow the user to upload up to 5 documents simultaneously. | Must |
-| FR-005 | The system shall support `.txt`, `.md`, `.pdf`, `.docx`, `.html`, and `.odt` if feasible. | Must |
+| FR-005 | The system shall support `.txt`, `.md`, and `.pdf` file uploads. | Must |
 | FR-006 | The system shall reject unsupported file types with a clear message. | Must |
 | FR-007 | The system should show uploaded file names and processing status. | Should |
 
@@ -315,7 +315,7 @@ study-and-learn/
 | FR-038 | The system shall regenerate fresh questions on lesson retake to prevent answer memorization. | Must |
 | FR-039 | The system shall gate module progression so the learner must pass module N before accessing module N+1. | Must |
 | FR-040 | The system shall enforce an 80% pass threshold for module completion with a pass/fail verdict. | Must |
-| FR-041 | The system should support a difficulty level selector (Easy/Moderate/Hard) mapped to age-appropriate content complexity. | Should |
+| FR-041 | The system could support a difficulty level selector (Easy/Moderate/Hard) mapped to age-appropriate content complexity. | Could |
 | FR-042 | The system shall present lessons via a custom CSS/JS slide-deck engine styled with retro fonts and cyberpunk visuals. | Must |
 
 ### 5.9 Admin / Editing Features
@@ -426,7 +426,7 @@ study-and-learn/
 | US-019 | As a learner, I want a retro mascot that provides simple visual feedback during my learning journey. | Mascot image displayed with idle/waiting/done states; animations or frames for key moments |
 | US-020 | As a learner, I want clear progress feedback during long AI operations so I know the app is working. | Background processing with visible progress bar or stage indicator instead of full-screen overlay |
 | US-021 | As a learner, I want the quality of generated lessons and quizzes to be acceptable for high-school to college-level material. | Prompt engineering refined; model research conducted for optimal quality/speed tradeoff on target hardware |
-| US-022 | As a learner, I want a difficulty toggle so content matches my age and skill level. | Easy (10–11), Moderate (12–13), Hard (14–15) difficulty options; prompt adjusted accordingly |
+| US-022 | As a learner, I want a difficulty toggle so content matches my age and skill level. *(Deferred to post-capstone — high effort, low impact for MVP.)* | Easy (10–11), Moderate (12–13), Hard (14–15) difficulty options; prompt adjusted accordingly |
 
 ---
 
@@ -438,7 +438,7 @@ study-and-learn/
 - Bootstrap UI + custom retro CSS theme.
 - Unified learning goal + document upload form (single submission).
 - File type validation.
-- Text extraction for `.txt`, `.md`, `.pdf`, and `.docx`.
+- Text extraction for `.txt`, `.md`, and `.pdf`.
 - Retrieval-Augmented Generation (RAG) pipeline (ChromaDB persistent vector store).
 - Multi-file upload (≤5).
 - AI summary generation through Ollama.
@@ -454,7 +454,7 @@ study-and-learn/
 - Lesson listing page with progress bar.
 - Server-side session storage (Flask-Session + cachelib).
 - Custom CSS/JS slide-deck engine (retro-themed).
-- pytest test suite (45 tests).
+- pytest test suite (60+ tests).
 - GitHub Actions test workflow.
 - Static public task board.
 - Design and testing document.
@@ -463,8 +463,7 @@ study-and-learn/
 
 - Retro mascot/companion with idle/waiting/done animation frames.
 - Loading progress indicators showing current stage during AI operations.
-- Difficulty level selector (Easy/Moderate/Hard) mapped to age groups.
-- Model performance research for optimal quality/speed on target hardware.
+- Non-blocking background progress indicator during document processing.
 - Upload status messages.
 - Generated output formatting and markdown rendering.
 - Demo seed files.
@@ -503,13 +502,13 @@ Ranked from easier to harder. Items above the line are implemented; items below 
 9. Gated module progression with pass/fail — done (80% threshold)
 10. Retake with regenerated questions — done
 11. Server-side session storage — done (Flask-Session + cachelib FileSystemCache)
-12. Loading/progress UI — full-screen spinner implemented; needs incremental improvement
+12. Loading/progress UI — full-screen spinner replaced with background progress bar in mascot speech bubble
+13. Fill-in-the-blank one-word validation — done (inline inputs, per-blank grading, case-insensitive)
+14. Lesson/quiz prompt engineering refinement — done (active-working mascot messages)
 
 ### Sprint 4 (In Progress)
-13. Fill-in-the-blank one-word validation with inline inputs
-14. Difficulty level selector (Easy/Moderate/Hard)
-15. Background progress indicator replacing full-screen overlay
-16. Lesson/quiz prompt engineering refinement
+15. Replace full-screen loading overlay on `/process` route with non-blocking background progress indicator
+16. Lesson/quiz prompt engineering refinement for pedagogical consistency
 
 ### Sprint 5–6 (Planned)
 17. Multi-user accounts (Flask-Login + PostgreSQL)
@@ -529,12 +528,14 @@ Ranked from easier to harder. Items above the line are implemented; items below 
 29. Final documentation and demo recording
 
 ### Post-Capstone / Stretch
-30. YouTube or external resource integration
-31. Short-answer (free-text) AI grading
-32. Spaced repetition and review scheduling
-33. Full adaptive study planner
-34. Social features (friends, chat, share lessons)
-35. Full offline mode (C/C++ rewrite without Ollama)
+30. Difficulty level selector (Easy/Moderate/Hard) — high effort, low impact for MVP
+31. Extended file type support (.docx, .html, .odt) — limited practical benefit for demo
+32. YouTube or external resource integration
+33. Short-answer (free-text) AI grading
+34. Spaced repetition and review scheduling
+35. Full adaptive study planner
+36. Social features (friends, chat, share lessons)
+37. Full offline mode (C/C++ rewrite without Ollama)
 
 ---
 
@@ -595,13 +596,13 @@ Later additions:
 
 1. ~~Should the first prototype use pgvector or ChromaDB?~~ → **ChromaDB** (chosen, implemented)
 2. ~~Which Ollama model gives acceptable local results on the target hardware?~~ → **qwen3:0.6b (chat) + qwen3-embedding:0.6b (embeddings)** (placeholder; upgrade path: `qwen3:1.7b`, `gemma3:4b`, or Ollama Cloud)
-3. ~~How many file types should be truly supported in the first sprint?~~ → **txt, md, pdf, docx** (implemented)
+3. ~~How many file types should be truly supported in the first sprint?~~ → **txt, md, pdf** (MVP); docx deferred to post-capstone
 4. ~~Should OCR be postponed until after the main workflow works?~~ → **Postponed** to Sprint 7
 5. ~~Should generated outputs be stored as JSON, Markdown, or database records?~~ → **JSON in Flask session (server-side via cachelib)**
 6. ~~Should the companion be purely visual or tied to progress?~~ → Visual feedback with click-to-talk implemented; animation frames deferred to Sprint 6
 7. ~~Which deployment platform is easiest for the final capstone demo?~~ → Render or Railway free tier TBD in Sprint 8
 8. ~~What is the optimal model for lesson/quiz generation quality vs speed on 6GB VRAM?~~ → qwen3:0.6b chosen as placeholder; upgrade guidance documented (Sprint 4 prompt tuning ongoing)
-9. ~~Should loading UI use full-screen overlay or background processing with stage indicator?~~ → Background processing with progress bar preferred (Sprint 4)
+9. ~~Should loading UI use full-screen overlay or background processing with stage indicator?~~ → Background processing with progress bar + mascot speech bubble (implemented Sprint 4)
 10. ~~How many mascot animation frames are needed for adequate visual feedback?~~ → TBD in Sprint 6
 
 ---

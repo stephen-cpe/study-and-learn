@@ -118,15 +118,15 @@ Build the smallest working version first, then iterate:
 - [x] Add server-side session storage (Flask-Session + cachelib FileSystemCache)
 - [x] Vendor fonts (Retrograde Bold, BoldPixels) for slide deck retro theming
 - [x] Write unit tests for lesson_generator + quiz_generator (17 new tests)
-- [x] Run full test suite — 45 tests passing
+- [x] Run full test suite — 45+ tests passing
 
 ---
 
 ### Sprint 4: UX Polish, Mascot, and Quality Improvements ⬜ CURRENT
 
-**Goal:** Polish the retro experience, integrate mascot into UI, improve loading UX, implement difficulty toggle, fix bugs, and tune prompts for better lesson output.
+**Goal:** Polish the retro experience, integrate mascot into UI, improve loading UX, fix bugs, and tune prompts for better lesson output.
 
-**User Stories:** US-018, US-019, US-020, US-021, US-022, US-025
+**User Stories:** US-018, US-019, US-020
 
 **Tasks:**
 - [x] Integrate mascot (`mascot-robot.png`) into bottom-right corner of UI (index + results pages)
@@ -144,21 +144,21 @@ Build the smallest working version first, then iterate:
 - [x] Fix markdown rendering (asterisks/bold not rendering in lesson slides + results)
 - [x] Fix suggested materials list (asterisk bullets not rendered)
 - [x] Add console debug dump for lesson answers (F12 testing)
-- [ ] Fix fill-in-the-blank: one-word-only input per blank, inline placement, per-blank grading
-- [ ] Replace full-screen loading overlay with background processing + progress bar / stage indicator
-- [ ] Add stage-by-stage progress reporting during lesson generation
-- [ ] Add difficulty level selector (Easy: 10–11 yrs, Moderate: 12–13 yrs, Hard: 14–15 yrs)
-- [ ] Adjust lesson/quiz prompts based on selected difficulty level
-- [ ] Improve lesson and quiz prompt templates for better pedagogical quality
+- [x] Fix fill-in-the-blank: one-word-only input per blank, inline placement, per-blank grading
+- [x] Replace full-screen loading overlay on results page with background progress bar in mascot speech bubble
+- [x] Add stage-by-stage progress reporting during lesson generation
+- [x] Improve lesson and quiz prompt templates (active-working mascot messages)
+- [x] Merge progress indicator into mascot speech bubble (non-overlapping, persistent visibility)
+- [ ] Replace full-screen loading overlay on `/process` route with non-blocking background progress indicator
 - [ ] Polish responsive layout for slide deck on smaller screens
-- [ ] Update unit tests for new prompt logic and difficulty toggle
+- [ ] Update unit tests for progress tracker
 
 **Sprint 4 Definition of Done:**
 - Fill-in-the-blank uses one-word inline inputs with per-blank validation
-- Loading UX uses background progress indicator
-- Mascot placed and interactive (animation frames deferred)
-- Difficulty toggle functional and reflected in generated content
-- Lesson/quiz quality measurably improved over Sprint 3 baseline
+- Loading UX on results page uses mascot speech bubble progress bar (persistent, non-overlapping)
+- Mascot placed and interactive with funnier idle messages and progress-aware behavior
+- Lesson generation progress visible through mascot (text + bar)
+- All documentation updated to reflect current state
 
 ---
 
@@ -291,7 +291,7 @@ Build the smallest working version first, then iterate:
 - [x] Learning goal form
 - [x] Document upload (≤5 files)
 - [x] File validation
-- [x] Text extraction (.txt, .md, .pdf, .docx)
+- [x] Text extraction (.txt, .md, .pdf)
 - [x] RAG pipeline (chunk → embed → store → retrieve)
 - [x] AI summary generation
 - [x] Relevance check (strong/partial/weak)
@@ -307,7 +307,7 @@ Build the smallest working version first, then iterate:
 - [x] Results page with improved hierarchy
 - [x] Lesson listing page with progress bar
 - [x] Markdown rendering for AI outputs
-- [x] 45 automated tests
+- [x] 60+ automated tests
 - [x] GitHub Actions CI
 - [x] Static task board
 - [x] Design/testing document
@@ -322,9 +322,9 @@ Build the smallest working version first, then iterate:
 - [x] Cloud model testing infrastructure (`ai_client_cloud.py`)
 - [x] JS refactored into external `app.js`
 - [x] Package renamed `app/` → `src/`
-- [ ] Fill-in-the-blank one-word-per-input fix (Sprint 4)
-- [ ] Background progress indicators (Sprint 4)
-- [ ] Difficulty level selector (Sprint 4)
+- [x] Fill-in-the-blank one-word-per-input fix (Sprint 4)
+- [x] Background progress indicators in mascot speech bubble (Sprint 4)
+- [ ] Non-blocking loading indicator on `/process` route (Sprint 4)
 - [ ] Responsive slide deck layout
 - [ ] Sample demo documents for consistent presentation
 
@@ -335,18 +335,18 @@ Build the smallest working version first, then iterate:
 ### Implemented ✅
 - [x] Retro colors/fonts/cyberpunk theme
 - [x] Better prompt templates
-- [x] Static mascot image
+- [x] Static mascot image with progress-aware speech bubble
 - [x] Simple quiz generation (4 question types)
 - [x] Slide-style lesson viewer (custom CSS/JS)
 - [x] Editable generated summary
 - [x] Saved/loaded generated outputs in session
 - [x] Export results as HTML (rendered on results page)
 - [x] Gated module progression with pass/fail
+- [x] One-word fill-in-the-blank inputs with per-blank grading
+- [x] Background progress reporting via mascot speech bubble
 
 ### Upcoming (Sprint 4–8)
-- [ ] One-word fill-in-the-blank inputs with per-blank grading (Sprint 4)
-- [ ] Background progress reporting during generation (Sprint 4)
-- [ ] Difficulty level selector (Easy/Moderate/Hard) (Sprint 4)
+- [ ] Non-blocking progress on `/process` route (Sprint 4)
 - [ ] Lesson/quiz prompt engineering refinement (Sprint 4)
 - [ ] User accounts (Flask-Login + PostgreSQL) (Sprint 5)
 - [ ] Learner dashboard with progress tracking (Sprint 5)
@@ -359,6 +359,22 @@ Build the smallest working version first, then iterate:
 - [ ] Badges/trophies for completed lessons (Sprint 7)
 - [ ] Source document referencing in lessons (Sprint 7)
 - [ ] Deployment, demo, and capstone submission (Sprint 8)
+
+### Post-Capstone
+- [ ] Difficulty level selector (Easy/Moderate/Hard)
+- [ ] Extended file type support (.docx, .html, .odt)
+- [ ] YouTube/video transcript integration
+- [ ] External learning resource search
+- [ ] Short-answer AI grading
+- [ ] Spaced repetition scheduling
+- [ ] Learner profile adaptation
+
+### Very Hard / Post-Capstone
+- [ ] Social features (friends, chat, share lessons)
+- [ ] Full offline mode (C/C++ rewrite without Ollama)
+- [ ] Adaptive difficulty based on performance
+- [ ] Companion that reacts to progress
+- [ ] Full teacher/admin content management workflow
 
 ### Hard / Future
 - [ ] YouTube/video transcript integration
@@ -404,11 +420,14 @@ Build the smallest working version first, then iterate:
 - [x] Generate lessons flow
 - [x] Lesson deck route
 
-### To Add (Sprint 4+)
-- [ ] Fill-in-the-blank one-word validation tests
-- [ ] Grade route test (AJAX response, score calculation, pass/fail)
+### Added (Sprint 4)
+- [x] Fill-in-the-blank one-word validation tests (validation, fallback, integration)
+- [x] Grade route test with fill_blank_answers dict (case-insensitive, one-word rejection)
+- [x] Progress tracker unit tests (stages, create/update/get/complete/cleanup, bounds)
+- [x] Progress integration tests (endpoint, generate-lessons progress flow)
+
+### To Add (Sprint 5+)
 - [ ] Retake route test (quiz regeneration, state reset)
-- [ ] Difficulty toggle prompt adjustment tests
 - [ ] Auth route tests (Sprint 5)
 
 ### Manual Demo Tests
