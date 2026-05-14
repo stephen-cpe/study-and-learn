@@ -1,98 +1,61 @@
-<!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Study-and-Learn</title>
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logo.png') }}">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/retro.css') }}">
-</head>
-<body>
-    <div class="scanlines" aria-hidden="true"></div>
+{% extends "base.html" %}
+{% block title %}Study-and-Learn{% endblock %}
 
-    <nav class="navbar navbar-expand-lg az-navbar sticky-top">
-        <div class="container">
-            <a class="navbar-brand d-flex align-items-center gap-2" href="/">
-                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" class="brand-logo">
-                <span class="brand-title">Study-and-Learn</span>
-            </a>
-        </div>
-    </nav>
+{% block content %}
+<h1 class="mt-4">Study-and-Learn</h1>
 
-    <div class="container">
-        <h1 class="mt-4">Study-and-Learn</h1>
-
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            {% for category, message in messages %}
-              <div class="alert alert-{{ 'danger' if category == 'error' else 'success' if category == 'success' else 'info' }} alert-dismissible fade show" role="alert">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-              </div>
-            {% endfor %}
-          {% endif %}
-        {% endwith %}
-
-        <!-- Unified Form: Learning Goal + File Upload -->
-        <div class="form-section">
-            <h2 class="section-title mb-4">Start Your Learning Journey</h2>
-            <form id="unified-form" action="{{ url_for('main.process') }}" method="POST" enctype="multipart/form-data">
-                <div class="mb-4">
-                    <label for="learning_goal" class="form-label">What do you want to learn?</label>
-                    <input type="text" class="form-control form-control-lg" id="learning_goal" name="learning_goal"
-                           placeholder="e.g., Learn about machine learning algorithms"
-                           value="{{ session.learning_goal or '' }}" required>
-                    <div class="form-text">Describe your learning goal clearly to get the best results</div>
-                </div>
-
-                <hr class="section-divider">
-
-                <div class="mb-4">
-                    <label for="files" class="form-label">Upload Study Materials</label>
-                    <input class="form-control form-control-lg" type="file" id="files" name="files"
-                           accept=".txt,.md,.pdf,.docx" multiple>
-                    <div class="form-text">Supported formats: TXT, MD, PDF, DOCX. Upload up to 5 files.</div>
-                </div>
-
-                <ul id="selected-files-list" class="list-unstyled mb-3"></ul>
-
-                <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-primary btn-lg flex-grow-1">
-                        Process My Learning Materials
-                    </button>
-                </div>
-            </form>
+<div class="form-section">
+    <h2 class="section-title mb-4">Start Your Learning Journey</h2>
+    <form id="unified-form" action="{{ url_for('main.process') }}" method="POST" enctype="multipart/form-data">
+        <div class="mb-4">
+            <label for="learning_goal" class="form-label">What do you want to learn?</label>
+            <input type="text" class="form-control form-control-lg" id="learning_goal" name="learning_goal"
+                   placeholder="e.g., Learn about machine learning algorithms"
+                   value="{{ session.learning_goal or '' }}" required>
+            <div class="form-text">Describe your learning goal clearly to get the best results</div>
         </div>
 
-        {% if session.learning_goal %}
-        <div class="form-section current-goal-section">
-            <h2 class="section-title mb-3">Current Learning Goal</h2>
-            <div class="current-goal-display">
-                <span class="hex-accent"></span>
-                <span class="goal-text">{{ session.learning_goal }}</span>
-                <span class="hex-accent"></span>
-            </div>
+        <hr class="section-divider">
+
+        <div class="mb-4">
+            <label for="files" class="form-label">Upload Study Materials</label>
+            <input class="form-control form-control-lg" type="file" id="files" name="files"
+                   accept=".txt,.md,.pdf,.docx" multiple>
+            <div class="form-text">Supported formats: TXT, MD, PDF, DOCX. Upload up to 5 files.</div>
         </div>
-        {% endif %}
+
+        <ul id="selected-files-list" class="list-unstyled mb-3"></ul>
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary btn-lg flex-grow-1">
+                Process My Learning Materials
+            </button>
+        </div>
+    </form>
+</div>
+
+{% if session.learning_goal %}
+<div class="form-section current-goal-section">
+    <h2 class="section-title mb-3">Current Learning Goal</h2>
+    <div class="current-goal-display">
+        <span class="hex-accent"></span>
+        <span class="goal-text">{{ session.learning_goal }}</span>
+        <span class="hex-accent"></span>
     </div>
+</div>
+{% endif %}
+{% endblock %}
 
-    <footer class="az-footer">
-        <div class="container">
-            <span>© 2026 Study-and-Learn Capstone Project</span>
-        </div>
-    </footer>
-
-    <div class="spinner-overlay" id="loadingOverlay">
-        <div class="spinner-border" role="status" style="width: 4rem; height: 4rem;">
-            <span class="visually-hidden">Loading...</span>
-        </div>
-        <div class="spinner-text">Processing your files... This may take a minute...</div>
+{% block extra_footer %}
+<div class="spinner-overlay" id="loadingOverlay">
+    <div class="spinner-border" role="status" style="width: 4rem; height: 4rem;">
+        <span class="visually-hidden">Loading...</span>
     </div>
+    <div class="spinner-text">Processing your files... This may take a minute...</div>
+</div>
+{% include '_mascot.html' %}
+{% endblock %}
 
-    {% include '_mascot.html' %}
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
-</body>
-</html>
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% endblock %}

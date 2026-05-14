@@ -190,6 +190,7 @@
 
         submitFinalQuiz() {
             const answers = [];
+            const fillBlankAnswers = {};
             const quizQuestions = document.querySelectorAll('.quiz-question');
             let allAnswered = true;
 
@@ -220,7 +221,9 @@
                 } else if (qtype === 'fill_blank') {
                     const input = qq.querySelector('.q-input');
                     if (input && input.value.trim()) {
-                        answers.push(input.value.trim());
+                        const val = input.value.trim();
+                        fillBlankAnswers[qid] = val;
+                        answers.push(null);
                     } else {
                         allAnswered = false;
                     }
@@ -237,7 +240,7 @@
             if (errorEl) errorEl.style.display = 'none';
 
             if (typeof window.gradeQuiz === 'function') {
-                window.gradeQuiz(answers);
+                window.gradeQuiz(answers, fillBlankAnswers);
             }
         }
 

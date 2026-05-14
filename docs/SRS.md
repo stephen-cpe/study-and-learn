@@ -222,9 +222,9 @@ study-and-learn/
 | Parameter | Value | Notes |
 |---|---|---|
 | Serving framework | Ollama | Local-first, REST API compatible |
-| Default model | `qwen3:0.6b` (via `OLLAMA_MODEL` env var) | Placeholder model. Upgrade to `qwen3:1.7b`, `gemma3:4b`, or Ollama Cloud models on capable machines. |
+| Default model | `qwen3:0.6b` (via `OLLAMA_MODEL` env var) | Placeholder model. Upgrade to `gemma3:4b` or better on capable machines, or use Ollama Cloud models. |
 | Embedding Model | `qwen3-embedding:0.6b` (via `OLLAMA_EMBEDDING_MODEL` env var) | Used exclusively for ChromaDB vector embeddings. Swappable via env var. |
-| Supported small models | `gemma3:4b`, `lfm2.5-thinking:1.2b`, `granite4.1:3b` | Swappable via env var for testing/performance tradeoffs |
+| Supported cloud models | `gemma3:12b-cloud`, `nemotron-3-nano:30b-cloud`, `rnj-1:8b-cloud` | Swappable via env var for testing/performance tradeoffs |
 | Testing mode | `AI_MOCK=true` returns structured JSON stubs | Ensures deterministic CI/CD without GPU dependency |
 | Multimodal capability | Text + image support deferred to post-MVP | OCR for scanned PDFs remains stretch goal |
 

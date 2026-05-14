@@ -56,5 +56,5 @@ def call_ollama(prompt: str, model: str = None) -> str:
 # of local Ollama. No other code changes needed — just this one import.
 # Comment it back to restore local mode.
 #
-# from .ai_client_cloud import call_ollama  # noqa: E402
+from .ai_client_cloud import call_ollama  # noqa: E402
 # ─────────────────────────────────────────────────────────────────────────────

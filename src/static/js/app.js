@@ -169,14 +169,18 @@
         });
     };
 
-    window.gradeQuiz = function (answers) {
+    window.gradeQuiz = function (answers, fillBlankAnswers) {
+      var body = {
+        answers: answers,
+        checkpoint_answers: checkpointAnswers
+      };
+      if (fillBlankAnswers && Object.keys(fillBlankAnswers).length > 0) {
+        body.fill_blank_answers = fillBlankAnswers;
+      }
       fetch('/lessons/' + moduleIndex + '/grade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          answers: answers,
-          checkpoint_answers: checkpointAnswers
-        })
+        body: JSON.stringify(body)
       })
         .then(function (r) { return r.json(); })
         .then(function (data) { deck.showResults(data); })
@@ -288,16 +292,97 @@
     var generateBtn = document.getElementById('generate-lessons-btn');
     if (generateBtn) {
       generateBtn.addEventListener('click', function () {
-        document.getElementById('loadingOverlay').classList.add('active');
-        document.getElementById('progress-text').textContent =
-          'Generating lesson content, quizzes, and checkpoints...';
-        var form = document.createElement('form');
-        form.method = 'POST';
-        form.action = generateBtn.dataset.generateUrl;
-        document.body.appendChild(form);
-        form.submit();
+        generateBtn.disabled = true;
+        generateBtn.textContent = 'Generating...';
+        startGenerateLessons(generateBtn.dataset.generateUrl);
       });
     }
+  }
+
+  /* ── Generate Lessons with Progress ─────────────────── */
+
+  var _progressInterval = null;
+  var _progressTimedOut = false;
+  var _receivedValidProgress = false;
+  var _progressActive = false;
+  var _mascotIntervalId = null;
+
+  function generateTaskId() {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    return 'task-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+  }
+
+  function stopProgressPoll() {
+    if (_progressInterval) {
+      clearInterval(_progressInterval);
+      _progressInterval = null;
+    }
+  }
+
+  function setBubblePersistent(text) {
+    _progressActive = true;
+    var bubble = document.getElementById('speech-bubble');
+    var bubbleText = document.getElementById('bubble-text');
+    if (bubble && bubbleText) {
+      bubbleText.textContent = text;
+      bubble.classList.add('active');
+    }
+  }
+
+  function showBubbleBar(pct) {
+    var bar = document.getElementById('bubble-progress');
+    var fill = document.getElementById('bubble-progress-fill');
+    if (bar && fill) {
+      bar.style.display = 'block';
+      fill.style.width = (pct || 0) + '%';
+    }
+  }
+
+  function startGenerateLessons(url) {
+    stopProgressPoll();
+    _progressTimedOut = false;
+    _receivedValidProgress = false;
+
+    var taskId = generateTaskId();
+    setBubblePersistent('Reading through your uploaded materials and extracting text...');
+    showBubbleBar(0);
+
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task_id: taskId })
+    }).catch(function () {});
+
+    var startTime = Date.now();
+    var STALE_TIMEOUT_MS = 60000;
+
+    _progressInterval = setInterval(function () {
+      var elapsed = Date.now() - startTime;
+
+      if (!_receivedValidProgress && elapsed > STALE_TIMEOUT_MS && !_progressTimedOut) {
+        _progressTimedOut = true;
+        stopProgressPoll();
+        setBubblePersistent('This is taking longer than expected \u2014 hang tight!');
+        showBubbleBar(50);
+        return;
+      }
+
+      fetch('/progress?task_id=' + encodeURIComponent(taskId))
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (data.stage === undefined || data.stage < 0) return;
+          _receivedValidProgress = true;
+          setBubblePersistent(data.mascot || 'Working on your lesson...');
+          showBubbleBar(data.pct);
+          if (data.stage >= 4) {
+            stopProgressPoll();
+            window.location.href = '/lessons';
+          }
+        })
+        .catch(function () {});
+    }, 2000);
   }
 
   /* ── Mascot ──────────────────────────────────────────── */
@@ -310,24 +395,34 @@
 
     var messages = [
       'Ready to learn something cool today?',
-      'Don\'t forget to take breaks!',
-      'I\'m watching your progress...',
-      'Upload some materials and I\'ll help structure your study path!',
-      'You got this!',
-      'Need a hint? Just click me.'
+      'Don\'t forget to take breaks \u2014 your brain needs a breather!',
+      'I\'m watching your progress... no pressure though.',
+      'Upload some materials and I\'ll turn them into pure knowledge!',
+      'You got this! ... Whatever \"this\" is.',
+      'Need a hint? Just click me. I don\'t bite.',
+      'Loading knowledge... 0% complete. Just kidding!',
+      'I\'d tell you a joke about AI, but I\'m still learning them.',
+      'Fun fact: You\'re smarter than you were 5 minutes ago.',
+      'Error 418: I\'m a robot, not a teapot.',
+      'My brain is the size of a planet and I use it to help you study.',
+      'If knowledge is power, you\'re about to become a superhero.'
     ];
 
-    window._mascotTalk = function () {
-      bubbleText.textContent = messages[Math.floor(Math.random() * messages.length)];
+    function idleTalk() {
+      if (!_progressActive) {
+        _mascotTalk(messages[Math.floor(Math.random() * messages.length)]);
+      }
+    }
+
+    window._mascotTalk = function (customMsg) {
+      if (_progressActive) return;
+      bubbleText.textContent = customMsg || messages[Math.floor(Math.random() * messages.length)];
       bubble.classList.add('active');
       setTimeout(function () { bubble.classList.remove('active'); }, 4000);
     };
 
-    setInterval(function () {
-      if (Math.random() < 0.25) window._mascotTalk();
-    }, 12000);
-
-    setTimeout(function () { window._mascotTalk(); }, 1500);
+    _mascotIntervalId = setInterval(idleTalk, 15000);
+    setTimeout(idleTalk, 1500);
   }
 
   /* ── Boot ────────────────────────────────────────────── */

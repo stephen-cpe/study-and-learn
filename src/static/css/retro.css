@@ -73,11 +73,17 @@ body {
   backdrop-filter: blur(10px);
 }
 
+.az-navbar .container-fluid {
+  padding-left: 0;
+  padding-right: 0;
+}
+
 .brand-logo {
-  width: 44px;
-  height: 44px;
+  width: 53px;
+  height: 53px;
   object-fit: contain;
   filter: drop-shadow(0 0 8px var(--az-glow));
+  margin-left: 8px;
 }
 
 .brand-title {
@@ -751,7 +757,7 @@ h2, .section-title {
     border: 2px solid #00b4d8;
     border-radius: 12px;
     padding: 10px 14px;
-    width: 200px;
+    width: 240px;
     color: #caf0f8;
     font-size: 0.85rem;
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
@@ -776,6 +782,30 @@ h2, .section-title {
     border-top-color: #00b4d8;
 }
 
+/* ===== IN-BUBBLE PROGRESS BAR ===== */
+.bubble-progress {
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(0, 180, 216, 0.2);
+}
+
+.bubble-progress-track {
+    height: 5px;
+    background: rgba(5, 11, 20, 0.7);
+    border-radius: 999px;
+    overflow: hidden;
+    border: 1px solid rgba(0, 180, 216, 0.15);
+}
+
+.bubble-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--az-cyan), #0096c7);
+    border-radius: 999px;
+    transition: width 0.5s ease;
+    box-shadow: 0 0 6px var(--az-glow);
+}
+
 @media (max-width: 768px) {
     #robot-mascot {
         width: 80px;
@@ -784,11 +814,18 @@ h2, .section-title {
         right: 16px;
     }
     #speech-bubble {
-        width: 160px;
+        width: 180px;
         font-size: 0.75rem;
         bottom: 110px;
         right: 50px;
         padding: 8px 10px;
+    }
+    .bubble-progress {
+        margin-top: 5px;
+        padding-top: 4px;
+    }
+    .bubble-progress-track {
+        height: 4px;
     }
 }
 

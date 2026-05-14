@@ -13,6 +13,7 @@ from src.services.curriculum_generator import generate_study_path
 from src.services.rag_retriever import build_rag_context
 from src.services.lesson_generator import generate_lesson
 from src.services.quiz_generator import generate_quiz, generate_inline_checkpoint
+from src.services import progress_tracker
 
 bp = Blueprint('main', __name__)
 
@@ -123,6 +124,15 @@ def reset():
     return redirect(url_for('main.index'))
 
 
+@bp.route('/progress')
+def progress():
+    task_id = request.args.get('task_id', '') or session.sid
+    status = progress_tracker.get_progress(task_id)
+    if status is None:
+        return jsonify({'stage': -1, 'label': 'No task', 'pct': 0, 'mascot': ''})
+    return jsonify(status)
+
+
 @bp.route('/generate-lessons', methods=['POST'])
 def generate_lessons():
     learning_goal = session.get('learning_goal', '')
@@ -131,6 +141,10 @@ def generate_lessons():
     if not learning_goal or not study_path.get('modules'):
         flash('No study path found. Please upload materials first.', 'error')
         return redirect(url_for('main.index'))
+
+    body = request.get_json(silent=True) or {}
+    task_id = body.get('task_id', '') or session.sid
+    progress_tracker.create_task(task_id=task_id)
 
     modules = study_path['modules']
     lessons = session.get('lessons', [])
@@ -144,8 +158,12 @@ def generate_lessons():
 
     retriever = make_retriever(learning_goal)
 
+    progress_tracker.update_progress(task_id, 1)
+
     for i, module in enumerate(modules):
+        progress_tracker.update_progress(task_id, 2)
         lesson_data = generate_lesson(module['title'], learning_goal, retriever)
+        progress_tracker.update_progress(task_id, 3)
         quiz_data = generate_quiz(module['title'], lesson_data.get('slides', []), retriever, n_questions=5)
 
         checkpoint_count = 0
@@ -176,6 +194,8 @@ def generate_lessons():
             'score': None,
             'passed': False
         })
+
+    progress_tracker.update_progress(task_id, 4)
 
     session['lessons'] = lessons
     session.modified = True
@@ -242,6 +262,7 @@ def grade_lesson(module_index):
     lesson = lessons_data[module_index]
     data = request.get_json(silent=True) or {}
     answers = data.get('answers', [])
+    fill_blank_answers = data.get('fill_blank_answers', {})
 
     quiz_questions = lesson.get('quiz', {}).get('questions', [])
     checkpoints = lesson.get('checkpoints', {})
@@ -252,7 +273,10 @@ def grade_lesson(module_index):
     quiz_results = []
 
     for i, question in enumerate(quiz_questions):
-        user_answer = answers[i] if i < len(answers) else None
+        if question['type'] == 'fill_blank':
+            user_answer = fill_blank_answers.get(question['id'], answers[i] if i < len(answers) else None)
+        else:
+            user_answer = answers[i] if i < len(answers) else None
         correct = _grade_single_question(question, user_answer)
         if correct:
             earned_points += 1
@@ -367,8 +391,11 @@ def _grade_single_question(question: dict, user_answer) -> bool:
     elif qtype == 'fill_blank':
         if not isinstance(user_answer, str):
             return False
+        ua = user_answer.strip()
+        if not ua or ' ' in ua:
+            return False
         acceptable = question.get('acceptable_answers', [question.get('answer', '')])
-        return user_answer.strip().lower() in [a.strip().lower() for a in acceptable]
+        return ua.lower() in [a.strip().lower() for a in acceptable if isinstance(a, str)]
     return False
 
 

@@ -127,3 +127,51 @@ def test_quiz_questions_have_explanations():
     result = _fallback_quiz(5)
     for q in result['questions']:
         assert 'explanation' in q, f"Question {q['id']} missing explanation"
+
+
+def test_fill_blank_validation_rejects_multi_word():
+    questions = [
+        {
+            "id": "q1", "type": "fill_blank", "prompt": "The capital of France is __.",
+            "answer": "paris", "acceptable_answers": ["paris", "france"],
+            "explanation": "Paris is the capital."
+        },
+        {
+            "id": "q2", "type": "fill_blank", "prompt": "___ is the process of learning.",
+            "answer": "study", "acceptable_answers": ["study", "active recall", "memorization technique"],
+            "explanation": "Studying is key."
+        },
+        {
+            "id": "q3", "type": "fill_blank", "prompt": "The answer is __.",
+            "answer": "42",
+            "explanation": "Ultimate answer."
+        }
+    ]
+    valid = _validate_questions(questions, 3)
+    assert len(valid) == 3
+
+    # q1: all single-word entries kept
+    assert len(valid[0]['acceptable_answers']) == 2
+    assert 'paris' in valid[0]['acceptable_answers']
+    assert 'france' in valid[0]['acceptable_answers']
+
+    # q2: multi-word "active recall" and "memorization technique" filtered out
+    assert len(valid[1]['acceptable_answers']) == 1
+    assert valid[1]['acceptable_answers'] == ['study']
+
+    # q3: no acceptable_answers provided, falls back to answer
+    assert len(valid[2]['acceptable_answers']) == 1
+    assert valid[2]['acceptable_answers'] == ['42']
+
+
+def test_fill_blank_answer_is_single_word_in_fallback():
+    result = _fallback_quiz(5)
+    fb_q = None
+    for q in result['questions']:
+        if q['type'] == 'fill_blank':
+            fb_q = q
+            break
+    assert fb_q is not None
+    assert ' ' not in fb_q['answer'], f"Fill-blank answer '{fb_q['answer']}' must be a single word"
+    for a in fb_q['acceptable_answers']:
+        assert ' ' not in a, f"Acceptable answer '{a}' must be a single word"

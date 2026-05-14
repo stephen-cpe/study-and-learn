@@ -83,3 +83,76 @@ def test_lesson_deck_route(mock_quiz_ollama, mock_lesson_ollama, client):
 
     response = client.get('/lessons/0')
     assert response.status_code == 200
+
+
+@patch('src.services.lesson_generator.call_ollama')
+@patch('src.services.quiz_generator.call_ollama')
+def test_generate_lessons_progress_updates(mock_quiz_ollama, mock_lesson_ollama, client):
+    mock_lesson_ollama.return_value = '{"module_title": "Intro", "slides": [{"type": "title", "title": "Hello", "subtitle": "World"}]}'
+    mock_quiz_ollama.return_value = '{"questions": [{"id": "q1", "type": "mcq", "prompt": "Q?", "options": ["A","B","C","D"], "answer_index": 0, "explanation": "E"}]}'
+
+    with client.session_transaction() as sess:
+        sess['learning_goal'] = 'Test'
+        sess['study_path'] = {'modules': [{'title': 'M1', 'estimated_effort': '1h'}]}
+        sess['extracted_texts'] = ['text']
+
+    response = client.post('/generate-lessons', follow_redirects=True)
+    assert response.status_code == 200
+    assert b'Generated' in response.data or b'successfully' in response.data
+
+    progress_resp = client.get('/progress')
+    assert progress_resp.status_code == 200
+    data = progress_resp.get_json()
+    assert 'stage' in data
+    assert 'label' in data
+    assert 'pct' in data
+
+
+def test_progress_endpoint_no_task(client):
+    progress_resp = client.get('/progress')
+    assert progress_resp.status_code == 200
+    data = progress_resp.get_json()
+    assert data['stage'] == -1
+
+
+def test_grade_lesson_fill_blank_one_word(client):
+    with client.session_transaction() as sess:
+        sess['learning_goal'] = 'Test goal'
+        sess['lessons'] = [{
+            'index': 0, 'module_title': 'M1', 'estimated_effort': '1h',
+            'lesson': {'slides': [{'type': 'title', 'title': 'M1', 'subtitle': ''}]},
+            'quiz': {'questions': [
+                {'id': 'q1', 'type': 'fill_blank', 'prompt': 'The capital of France is __.',
+                 'answer': 'paris', 'acceptable_answers': ['paris', 'france'],
+                 'explanation': 'Paris is the capital.'},
+                {'id': 'q2', 'type': 'mcq', 'prompt': 'What is 2+2?',
+                 'options': ['3', '4', '5'], 'answer_index': 1, 'explanation': 'Basic math.'}
+            ]},
+            'checkpoints': {},
+            'completed': False, 'score': None, 'passed': False
+        }]
+
+    # Correct fill_blank (case-insensitive), correct MCQ
+    response = client.post('/lessons/0/grade', json={
+        'answers': [None, 1],
+        'fill_blank_answers': {'q1': 'Paris'},
+        'checkpoint_answers': {}
+    })
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data['score'] == 100
+    assert data['passed'] is True
+    assert len(data['quiz_results']) == 2
+    assert data['quiz_results'][0]['correct'] is True
+    assert data['quiz_results'][1]['correct'] is True
+
+    # Multi-word answer rejected for fill_blank
+    response2 = client.post('/lessons/0/grade', json={
+        'answers': [None, 1],
+        'fill_blank_answers': {'q1': 'paris france'},
+        'checkpoint_answers': {}
+    })
+    assert response2.status_code == 200
+    data2 = response2.get_json()
+    assert data2['quiz_results'][0]['correct'] is False
+    assert data2['score'] == 50

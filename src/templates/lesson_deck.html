@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ lesson.module_title }} — Study-and-Learn</title>
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logo-v2.png') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logo.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/study-and-learn.css') }}">
 </head>
 <body>
@@ -112,7 +112,7 @@
                                 <label class="q-option"><input type="radio" name="{{ q.id }}" value="false"> False</label>
                             </div>
                             {% elif q.type == 'fill_blank' %}
-                            <input type="text" class="q-input" name="{{ q.id }}" placeholder="Type your answer...">
+                            <input type="text" class="q-input" maxlength="20" data-qid="{{ q.id }}" name="{{ q.id }}" placeholder="Type a single word...">
                             {% endif %}
                         </div>
                         {% endfor %}

@@ -39,7 +39,7 @@ For each question type:
 - mcq: Single correct answer from options A-D. Include prompt, options array, answer_index (0-based), explanation.
 - true_false: True or false statement. Include prompt, answer (boolean), explanation.
 - multi_select: Multiple correct answers from options A-D. Include prompt, options array, answer_indices array (0-based), explanation.
-- fill_blank: Sentence with ___ placeholder. Include prompt (with ___), answer string, acceptable_answers array, explanation.
+- fill_blank: Sentence with single ___ placeholder. Include prompt (with ___ only), answer string (single word only), acceptable_answers array (each entry a single word), explanation.
 
 Provide your response in this JSON format:
 {{
@@ -190,12 +190,19 @@ def _validate_questions(questions: list, expected_count: int) -> list:
                 })
         elif qtype == 'fill_blank':
             if all(k in q for k in ['prompt', 'answer']):
+                answer = q['answer']
+                if not isinstance(answer, str):
+                    continue
+                acceptable = q.get('acceptable_answers', [answer])
+                single_word = [a for a in acceptable if isinstance(a, str) and ' ' not in a.strip()]
+                if not single_word:
+                    single_word = [answer] if ' ' not in answer.strip() else acceptable[:1]
                 valid.append({
                     'id': q.get('id', f'q{len(valid)+1}'),
                     'type': 'fill_blank',
                     'prompt': q['prompt'],
-                    'answer': q['answer'],
-                    'acceptable_answers': q.get('acceptable_answers', [q['answer']]),
+                    'answer': answer,
+                    'acceptable_answers': single_word,
                     'explanation': q.get('explanation', '')
                 })
         if len(valid) >= expected_count:
@@ -241,9 +248,9 @@ def _fallback_quiz(n_questions: int = 5) -> dict:
         {
             'id': 'q4',
             'type': 'fill_blank',
-            'prompt': 'The process of actively retrieving information from memory is called ___.',
-            'answer': 'active recall',
-            'acceptable_answers': ['active recall', 'recall', 'retrieval practice'],
+            'prompt': 'The practice of actively retrieving information from memory is called ___.',
+            'answer': 'recall',
+            'acceptable_answers': ['recall', 'retrieval'],
             'explanation': 'Active recall is the practice of actively stimulating memory during the learning process.'
         },
         {

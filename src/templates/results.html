@@ -1,139 +1,101 @@
-<!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analysis Results — Study-and-Learn</title>
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logo-v2.png') }}">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/retro.css') }}">
-</head>
-<body>
-    <div class="scanlines" aria-hidden="true"></div>
-    <nav class="navbar navbar-expand-lg az-navbar sticky-top">
-        <div class="container">
-            <a class="navbar-brand d-flex align-items-center gap-2" href="/">
-                <img src="{{ url_for('static', filename='images/logo-v2.png') }}" alt="Logo" class="brand-logo">
-                <span class="brand-title">Study-and-Learn</span>
-            </a>
-        </div>
-    </nav>
-    <div class="container">
-        <h1 class="mt-4">Analysis Results</h1>
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        {% for category, message in messages %}
-        <div class="alert alert-{{ 'danger' if category == 'error' else 'success' if category == 'success' else 'info' }} alert-dismissible fade show" role="alert">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-        {% endfor %}
-        {% endif %}
-        {% endwith %}
+{% extends "base.html" %}
+{% block title %}Analysis Results — Study-and-Learn{% endblock %}
 
-        <div class="results-meta mb-4">
-            <span class="badge goal-badge">{{ learning_goal }}</span>
-            {% if filenames %}
-            <div class="file-list">
-                {% for f in filenames %}
-                <span class="badge filename-badge file-list-item">{{ f }}</span>
-                {% endfor %}
+{% block content %}
+<h1 class="mt-4">Analysis Results</h1>
+
+<div class="results-meta mb-4">
+    <span class="badge goal-badge">{{ learning_goal }}</span>
+    {% if filenames %}
+    <div class="file-list">
+        {% for f in filenames %}
+        <span class="badge filename-badge file-list-item">{{ f }}</span>
+        {% endfor %}
+    </div>
+    {% else %}
+    <span class="badge filename-badge">Files: {{ filename }}</span>
+    {% endif %}
+</div>
+
+<div class="results-grid">
+    <div class="card results-card-summary">
+        <div class="card-header">
+            <h2 class="mb-0">Document Summary</h2>
+        </div>
+        <div class="card-body markdown-content">
+            <div id="summary-content" class="raw-md">{{ summary }}</div>
+        </div>
+    </div>
+
+    <div class="card results-card-relevance">
+        <div class="card-header">
+            <h2 class="mb-0">Relevance Check</h2>
+        </div>
+        <div class="card-body">
+            {% set rel_label = (relevance_result.relevance_label|default('partial')|trim|lower).split(' ')[0] %}
+            <div class="relevance-indicator relevance-{{ rel_label }}">
+                <span class="relevance-dot"></span>
+                <h3>{{ relevance_result.relevance_label|capitalize }} Match</h3>
+            </div>
+            <div class="relevance-details">
+                <div class="relevance-section">
+                    <h4>Explanation</h4>
+                    <div id="relevance-content" class="raw-md markdown-content">{{ relevance_result.explanation }}</div>
+                </div>
+                {% if relevance_result.missing_material and relevance_result.missing_material|lower != 'none' %}
+                <div class="relevance-section">
+                    <h4>Suggested Materials</h4>
+                    <div id="suggested-materials" class="markdown-content">{{ relevance_result.missing_material }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="card results-card-path">
+        <div class="card-header">
+            <h2 class="mb-0">Recommended Study Path</h2>
+        </div>
+        <div class="card-body">
+            {% if study_path.modules %}
+            <div class="module-timeline">
+            {% for module in study_path.modules %}
+            <div class="module-timeline-item">
+                <div class="module-number">{{ loop.index }}</div>
+                <div class="module-item-enhanced">
+                    <h5><span class="module-title raw-md">{{ module.title }}</span></h5>
+                    <span class="module-effort">{{ module.estimated_effort }}</span>
+                </div>
+            </div>
+            {% endfor %}
             </div>
             {% else %}
-            <span class="badge filename-badge">Files: {{ filename }}</span>
+            <p class="text-muted">No study path generated.</p>
             {% endif %}
-        </div>
 
-        <div class="results-grid">
-            <div class="card results-card-summary">
-                <div class="card-header">
-                    <h2 class="mb-0">Document Summary</h2>
+            <div class="generate-lessons-section mt-4">
+                <div class="d-grid">
+                    <button id="generate-lessons-btn" class="btn btn-accent btn-lg" data-generate-url="{{ url_for('main.generate_lessons') }}">
+                        Generate Interactive Lessons
+                    </button>
                 </div>
-                <div class="card-body markdown-content">
-                    <div id="summary-content" class="raw-md">{{ summary }}</div>
-                </div>
+                <div class="generate-info">Creates slide-based lessons with quizzes and checkpoints</div>
             </div>
-
-            <div class="card results-card-relevance">
-                <div class="card-header">
-                    <h2 class="mb-0">Relevance Check</h2>
-                </div>
-                <div class="card-body">
-                    {% set rel_label = (relevance_result.relevance_label|default('partial')|trim|lower).split(' ')[0] %}
-                    <div class="relevance-indicator relevance-{{ rel_label }}">
-                        <span class="relevance-dot"></span>
-                        <h3>{{ relevance_result.relevance_label|capitalize }} Match</h3>
-                    </div>
-                    <div class="relevance-details">
-                        <div class="relevance-section">
-                            <h4>Explanation</h4>
-                            <div id="relevance-content" class="raw-md markdown-content">{{ relevance_result.explanation }}</div>
-                        </div>
-                        {% if relevance_result.missing_material and relevance_result.missing_material|lower != 'none' %}
-                        <div class="relevance-section">
-                            <h4>Suggested Materials</h4>
-                            <div id="suggested-materials" class="markdown-content">{{ relevance_result.missing_material }}</div>
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-
-            <div class="card results-card-path">
-                <div class="card-header">
-                    <h2 class="mb-0">Recommended Study Path</h2>
-                </div>
-                <div class="card-body">
-                    {% if study_path.modules %}
-                    <div class="module-timeline">
-                    {% for module in study_path.modules %}
-                    <div class="module-timeline-item">
-                        <div class="module-number">{{ loop.index }}</div>
-                        <div class="module-item-enhanced">
-                            <h5><span class="module-title raw-md">{{ module.title }}</span></h5>
-                            <span class="module-effort">{{ module.estimated_effort }}</span>
-                        </div>
-                    </div>
-                    {% endfor %}
-                    </div>
-                    {% else %}
-                    <p class="text-muted">No study path generated.</p>
-                    {% endif %}
-
-                    <div class="generate-lessons-section mt-4">
-                        <div class="d-grid">
-                            <button id="generate-lessons-btn" class="btn btn-accent btn-lg" data-generate-url="{{ url_for('main.generate_lessons') }}">
-                                Generate Interactive Lessons
-                            </button>
-                        </div>
-                        <div class="generate-info">Creates slide-based lessons with quizzes and checkpoints</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="action-buttons mb-4">
-            <a href="{{ url_for('main.reset') }}" class="btn btn-outline-primary">Start Over</a>
-            <a href="{{ url_for('main.index') }}" class="btn btn-primary">Process New Materials</a>
         </div>
     </div>
+</div>
 
-    <footer class="az-footer">
-        <div class="container"><span>© 2026 Study-and-Learn Capstone Project</span></div>
-    </footer>
+<div class="action-buttons mb-4">
+    <a href="{{ url_for('main.reset') }}" class="btn btn-outline-primary">Start Over</a>
+    <a href="{{ url_for('main.index') }}" class="btn btn-primary">Process New Materials</a>
+</div>
+{% endblock %}
 
-    <div class="spinner-overlay" id="loadingOverlay">
-        <div class="spinner-border" role="status" style="width: 4rem; height: 4rem;">
-            <span class="visually-hidden">Loading...</span>
-        </div>
-        <div class="spinner-text">Generating lessons... This may take a few minutes...</div>
-        <div class="spinner-subtext" id="progress-text"></div>
-    </div>
+{% block extra_footer %}
+{% include '_mascot.html' %}
+{% endblock %}
 
-    {% include '_mascot.html' %}
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
-</body>
-</html>
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% endblock %}
