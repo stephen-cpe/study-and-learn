@@ -66,7 +66,7 @@ from .ai_client_cloud import call_ollama  # noqa: E402   # ← uncommented
 
 ```env
 OLLAMA_CLOUD_API_KEY=your-api-key-here
-OLLAMA_MODEL=gemma3:27b-cloud
+OLLAMA_MODEL=gemma3:12b-cloud
 ```
 
 **3. Done** — no other files need changing. The `from .ai_client_cloud import call_ollama` line replaces the local `call_ollama` at the module level, so every service (summarizer, quiz generator, etc.) automatically uses the cloud.

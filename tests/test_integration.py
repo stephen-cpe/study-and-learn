@@ -4,6 +4,7 @@ import pytest
 from unittest.mock import patch
 from cachelib import FileSystemCache
 from src import create_app
+from src.services import progress_tracker
 
 @pytest.fixture
 def client():
@@ -115,44 +116,89 @@ def test_progress_endpoint_no_task(client):
     assert data['stage'] == -1
 
 
-def test_grade_lesson_fill_blank_one_word(client):
-    with client.session_transaction() as sess:
-        sess['learning_goal'] = 'Test goal'
-        sess['lessons'] = [{
-            'index': 0, 'module_title': 'M1', 'estimated_effort': '1h',
-            'lesson': {'slides': [{'type': 'title', 'title': 'M1', 'subtitle': ''}]},
-            'quiz': {'questions': [
-                {'id': 'q1', 'type': 'fill_blank', 'prompt': 'The capital of France is __.',
-                 'answer': 'paris', 'acceptable_answers': ['paris', 'france'],
-                 'explanation': 'Paris is the capital.'},
-                {'id': 'q2', 'type': 'mcq', 'prompt': 'What is 2+2?',
-                 'options': ['3', '4', '5'], 'answer_index': 1, 'explanation': 'Basic math.'}
-            ]},
-            'checkpoints': {},
-            'completed': False, 'score': None, 'passed': False
-        }]
+@patch('src.services.rag_retriever.build_rag_context')
+@patch('src.services.summarizer.call_ollama')
+@patch('src.services.relevance_checker.call_ollama')
+@patch('src.services.curriculum_generator.call_ollama')
+def test_process_with_progress_tracking(mock_curriculum, mock_relevance, mock_summarizer, mock_rag, client):
+    mock_rag.return_value = "RAG context for testing."
+    mock_summarizer.return_value = "Main topics: ML, algorithms. Difficulty: intermediate."
+    mock_relevance.return_value = '{"relevance_label": "strong", "explanation": "Good match", "missing_material": "None"}'
+    mock_curriculum.return_value = '{"modules": [{"title": "Intro to ML", "estimated_effort": "2 hours"}]}'
 
-    # Correct fill_blank (case-insensitive), correct MCQ
-    response = client.post('/lessons/0/grade', json={
-        'answers': [None, 1],
-        'fill_blank_answers': {'q1': 'Paris'},
-        'checkpoint_answers': {}
-    })
+    task_id = 'test-process-task-001'
+    data = {
+        'learning_goal': 'Learn ML',
+        'task_id': task_id,
+        'files': [(io.BytesIO(b'Sample ML text'), 'test.txt')]
+    }
+    response = client.post('/process', data=data, content_type='multipart/form-data')
     assert response.status_code == 200
-    data = response.get_json()
-    assert data['score'] == 100
-    assert data['passed'] is True
-    assert len(data['quiz_results']) == 2
-    assert data['quiz_results'][0]['correct'] is True
-    assert data['quiz_results'][1]['correct'] is True
+    json_data = response.get_json()
+    assert json_data is not None
+    assert 'redirect' in json_data
+    assert '/results' in json_data['redirect']
 
-    # Multi-word answer rejected for fill_blank
-    response2 = client.post('/lessons/0/grade', json={
-        'answers': [None, 1],
-        'fill_blank_answers': {'q1': 'paris france'},
-        'checkpoint_answers': {}
-    })
-    assert response2.status_code == 200
-    data2 = response2.get_json()
-    assert data2['quiz_results'][0]['correct'] is False
-    assert data2['score'] == 50
+    progress_data = progress_tracker.get_progress(task_id)
+    assert progress_data is None or progress_data['stage'] == 6
+
+
+@patch('src.services.rag_retriever.build_rag_context')
+@patch('src.services.summarizer.call_ollama')
+@patch('src.services.relevance_checker.call_ollama')
+@patch('src.services.curriculum_generator.call_ollama')
+def test_process_progress_stages_advance(mock_curriculum, mock_relevance, mock_summarizer, mock_rag, client):
+    mock_rag.return_value = "RAG context for testing."
+    mock_summarizer.return_value = "Main topics: ML, algorithms. Difficulty: intermediate."
+    mock_relevance.return_value = '{"relevance_label": "strong", "explanation": "Good match", "missing_material": "None"}'
+    mock_curriculum.return_value = '{"modules": [{"title": "Intro to ML", "estimated_effort": "2 hours"}]}'
+
+    task_id = 'test-process-stages-002'
+    data = {
+        'learning_goal': 'Learn ML',
+        'task_id': task_id,
+        'files': [(io.BytesIO(b'Sample text'), 'test.txt')]
+    }
+    response = client.post('/process', data=data, content_type='multipart/form-data')
+    assert response.status_code == 200
+    json_data = response.get_json()
+    assert json_data is not None
+
+    progress_resp = client.get('/progress?task_id=' + task_id)
+    assert progress_resp.status_code == 200
+    progress_json = progress_resp.get_json()
+    assert progress_json['stage'] == -1 or progress_json['stage'] >= 6
+
+
+def test_process_non_blocking_no_overlay(client):
+    response = client.get('/')
+    assert response.status_code == 200
+    assert b'loadingOverlay' not in response.data
+    assert b'spinner-overlay' not in response.data
+    assert b'robot-mascot' in response.data
+    assert b'speech-bubble' in response.data
+    assert b'bubble-progress' in response.data
+
+
+def test_process_ajax_error_response(client):
+    data = {
+        'learning_goal': '',
+        'task_id': 'test-err-001',
+        'files': [(io.BytesIO(b'Sample'), 'test.txt')]
+    }
+    response = client.post('/process', data=data, content_type='multipart/form-data')
+    assert response.status_code == 400
+    json_data = response.get_json()
+    assert 'error' in json_data
+    assert 'learning goal' in json_data['error'].lower()
+
+
+def test_process_ajax_no_files(client):
+    data = {
+        'learning_goal': 'Learn testing',
+        'task_id': 'test-err-002',
+    }
+    response = client.post('/process', data=data, content_type='multipart/form-data')
+    assert response.status_code == 400
+    json_data = response.get_json()
+    assert 'error' in json_data

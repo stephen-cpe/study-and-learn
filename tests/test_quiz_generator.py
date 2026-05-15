@@ -175,3 +175,111 @@ def test_fill_blank_answer_is_single_word_in_fallback():
     assert ' ' not in fb_q['answer'], f"Fill-blank answer '{fb_q['answer']}' must be a single word"
     for a in fb_q['acceptable_answers']:
         assert ' ' not in a, f"Acceptable answer '{a}' must be a single word"
+
+
+def test_quiz_prompt_requires_plausible_distractors(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    import src.services.quiz_generator as qg_module
+    captured_prompt = {}
+
+    def mock_call_ollama(prompt, model=None):
+        captured_prompt['prompt'] = prompt
+        return '{"questions": [{"id": "q1", "type": "mcq", "prompt": "Test?", "options": ["A","B","C","D"], "answer_index": 0, "explanation": "E"}]}'
+
+    monkeypatch.setattr(qg_module, 'call_ollama', mock_call_ollama)
+
+    generate_quiz("Test Module", [], None, n_questions=3)
+    p = captured_prompt['prompt']
+
+    assert 'plausible' in p.lower()
+    assert 'distractor' in p.lower() or 'wrong answer' in p.lower()
+    assert 'single word' in p.lower()
+    assert 'fill_blank' in p or 'fill blank' in p.lower()
+
+
+def test_quiz_prompt_contains_pedagogical_requirements(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    import src.services.quiz_generator as qg_module
+    captured_prompt = {}
+
+    def mock_call_ollama(prompt, model=None):
+        captured_prompt['prompt'] = prompt
+        return '{"questions": [{"id": "q1", "type": "mcq", "prompt": "Test?", "options": ["A","B","C","D"], "answer_index": 0, "explanation": "E"}]}'
+
+    monkeypatch.setattr(qg_module, 'call_ollama', mock_call_ollama)
+
+    generate_quiz("Biology 101", [], None, n_questions=3)
+    p = captured_prompt['prompt']
+
+    assert 'explanation' in p.lower()
+    assert 'unambiguously' in p.lower() or 'unambiguous' in p.lower()
+    assert 'MUST' in p
+    assert 'only a JSON' in p.lower() or 'ONLY a JSON' in p
+
+
+def test_quiz_prompt_rag_grounding_with_context(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    import src.services.quiz_generator as qg_module
+    captured_prompt = {}
+
+    def mock_call_ollama(prompt, model=None):
+        captured_prompt['prompt'] = prompt
+        return '{"questions": [{"id": "q1", "type": "mcq", "prompt": "Test?", "options": ["A","B","C","D"], "answer_index": 0, "explanation": "E"}]}'
+
+    monkeypatch.setattr(qg_module, 'call_ollama', mock_call_ollama)
+
+    def mock_retrieve(query):
+        return "Mitochondria produce ATP through cellular respiration."
+
+    generate_quiz("Cell Biology", [], mock_retrieve, n_questions=3)
+    p = captured_prompt['prompt']
+
+    assert 'MUST base' in p or 'base every' in p.lower()
+    assert 'fabricate' in p.lower() or 'NOT' in p or 'do NOT' in p
+
+
+def test_checkpoint_prompt_uses_immediate_recall(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    import src.services.quiz_generator as qg_module
+    captured_prompt = {}
+
+    def mock_call_ollama(prompt, model=None):
+        captured_prompt['prompt'] = prompt
+        return '{"id": "cp", "type": "mcq", "prompt": "Test?", "options": ["A","B","C","D"], "answer_index": 0, "explanation": "E"}'
+
+    monkeypatch.setattr(qg_module, 'call_ollama', mock_call_ollama)
+
+    slides = [{"type": "content", "heading": "Mitosis", "bullets": ["Cells divide", "DNA replicates"]}]
+    generate_inline_checkpoint("Biology", slides, None)
+    p = captured_prompt['prompt']
+
+    assert 'IMMEDIATE RECALL' in p or 'immediate recall' in p.lower()
+    assert 'core concept' in p.lower() or 'key concept' in p.lower()
+    assert 'NOT obscure' in p or 'not obscure' in p.lower()
+    assert 'plausible' in p.lower()
+
+
+def test_mock_responses_pass_validation_under_new_prompts(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    quiz = generate_quiz("Test Module", [], None, n_questions=5)
+    assert isinstance(quiz, dict)
+    assert 'questions' in quiz
+    assert len(quiz['questions']) == 5
+    for q in quiz['questions']:
+        assert 'type' in q
+        assert 'prompt' in q
+        assert 'explanation' in q
+        if q['type'] == 'fill_blank':
+            assert ' ' not in q['answer'], f"Fill-blank answer must be single word: {q['answer']}"
+            for a in q.get('acceptable_answers', []):
+                assert ' ' not in a, f"Acceptable answer must be single word: {a}"

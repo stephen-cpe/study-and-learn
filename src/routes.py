@@ -29,21 +29,32 @@ def index():
 
 @bp.route('/process', methods=['POST'])
 def process():
+    task_id = request.form.get('task_id', '') or None
+    is_ajax = task_id is not None
+
     goal = request.form.get('learning_goal', '').strip()
     files = request.files.getlist('files')
     valid_files = [f for f in files if f and f.filename and f.filename.strip()]
 
-    if not goal:
-        flash('Please enter a learning goal', 'error')
+    def _error(msg):
+        if is_ajax:
+            if task_id:
+                progress_tracker.cleanup_task(task_id)
+            return jsonify({'error': msg}), 400
+        flash(msg, 'error')
         return redirect(url_for('main.index'))
+
+    if not goal:
+        return _error('Please enter a learning goal')
 
     if not valid_files:
-        flash('No valid files selected', 'error')
-        return redirect(url_for('main.index'))
+        return _error('No valid files selected')
 
     if len(valid_files) > MAX_FILES:
-        flash(f'Maximum {MAX_FILES} files allowed', 'error')
-        return redirect(url_for('main.index'))
+        return _error(f'Maximum {MAX_FILES} files allowed')
+
+    if is_ajax:
+        progress_tracker.create_task(task_id=task_id, stages=progress_tracker.PROCESS_STAGES)
 
     upload_folder = current_app.config['UPLOAD_FOLDER']
     os.makedirs(upload_folder, exist_ok=True)
@@ -61,23 +72,49 @@ def process():
                 extracted_texts.append(text)
                 filenames.append(filename)
             except ValueError as e:
+                if is_ajax:
+                    progress_tracker.cleanup_task(task_id)
+                    return jsonify({'error': f'Error extracting {filename}: {str(e)}'}), 400
                 flash(f'Error extracting {filename}: {str(e)}', 'error')
                 return redirect(url_for('main.index'))
         else:
+            if is_ajax:
+                progress_tracker.cleanup_task(task_id)
+                return jsonify({'error': f'Invalid file type: {file.filename}'}), 400
             flash(f'Skipping invalid file type: {file.filename}', 'warning')
 
     if not extracted_texts:
+        if is_ajax:
+            progress_tracker.cleanup_task(task_id)
+            return jsonify({'error': 'No valid files to process'}), 400
         flash('No valid files to process', 'error')
         return redirect(url_for('main.index'))
 
     try:
+        if is_ajax:
+            progress_tracker.update_progress(task_id, 0)
+
         rag_context = build_rag_context(goal, extracted_texts)
         if not rag_context:
             rag_context = "\n\n".join(extracted_texts)
 
+        if is_ajax:
+            progress_tracker.update_progress(task_id, 1)
+
+        if is_ajax:
+            progress_tracker.update_progress(task_id, 2)
+
         summary = generate_summary(rag_context)
+        if is_ajax:
+            progress_tracker.update_progress(task_id, 3)
+
         relevance_result = check_relevance(goal, rag_context, summary)
+        if is_ajax:
+            progress_tracker.update_progress(task_id, 4)
+
         study_path = generate_study_path(goal, rag_context, summary)
+        if is_ajax:
+            progress_tracker.update_progress(task_id, 5)
 
         session['learning_goal'] = goal
         session['summary'] = summary
@@ -87,10 +124,18 @@ def process():
         session['uploaded_filenames'] = filenames
         session['extracted_texts'] = extracted_texts
 
+        if is_ajax:
+            progress_tracker.update_progress(task_id, 6)
+            progress_tracker.cleanup_task(task_id)
+            return jsonify({'redirect': url_for('main.results')})
+
         flash(f'Processed {len(filenames)} file(s) successfully!', 'success')
         return redirect(url_for('main.results'))
 
     except Exception as e:
+        if is_ajax:
+            progress_tracker.cleanup_task(task_id)
+            return jsonify({'error': str(e)}), 500
         flash(f'Processing error: {str(e)}', 'error')
         return redirect(url_for('main.index'))
 

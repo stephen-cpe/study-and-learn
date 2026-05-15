@@ -7,43 +7,56 @@ from src.services.ai_client import call_ollama
 
 
 def test_call_ollama_with_mock(monkeypatch):
-    """Test that AI_MOCK=true returns a mock response."""
-    # Set environment variable to mock
+    """Test that AI_MOCK=true returns a mock response.
+
+    Works regardless of whether ai_client.py uses local or cloud Ollama.
+    """
     monkeypatch.setenv('AI_MOCK', 'true')
-    # Also set OLLAMA_BASE_URL to something, though it shouldn't be used
-    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
 
     response = call_ollama("test prompt")
-    # The mock should return a string
     assert isinstance(response, str)
-    # We can check for a known mock response if we define one in the service
-    # For now, we just check it's a string and not empty
     assert response != ''
+    if 'cloud' in call_ollama.__module__ or 'cloud' in str(type(call_ollama)):
+        assert "Mock response for prompt" in response
 
 
 def test_call_ollama_without_mock(monkeypatch):
     """Test that without AI_MOCK, we attempt to call Ollama (but we don't want to actually call in test).
-    We'll monkeypatch the requests.post to avoid real calls.
-    """
-    # Unset AI_MOCK
-    monkeypatch.delenv('AI_MOCK', raising=False)
-    # Set OLLAMA_BASE_URL
-    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+    We'll monkeypatch the requests.post to avoid making a real HTTP request.
 
-    # We'll mock requests.post to avoid making a real HTTP request
+    This test works regardless of whether ai_client.py uses local or cloud Ollama.
+    """
+    monkeypatch.delenv('AI_MOCK', raising=False)
+
+    import src.services.ai_client as ai_client_module
+
+    is_cloud = getattr(call_ollama, '__module__', '') == 'src.services.ai_client_cloud'
+
+    if is_cloud:
+        monkeypatch.setenv('OLLAMA_CLOUD_BASE_URL', 'https://ollama.com')
+        monkeypatch.setenv('OLLAMA_CLOUD_API_KEY', 'test-key')
+        monkeypatch.setenv('OLLAMA_MODEL', 'gemma3:12b-cloud')
+    else:
+        monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+        monkeypatch.setenv('OLLAMA_MODEL', 'qwen3:0.6b')
+
     class MockResponse:
         def json(self):
-            return {"response": "This is a mocked Ollama response"}
-        
+            if is_cloud:
+                return {"choices": [{"message": {"content": "This is a mocked cloud Ollama response"}}]}
+            else:
+                return {"response": "This is a mocked local Ollama response"}
+
         def raise_for_status(self):
             pass
 
-    def mock_post(*args, **kwargs):
+    def mock_post(url, **kwargs):
         return MockResponse()
 
-    # We need to patch the requests.post inside the ai_client module
-    import src.services.ai_client as ai_client_module
     monkeypatch.setattr(ai_client_module.requests, 'post', mock_post)
 
     response = call_ollama("test prompt")
-    assert response == "This is a mocked Ollama response"
+    if is_cloud:
+        assert response == "This is a mocked cloud Ollama response"
+    else:
+        assert response == "This is a mocked local Ollama response"

@@ -105,24 +105,51 @@
         fileInput.focus();
         return;
       }
-      document.getElementById('loadingOverlay').classList.add('active');
+      var taskId = generateTaskId();
+      setBubblePersistent('Receiving your study materials...');
+      showBubbleBar(0);
       var formData = new FormData();
       formData.append('learning_goal', goalInput.value.trim());
+      formData.append('task_id', taskId);
       selectedFiles.forEach(function (file) {
         formData.append('files', file);
       });
       fetch(form.action, { method: 'POST', body: formData })
         .then(function (response) {
-          if (response.redirected) {
+          if (response.ok) {
+            var ct = (response.headers.get('content-type') || '');
+            if (ct.indexOf('application/json') !== -1) {
+              return response.json().then(function (data) {
+                if (data.redirect) {
+                  window.location.href = data.redirect;
+                } else if (data.error) {
+                  _mascotTalk(data.error);
+                  showBubbleBar(0);
+                  _progressActive = false;
+                }
+              });
+            }
             window.location.href = response.url;
             return;
           }
-          window.location.reload();
+          response.json().then(function (data) {
+            var msg = (data && data.error) ? data.error : 'Upload failed. Please try again.';
+            _mascotTalk(msg);
+            showBubbleBar(0);
+            _progressActive = false;
+          }).catch(function () {
+            _mascotTalk('Upload failed. Please try again.');
+            showBubbleBar(0);
+            _progressActive = false;
+          });
         })
         .catch(function () {
-          alert('Upload failed. Please try again.');
-          document.getElementById('loadingOverlay').classList.remove('active');
+          _mascotTalk('Network error. Please try again.');
+          showBubbleBar(0);
+          _progressActive = false;
         });
+
+      startProcessProgressPoll(taskId);
     });
   }
 
@@ -296,6 +323,42 @@
         generateBtn.textContent = 'Generating...';
         startGenerateLessons(generateBtn.dataset.generateUrl);
       });
+    }
+  }
+
+  /* ── Process / Upload with Progress ─────────────────── */
+
+  var _processPollInterval = null;
+
+  function startProcessProgressPoll(taskId) {
+    stopProcessProgressPoll();
+    var startTime = Date.now();
+    var STALE_TIMEOUT_MS = 120000;
+
+    _processPollInterval = setInterval(function () {
+      var elapsed = Date.now() - startTime;
+      if (elapsed > STALE_TIMEOUT_MS) {
+        stopProcessProgressPoll();
+        setBubblePersistent('This is taking longer than expected — hang tight!');
+        showBubbleBar(50);
+        return;
+      }
+
+      fetch('/progress?task_id=' + encodeURIComponent(taskId))
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (data.stage === undefined || data.stage < 0) return;
+          setBubblePersistent(data.mascot || 'Processing your materials...');
+          showBubbleBar(data.pct);
+        })
+        .catch(function () {});
+    }, 2000);
+  }
+
+  function stopProcessProgressPoll() {
+    if (_processPollInterval) {
+      clearInterval(_processPollInterval);
+      _processPollInterval = null;
     }
   }
 

@@ -468,7 +468,6 @@ study-and-learn/
 - Generated output formatting and markdown rendering.
 - Demo seed files.
 - Error handling for AI/model unavailable.
-- Responsive mobile layout for slide deck.
 
 ### 8.3 Not Official MVP / Stretch
 

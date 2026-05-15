@@ -67,6 +67,93 @@ def test_generate_lesson_prompt_construction(monkeypatch):
     assert 'Learn ML' in captured_prompt['prompt']
 
 
+def test_lesson_prompt_contains_pedagogical_constraints(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    import src.services.lesson_generator as lg_module
+    captured_prompt = {}
+
+    def mock_call_ollama(prompt, model=None):
+        captured_prompt['prompt'] = prompt
+        return '{"module_title": "Test", "slides": [{"type": "title", "title": "Test", "subtitle": "S"}]}'
+
+    monkeypatch.setattr(lg_module, 'call_ollama', mock_call_ollama)
+
+    generate_lesson("Biology 101", "Learn cell biology", None)
+    p = captured_prompt['prompt']
+
+    assert 'learning objectives' in p.lower()
+    assert 'progressive' in p.lower() or 'progressively' in p.lower()
+    assert 'real-world' in p.lower() or 'concrete' in p.lower()
+    assert 'summary' in p.lower()
+    assert 'JSON' in p
+    assert 'ground' in p.lower() or 'MUST' in p or 'only' in p.lower()
+
+
+def test_lesson_prompt_contains_rag_grounding_when_context_present(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    import src.services.lesson_generator as lg_module
+    captured_prompt = {}
+
+    def mock_call_ollama(prompt, model=None):
+        captured_prompt['prompt'] = prompt
+        return '{"module_title": "Test", "slides": [{"type": "title", "title": "Test", "subtitle": "S"}]}'
+
+    monkeypatch.setattr(lg_module, 'call_ollama', mock_call_ollama)
+
+    def mock_retrieve(query):
+        return "Cells have a nucleus and cytoplasm."
+
+    generate_lesson("Cell Biology", "learn cells", mock_retrieve)
+    p = captured_prompt['prompt']
+
+    assert 'MUST ground' in p or 'ground every' in p.lower()
+    assert 'fabricate' in p.lower() or 'NOT' in p or 'do NOT' in p
+
+
+def test_lesson_prompt_no_context_graceful_fallback(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    import src.services.lesson_generator as lg_module
+    captured_prompt = {}
+
+    def mock_call_ollama(prompt, model=None):
+        captured_prompt['prompt'] = prompt
+        return '{"module_title": "Test", "slides": [{"type": "title", "title": "Test", "subtitle": "S"}]}'
+
+    monkeypatch.setattr(lg_module, 'call_ollama', mock_call_ollama)
+
+    generate_lesson("Math 101", "Learn algebra", None)
+    p = captured_prompt['prompt']
+
+    assert 'No source context' in p or 'general-education' in p.lower()
+    assert 'widely known' in p.lower() or 'do NOT invent' in p
+
+
+def test_lesson_prompt_json_output_constraints(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    import src.services.lesson_generator as lg_module
+    captured_prompt = {}
+
+    def mock_call_ollama(prompt, model=None):
+        captured_prompt['prompt'] = prompt
+        return '{"module_title": "T", "slides": [{"type": "title", "title": "T", "subtitle": "T"}]}'
+
+    monkeypatch.setattr(lg_module, 'call_ollama', mock_call_ollama)
+
+    generate_lesson("Physics", "Learn mechanics", None)
+    p = captured_prompt['prompt']
+
+    assert 'ONLY a JSON object' in p or 'no prose' in p.lower()
+    assert 'type' in p
+
+
 def test_validate_slides():
     slides = [
         {"type": "title", "title": "Test"},

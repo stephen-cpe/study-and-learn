@@ -14,7 +14,7 @@ Environment variables
 ---------------------
 OLLAMA_CLOUD_API_KEY   (required)  Ollama Cloud API key
 OLLAMA_CLOUD_BASE_URL  (optional)  Default: https://ollama.com
-OLLAMA_MODEL           (optional)  Default: gemma3:27b-cloud
+OLLAMA_MODEL           (optional)  Default: gemma3:12b-cloud
 OLLAMA_TIMEOUT         (optional)  Default: 180 seconds
 """
 import os
@@ -31,7 +31,7 @@ def call_ollama(prompt: str, model: str = None) -> str:
         return f"Mock response for prompt: {prompt[:50]}..."
 
     if model is None:
-        model = os.environ.get('OLLAMA_MODEL', 'gemma3:27b-cloud')
+        model = os.environ.get('OLLAMA_MODEL', 'gemma3:12b-cloud')
 
     base_url = os.environ.get('OLLAMA_CLOUD_BASE_URL', 'https://ollama.com')
     url = f"{base_url}/v1/chat/completions"

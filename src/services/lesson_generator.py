@@ -23,20 +23,45 @@ def generate_lesson(module_title: str, learning_goal: str, retriever) -> dict:
 
     rag_context = build_rag_context_for_module(module_title, learning_goal, retriever)
 
-    prompt = f"""You are an AI assistant that creates interactive lessons.
-Generate a structured lesson for the following module, grounded in the provided context.
+    context_instruction = ""
+    if rag_context and rag_context.strip():
+        context_instruction = (
+            "You MUST ground every slide in the provided Context below. "
+            "Only state facts directly supported by the Context. "
+            "If the Context is insufficient for a slide, write a general-education slide on the topic "
+            "and label it as supplementary material — do NOT fabricate specific details, statistics, or examples "
+            "not found in the Context.\n\n"
+        )
+    else:
+        context_instruction = (
+            "No source context is available. Write a general-education introduction to the topic. "
+            "Use widely known facts only. Do NOT invent specific data, quotes, or statistics.\n\n"
+        )
 
+    prompt = f"""You are an expert educator creating a structured, interactive lesson for high-school to early-college learners.
+
+{context_instruction}
 Learning Goal: {learning_goal}
 Module Title: {module_title}
 Context: {rag_context if rag_context else 'No additional context available.'}
 
-Create 6-8 slides covering the key concepts for this module. Include:
-- A title slide
-- Content slides with headings and bullet points
-- At least one example slide
-- A summary slide
+PEDAGOGICAL REQUIREMENTS:
+1. Start with exactly 1-3 clear learning objectives on the first content slide.
+2. Build concepts progressively: define basics before introducing complexity.
+3. Every example slide must include a concrete, real-world scenario — not abstract descriptions.
+4. The summary slide must recap learning objectives and key takeaways.
+5. Use plain, jargon-free language. When a technical term is unavoidable, define it on first use.
 
-Provide your response in the following JSON format:
+OUTPUT RULES:
+- Respond with ONLY a JSON object — no prose, no markdown, no preamble.
+- Every slide MUST have a "type" field that is exactly one of: title, content, example, summary.
+- Content slides MUST have a "heading" (string) and "bullets" (array of strings, 2-5 items).
+- Title slides MUST have "title" and "subtitle" (both strings).
+- Example slides MUST have "heading" and "body" (both strings).
+- Summary slides MUST have "bullets" (array of 2-5 strings).
+- Generate exactly 6-8 slides.
+
+JSON FORMAT:
 {{
   "module_title": "{module_title}",
   "slides": [

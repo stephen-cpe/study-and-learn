@@ -25,23 +25,48 @@ def generate_quiz(module_title: str, slides: list, retriever, n_questions: int =
     question_types = ['mcq', 'true_false', 'multi_select', 'fill_blank']
     type_mix = _build_type_mix(n_questions, question_types)
 
-    prompt = f"""You are an AI assistant that creates educational quizzes.
-Generate a quiz for the following lesson module.
+    context_instruction = ""
+    if rag_context and rag_context.strip():
+        context_instruction = (
+            "You MUST base every question on facts from the provided Context. "
+            "Do NOT ask about information not present in the Context or lesson content. "
+            "If the Context lacks sufficient detail for a question, write a question "
+            "about a concept from the lesson content instead — never fabricate details.\n\n"
+        )
+    else:
+        context_instruction = (
+            "No additional context is available. Base questions only on the lesson content provided. "
+            "Use widely known facts only — do NOT invent specific data.\n\n"
+        )
 
+    prompt = f"""You are an expert educator creating a quiz for high-school to early-college learners.
+
+{context_instruction}
 Module: {module_title}
 Lesson Content: {slide_summary}
-Additional Context: {rag_context if rag_context else 'None'}
+Context: {rag_context if rag_context else 'None'}
+
+PEDAGOGICAL REQUIREMENTS:
+1. Every distractor (wrong answer) MUST be plausible — a confident but mistaken learner could choose it.
+   Avoid absurd, obviously wrong, or silly distractors.
+2. Every correct answer MUST be unambiguously correct based on the lesson content or Context.
+3. For fill_blank: the answer MUST be a single word only (no spaces, no hyphens, no multi-word phrases).
+   The blank MUST replace a key term directly stated in the preceding lesson content.
+4. Explanations MUST explain WHY the correct answer is right and briefly why distractors are wrong.
+5. Distribute questions across the module's key concepts — do NOT cluster all questions on one detail.
 
 Create exactly {n_questions} questions with the following type distribution:
 {json.dumps(type_mix)}
 
 For each question type:
-- mcq: Single correct answer from options A-D. Include prompt, options array, answer_index (0-based), explanation.
-- true_false: True or false statement. Include prompt, answer (boolean), explanation.
-- multi_select: Multiple correct answers from options A-D. Include prompt, options array, answer_indices array (0-based), explanation.
-- fill_blank: Sentence with single ___ placeholder. Include prompt (with ___ only), answer string (single word only), acceptable_answers array (each entry a single word), explanation.
+- mcq: 4 options, exactly 1 correct. Include prompt, options array, answer_index (0-based), explanation.
+- true_false: A clear factual statement. Include prompt, answer (boolean), explanation.
+- multi_select: 4 options, 2-3 correct. Include prompt, options array, answer_indices array (0-based), explanation.
+- fill_blank: A sentence with exactly one ___ placeholder replacing a single key term. Include prompt (with ___), answer string (single word only — no spaces), acceptable_answers array (each a single word), explanation.
 
-Provide your response in this JSON format:
+Respond with ONLY a JSON object — no prose, no markdown, no commentary.
+
+JSON FORMAT:
 {{
   "questions": [
     {{
@@ -50,7 +75,7 @@ Provide your response in this JSON format:
       "prompt": "What is the capital of France?",
       "options": ["London", "Paris", "Berlin", "Madrid"],
       "answer_index": 1,
-      "explanation": "Paris is the capital of France."
+      "explanation": "Paris is the capital of France. London, Berlin, and Madrid are capitals of other countries."
     }}
   ]
 }}
@@ -86,21 +111,31 @@ def generate_inline_checkpoint(module_title: str, slides_subset: list, retriever
         except Exception:
             pass
 
-    prompt = f"""You are an AI assistant that creates quick comprehension checkpoints.
-Based on the following lesson segment, create 1 multiple-choice question.
+    prompt = f"""You are an expert educator creating a quick comprehension checkpoint for high-school to early-college learners.
+
+Create 1 multiple-choice question that tests IMMEDIATE RECALL of a key concept from the lesson segment.
+The question must be answerable using only the information provided below.
 
 Module: {module_title}
 Segment Content: {slide_summary}
-Additional Context: {rag_context if rag_context else 'None'}
+Context: {rag_context if rag_context else 'None'}
 
-Provide your response in this JSON format:
+CHECKPOINT RULES:
+1. The question MUST test a core concept directly stated in the segment content — NOT obscure trivia.
+2. All 4 options must be plausible — avoid absurd or obviously wrong distractors.
+3. The correct answer must be unambiguously correct based on the segment content.
+4. The explanation must briefly justify why the answer is correct.
+
+Respond with ONLY a JSON object — no prose, no markdown.
+
+JSON FORMAT:
 {{
   "id": "checkpoint",
   "type": "mcq",
   "prompt": "Question text here?",
-  "options": ["A", "B", "C", "D"],
+  "options": ["Option A", "Option B", "Option C", "Option D"],
   "answer_index": 0,
-  "explanation": "Explanation of the correct answer."
+  "explanation": "Brief explanation of the correct answer."
 }}
 
 Question:"""

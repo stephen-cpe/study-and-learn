@@ -10,7 +10,7 @@ os.makedirs(_cache_dir, exist_ok=True)
 
 _cache = FileSystemCache(cache_dir=_cache_dir, threshold=500, default_timeout=900)
 
-STAGES = [
+GENERATE_STAGES = [
     {"stage": 0, "label": "Parsing documents", "pct": 0, "mascot": "Reading through your uploaded materials and extracting text..."},
     {"stage": 1, "label": "Chunking & embedding", "pct": 25, "mascot": "Splitting content into manageable sections and building knowledge maps..."},
     {"stage": 2, "label": "Retrieving context", "pct": 50, "mascot": "Scanning for important concepts and connecting the dots..."},
@@ -18,11 +18,25 @@ STAGES = [
     {"stage": 4, "label": "Finalizing", "pct": 100, "mascot": "Polishing everything up and getting your study path ready..."},
 ]
 
+PROCESS_STAGES = [
+    {"stage": 0, "label": "Uploading files", "pct": 0, "mascot": "Receiving your study materials..."},
+    {"stage": 1, "label": "Parsing documents", "pct": 15, "mascot": "Reading through your uploaded materials and extracting text..."},
+    {"stage": 2, "label": "Building knowledge index", "pct": 35, "mascot": "Chunking and indexing your content for smart retrieval..."},
+    {"stage": 3, "label": "Generating summary", "pct": 55, "mascot": "Summarizing what your materials cover..."},
+    {"stage": 4, "label": "Checking relevance", "pct": 70, "mascot": "Checking how well your materials match your learning goal..."},
+    {"stage": 5, "label": "Creating study path", "pct": 85, "mascot": "Building your personalized study path..."},
+    {"stage": 6, "label": "Complete", "pct": 100, "mascot": "All done! Your results are ready."},
+]
 
-def create_task(task_id=None):
+STAGES = GENERATE_STAGES
+
+
+def create_task(task_id=None, stages=None):
     if task_id is None:
         task_id = str(uuid.uuid4())
-    _cache.set(task_id, dict(STAGES[0]))
+    stage_list = stages or STAGES
+    _cache.set(task_id, dict(stage_list[0]))
+    _cache.set(task_id + ':stages', stage_list)
     logger.info(f"[progress] create_task: {task_id} → stage 0")
     return task_id
 
@@ -31,9 +45,10 @@ def update_progress(task_id, stage):
     if not _cache.has(task_id):
         logger.warning(f"[progress] update skipped — task {task_id} not found")
         return
-    if 0 <= stage < len(STAGES):
-        _cache.set(task_id, dict(STAGES[stage]))
-        logger.info(f"[progress] update: {task_id} → stage {stage} ({STAGES[stage]['label']})")
+    stage_list = _cache.get(task_id + ':stages') or STAGES
+    if 0 <= stage < len(stage_list):
+        _cache.set(task_id, dict(stage_list[stage]))
+        logger.info(f"[progress] update: {task_id} → stage {stage} ({stage_list[stage]['label']})")
 
 
 def get_progress(task_id):
@@ -46,9 +61,10 @@ def get_progress(task_id):
 
 
 def complete_task(task_id):
+    stage_list = _cache.get(task_id + ':stages') or STAGES
     if _cache.has(task_id):
-        _cache.set(task_id, dict(STAGES[-1]))
-        logger.info(f"[progress] complete: {task_id} → stage 4")
+        _cache.set(task_id, dict(stage_list[-1]))
+        logger.info(f"[progress] complete: {task_id} → stage {len(stage_list) - 1}")
 
 
 def cleanup_task(task_id):
