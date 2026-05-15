@@ -172,7 +172,7 @@ Candidate deployment platforms:
 | Frontend | Bootstrap 5 | Simple, responsive UI with minimal build tooling |
 | AI serving | Ollama | Local model serving for development |
 | Embeddings / retrieval | ChromaDB |
-| Database | SQLite (metadata) + ChromaDB (vectors) | Stores uploads, metadata, outputs, and possibly embeddings |
+| Database | PostgreSQL (metadata) + ChromaDB (vectors) | Stores uploads, metadata, outputs, and possibly embeddings |
 | Testing | pytest | Start simple and expand |
 | CI/CD | GitHub Actions | Run tests automatically on push / pull request |
 | Task board | Static GitHub Pages site | Simple public project board without bloated tools |

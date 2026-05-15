@@ -122,7 +122,7 @@ Build the smallest working version first, then iterate:
 
 ---
 
-### Sprint 4: UX Polish, Mascot, and Quality Improvements ⬜ CURRENT
+### Sprint 4: UX Polish, Mascot, and Quality Improvements ✅ COMPLETE
 
 **Goal:** Polish the retro experience, integrate mascot into UI, improve loading UX, fix bugs, and tune prompts for better lesson output.
 
@@ -149,9 +149,9 @@ Build the smallest working version first, then iterate:
 - [x] Add stage-by-stage progress reporting during lesson generation
 - [x] Improve lesson and quiz prompt templates (active-working mascot messages)
 - [x] Merge progress indicator into mascot speech bubble (non-overlapping, persistent visibility)
-- [ ] Replace full-screen loading overlay on `/process` route with non-blocking background progress indicator
-- [ ] Polish responsive layout for slide deck on smaller screens
-- [ ] Update unit tests for progress tracker
+- [x] Replace full-screen loading overlay on `/process` route with non-blocking background progress indicator
+- [x] Polish responsive layout for slide deck on smaller screens [SCOPE: OUT — mobile/responsive layout removed per SRS product owner directive]
+- [x] Update unit tests for progress tracker
 
 **Sprint 4 Definition of Done:**
 - Fill-in-the-blank uses one-word inline inputs with per-blank validation
@@ -162,14 +162,14 @@ Build the smallest working version first, then iterate:
 
 ---
 
-### Sprint 5: User Accounts & Session Persistence ⬜ FUTURE
+### Sprint 5: User Accounts & Session Persistence ⬜ CURRENT
 
 **Goal:** Add learner accounts (Flask-Login + PostgreSQL), dashboard with progress tracking, max 3 active lessons gating, admin access control, and demo accounts.
 
 **User Stories:** US-027, US-028, US-029, US-030, US-031
 
 **Tasks:**
-- [ ] Integrate Flask-Login, Flask-SQLAlchemy, PostgreSQL (SQLite for local demo)
+- [ ] Integrate Flask-Login, Flask-SQLAlchemy, PostgreSQL
 - [ ] Build sign-up, sign-in, logout routes and templates
 - [ ] Store user credentials securely (hashed passwords)
 - [ ] Build learner dashboard showing active lessons and completion status
@@ -324,8 +324,8 @@ Build the smallest working version first, then iterate:
 - [x] Package renamed `app/` → `src/`
 - [x] Fill-in-the-blank one-word-per-input fix (Sprint 4)
 - [x] Background progress indicators in mascot speech bubble (Sprint 4)
-- [ ] Non-blocking loading indicator on `/process` route (Sprint 4)
-- [ ] Responsive slide deck layout
+- [x] Non-blocking loading indicator on `/process` route (Sprint 4)
+- [x] Responsive slide deck layout [SCOPE: OUT — mobile/responsive layout removed per SRS product owner directive]
 - [ ] Sample demo documents for consistent presentation
 
 ---
@@ -346,8 +346,8 @@ Build the smallest working version first, then iterate:
 - [x] Background progress reporting via mascot speech bubble
 
 ### Upcoming (Sprint 4–8)
-- [ ] Non-blocking progress on `/process` route (Sprint 4)
-- [ ] Lesson/quiz prompt engineering refinement (Sprint 4)
+- [x] Non-blocking progress on `/process` route (Sprint 4)
+- [x] Lesson/quiz prompt engineering refinement (Sprint 4)
 - [ ] User accounts (Flask-Login + PostgreSQL) (Sprint 5)
 - [ ] Learner dashboard with progress tracking (Sprint 5)
 - [ ] Max 3 active lessons gating (Sprint 5)
