@@ -1,114 +1,112 @@
 # Study-and-Learn
 
-A guided, form-driven AI web application that converts uploaded study materials into structured summaries, relevance assessments, study paths, interactive slide-based lessons, and auto-graded quizzes — all powered by LLMs via Ollama.
+A Flask web application that converts uploaded study materials into structured summaries, study paths, interactive lessons, and auto-graded quizzes using AI.
 
-## Tech Stack
+## Prerequisites
 
-| Layer | Technology |
-|-------|-----------|
-| Backend | Python 3.13, Flask, Flask-Session (cachelib) |
-| Frontend | Bootstrap 5, custom CSS/JS slide deck, retro pixel fonts |
-| AI / RAG | Ollama (qwen3:0.6b + qwen3-embedding:0.6b), LangChain, ChromaDB |
-| Testing | pytest, GitHub Actions CI |
+1. Install Python 3.13 from https://python.org
+2. Install Ollama from https://ollama.com/download
+3. Install PostgreSQL from https://www.postgresql.org/download/windows
 
-## Ollama Setup
+## Setup
 
-1. Install Ollama from https://ollama.com/download
-2. Pull required models:
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/stephen-cpe/study-and-learn.git
+cd study-and-learn
+```
+
+### 2. Create virtual environment
+
+```bash
+python -m venv venv
+venv\Scripts\activate
+python -m pip install --upgrade pip
+```
+
+### 3. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Set up PostgreSQL database
+
+Open PowerShell as Administrator and run:
+
+```bash
+# Connect to PostgreSQL as postgres superuser
+psql -U postgres -h localhost -d postgres
+
+# Inside psql, run these commands:
+CREATE DATABASE study_and_learn;
+CREATE USER study_user WITH PASSWORD 'study_pass';
+GRANT ALL PRIVILEGES ON DATABASE study_and_learn TO study_user;
+GRANT CREATE ON SCHEMA public TO study_user;
+GRANT USAGE ON SCHEMA public TO study_user;
+\q
+```
+
+### 5. Pull Ollama models
+
 ```bash
 ollama pull qwen3:0.6b
 ollama pull qwen3-embedding:0.6b
 ```
-> `qwen3:0.6b` is a placeholder model. If your machine can handle it, upgrade to `qwen3:1.7b`, `gemma3:4b`, or use [Ollama Cloud models](README.md#switching-between-local-and-cloud) for better results.
 
-## Quick Start (Local Development)
+Note: qwen3:0.6b is a placeholder model. For better results, use qwen3:8b or gemma3:12b if your system can handle it.
+
+### 6. Create .env file
+
+Create a `.env` file in the project root:
+
+```
+SECRET_KEY=your-secret-key-here
+DATABASE_URL=postgresql+psycopg2://study_user:study_pass@localhost:5432/study_and_learn
+OLLAMA_MODEL=qwen3:0.6b
+OLLAMA_EMBEDDING_MODEL=qwen3-embedding:0.6b
+```
+
+### 7. Run the application
+
 ```bash
-# 1. Clone and enter repo
-git clone https://github.com/stephen-cpe/study-and-learn.git
-cd study-and-learn
-
-# 2. Create virtual environment
-python -m venv venv
-venv\Scripts\activate
-python.exe -m pip install --upgrade pip
-
-# 3. Install dependencies
-pip install -r requirements.txt
-
-# 4. Run the app
 python app.py
+```
 
-# 5. Run tests
+Open http://localhost:5000 in your browser.
+
+## Testing
+
+```bash
 pytest -v tests/
 ```
-## Switching Between Local and Cloud
 
-The app uses local Ollama by default. To switch to Ollama Cloud:
+## Using Ollama Cloud (Optional)
 
-**1. Uncomment one import** in `src/services/ai_client.py:41`:
+To use Ollama Cloud instead of local models:
 
-```python
-# ── Switch to Ollama Cloud ──────────────────────────────────────────────────
-# Uncomment the line below to route all AI calls through Ollama Cloud
-# from .ai_client_cloud import call_ollama  # noqa: E402
-# ─────────────────────────────────────────────────────────────────────────────
-```
+1. In `src/services/ai_client.py`, uncomment line 28:
+   ```python
+   from .ai_client_cloud import call_ollama
+   ```
 
-Change to:
+2. Add to your `.env` file:
+   ```
+   OLLAMA_CLOUD_API_KEY=your-api-key-here
+   OLLAMA_MODEL=gemma3:12b-cloud
+   ```
 
-```python
-# ── Switch to Ollama Cloud ──────────────────────────────────────────────────
-from .ai_client_cloud import call_ollama  # noqa: E402   # ← uncommented
-# ─────────────────────────────────────────────────────────────────────────────
-```
+## Testing without GPU
 
-**2. Create a `.env` file** (already in `.gitignore`):
-
-```env
-OLLAMA_CLOUD_API_KEY=your-api-key-here
-OLLAMA_MODEL=gemma3:12b-cloud
-```
-
-**3. Done** — no other files need changing. The `from .ai_client_cloud import call_ollama` line replaces the local `call_ollama` at the module level, so every service (summarizer, quiz generator, etc.) automatically uses the cloud.
-
-**To switch back**, comment the import line again:
-
-```python
-# from .ai_client_cloud import call_ollama  # noqa: E402
-```
-
-## Environment Variables
-
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `OLLAMA_MODEL` | `qwen3:0.6b` | Chat generation model |
-| `OLLAMA_EMBEDDING_MODEL` | `qwen3-embedding:0.6b` | Vector embeddings model |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server address |
-| `OLLAMA_TIMEOUT` | `180` | Request timeout in seconds |
-| `AI_MOCK` | — | Set to `true` for mock responses (no GPU required) |
-| `CI` | — | Set to `true` for in-memory ChromaDB in CI |
-| `SECRET_KEY` | `dev-key-for-testing-only` | Flask session signing key |
-
-### Cloud-only variables (ignored in local mode)
-
-| Variable | Required | Default | Purpose |
-|----------|----------|---------|---------|
-| `OLLAMA_CLOUD_API_KEY` | Yes | — | Ollama Cloud API key |
-| `OLLAMA_CLOUD_BASE_URL` | No | `https://ollama.com` | Ollama Cloud API base URL |
+Set `AI_MOCK=true` in your `.env` file to use mock responses (no Ollama required).
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [SRS.md](SRS.md) | Software requirements, user stories, scope |
-| [TODO.md](TODO.md) | Sprint plan, task backlog, scope-creep ladder |
-| [DESIGN_AND_TESTING.md](DESIGN_AND_TESTING.md) | Architecture decisions (ADRs), testing strategy, CI/CD |
-| [AI_AGENT_PROTOCOL.md](AI_AGENT_PROTOCOL.md) | AI agent operating rules and guardrails |
-
-## Links
-- [Public Task Board](https://stephen-cpe.github.io/task-board-v1/)
-- [Task Board Repository](https://github.com/stephen-cpe/task-board-v1/)
-- [Deployed App](#) *(coming soon — Sprint 7)*
+- SRS.md - Software requirements and user stories
+- TODO.md - Sprint plan and task backlog
+- DESIGN_AND_TESTING.md - Architecture and testing strategy
 
 ## License
-MIT — for educational purposes only.
+
+MIT - For educational purposes only.

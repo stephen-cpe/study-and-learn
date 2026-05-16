@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Sign Up — Study-and-Learn{% endblock %}
+
+{% block content %}
+<h1 class="mt-4">Sign Up</h1>
+
+<div class="form-section">
+    <h2 class="section-title mb-4">Create Your Account</h2>
+    <form action="{{ url_for('main.signup') }}" method="POST">
+        <div class="mb-4">
+            <label for="username" class="form-label">Username</label>
+            <input type="text" class="form-control form-control-lg" id="username" name="username"
+                   placeholder="Choose a username" required>
+        </div>
+
+        <div class="mb-4">
+            <label for="email" class="form-label">Email</label>
+            <input type="email" class="form-control form-control-lg" id="email" name="email"
+                   placeholder="you@example.com" required>
+        </div>
+
+        <div class="mb-4">
+            <label for="password" class="form-label">Password</label>
+            <input type="password" class="form-control form-control-lg" id="password" name="password"
+                   placeholder="Create a password" required>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary btn-lg flex-grow-1">
+                Create Account
+            </button>
+        </div>
+    </form>
+
+    <div class="mt-4 text-center">
+        <p>Already have an account? <a href="{{ url_for('main.login') }}" class="az-link">Log in</a></p>
+    </div>
+</div>
+{% endblock %}

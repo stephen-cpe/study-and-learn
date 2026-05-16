@@ -11,9 +11,13 @@ from src.services.summarizer import generate_summary
 from src.services.relevance_checker import check_relevance
 from src.services.curriculum_generator import generate_study_path
 from src.services.rag_retriever import build_rag_context
-from src.services.lesson_generator import generate_lesson
-from src.services.quiz_generator import generate_quiz, generate_inline_checkpoint
+from src.services.lesson_orchestrator import make_retriever, build_module_artifacts
+from src.services.grader import _grade_single_question, _get_correct_answer
+from src.repositories.session_repo import get_lessons, save_lessons
 from src.services import progress_tracker
+from flask_login import login_user, logout_user
+from src.models import User
+from src import db
 
 bp = Blueprint('main', __name__)
 
@@ -192,49 +196,25 @@ def generate_lessons():
     progress_tracker.create_task(task_id=task_id)
 
     modules = study_path['modules']
-    lessons = session.get('lessons', [])
+    lessons = get_lessons()
 
     extracted_texts = session.get('extracted_texts', [])
-
-    def make_retriever(goal):
-        def retrieve(query):
-            return build_rag_context(goal, extracted_texts) if extracted_texts else ""
-        return retrieve
-
-    retriever = make_retriever(learning_goal)
+    retriever = make_retriever(learning_goal, extracted_texts)
 
     progress_tracker.update_progress(task_id, 1)
 
     for i, module in enumerate(modules):
         progress_tracker.update_progress(task_id, 2)
-        lesson_data = generate_lesson(module['title'], learning_goal, retriever)
+        artifacts = build_module_artifacts(module, learning_goal, retriever)
         progress_tracker.update_progress(task_id, 3)
-        quiz_data = generate_quiz(module['title'], lesson_data.get('slides', []), retriever, n_questions=5)
-
-        checkpoint_count = 0
-        slides = lesson_data.get('slides', [])
-        checkpoints = {}
-        if len(slides) > 2:
-            interval = max(1, len(slides) // 3)
-            for idx in range(interval - 1, len(slides) - 1, interval):
-                slides_subset = slides[max(0, idx - 1):idx + 1]
-                cp = generate_inline_checkpoint(module['title'], slides_subset, retriever)
-                checkpoints[str(idx)] = cp
-                checkpoint_count += 1
-            if len(slides) > 1:
-                last_checkpoint_slide = max(0, len(slides) - 2)
-                if str(last_checkpoint_slide) not in checkpoints:
-                    slides_subset = slides[max(0, last_checkpoint_slide - 1):last_checkpoint_slide + 1]
-                    cp = generate_inline_checkpoint(module['title'], slides_subset, retriever)
-                    checkpoints[str(last_checkpoint_slide)] = cp
 
         lessons.append({
             'index': i,
             'module_title': module['title'],
             'estimated_effort': module.get('estimated_effort', 'N/A'),
-            'lesson': lesson_data,
-            'quiz': quiz_data,
-            'checkpoints': checkpoints,
+            'lesson': artifacts['lesson'],
+            'quiz': artifacts['quiz'],
+            'checkpoints': artifacts['checkpoints'],
             'completed': False,
             'score': None,
             'passed': False
@@ -242,8 +222,7 @@ def generate_lessons():
 
     progress_tracker.update_progress(task_id, 4)
 
-    session['lessons'] = lessons
-    session.modified = True
+    save_lessons(lessons)
 
     flash(f'Generated {len(modules)} lessons successfully!', 'success')
     return redirect(url_for('main.lessons'))
@@ -251,11 +230,10 @@ def generate_lessons():
 
 @bp.route('/lessons')
 def lessons():
-    if 'lessons' not in session:
+    lessons_data = get_lessons()
+    if not lessons_data:
         flash('No lessons generated yet. Generate lessons from your results first.', 'info')
         return redirect(url_for('main.results'))
-
-    lessons_data = session.get('lessons', [])
 
     for i, lesson in enumerate(lessons_data):
         lesson['unlocked'] = True
@@ -271,11 +249,10 @@ def lessons():
 
 @bp.route('/lessons/<int:module_index>')
 def lesson_deck(module_index):
-    if 'lessons' not in session:
+    lessons_data = get_lessons()
+    if not lessons_data:
         flash('No lessons generated yet.', 'error')
         return redirect(url_for('main.results'))
-
-    lessons_data = session.get('lessons', [])
 
     if module_index < 0 or module_index >= len(lessons_data):
         flash('Invalid module index.', 'error')
@@ -297,10 +274,10 @@ def lesson_deck(module_index):
 
 @bp.route('/lessons/<int:module_index>/grade', methods=['POST'])
 def grade_lesson(module_index):
-    if 'lessons' not in session:
+    lessons_data = get_lessons()
+    if not lessons_data:
         return jsonify({'error': 'No lessons found'}), 404
 
-    lessons_data = session.get('lessons', [])
     if module_index < 0 or module_index >= len(lessons_data):
         return jsonify({'error': 'Invalid module index'}), 404
 
@@ -358,8 +335,7 @@ def grade_lesson(module_index):
     lessons_data[module_index]['completed'] = True
     lessons_data[module_index]['score'] = score_pct
     lessons_data[module_index]['passed'] = passed
-    session['lessons'] = lessons_data
-    session.modified = True
+    save_lessons(lessons_data)
 
     return jsonify({
         'score': score_pct,
@@ -374,10 +350,10 @@ def grade_lesson(module_index):
 
 @bp.route('/lessons/<int:module_index>/retake', methods=['POST'])
 def retake_lesson(module_index):
-    if 'lessons' not in session:
+    lessons_data = get_lessons()
+    if not lessons_data:
         return jsonify({'error': 'No lessons found'}), 404
 
-    lessons_data = session.get('lessons', [])
     if module_index < 0 or module_index >= len(lessons_data):
         return jsonify({'error': 'Invalid module index'}), 404
 
@@ -387,71 +363,75 @@ def retake_lesson(module_index):
     learning_goal = session.get('learning_goal', '')
     extracted_texts = session.get('extracted_texts', [])
 
-    def make_retriever(goal):
-        def retrieve(query):
-            return build_rag_context(goal, extracted_texts) if extracted_texts else ""
-        return retrieve
+    retriever = make_retriever(learning_goal, extracted_texts)
 
-    retriever = make_retriever(learning_goal)
+    artifacts = build_module_artifacts(
+        {'title': module_title},
+        learning_goal,
+        retriever,
+        existing_slides=slides,
+    )
 
-    new_quiz = generate_quiz(module_title, slides, retriever, n_questions=5)
-    new_checkpoints = {}
-    if len(slides) > 2:
-        interval = max(1, len(slides) // 3)
-        for idx in range(interval - 1, len(slides) - 1, interval):
-            slides_subset = slides[max(0, idx - 1):idx + 1]
-            cp = generate_inline_checkpoint(module_title, slides_subset, retriever)
-            new_checkpoints[str(idx)] = cp
-        if len(slides) > 1:
-            last_checkpoint_slide = max(0, len(slides) - 2)
-            if str(last_checkpoint_slide) not in new_checkpoints:
-                slides_subset = slides[max(0, last_checkpoint_slide - 1):last_checkpoint_slide + 1]
-                cp = generate_inline_checkpoint(module_title, slides_subset, retriever)
-                new_checkpoints[str(last_checkpoint_slide)] = cp
-
-    lessons_data[module_index]['quiz'] = new_quiz
-    lessons_data[module_index]['checkpoints'] = new_checkpoints
+    lessons_data[module_index]['quiz'] = artifacts['quiz']
+    lessons_data[module_index]['checkpoints'] = artifacts['checkpoints']
     lessons_data[module_index]['completed'] = False
     lessons_data[module_index]['score'] = None
     lessons_data[module_index]['passed'] = False
-    session['lessons'] = lessons_data
-    session.modified = True
+    save_lessons(lessons_data)
 
     return jsonify({'success': True})
 
 
-def _grade_single_question(question: dict, user_answer) -> bool:
-    qtype = question.get('type', '')
-    if qtype == 'mcq':
-        return user_answer is not None and int(user_answer) == question.get('answer_index', -1)
-    elif qtype == 'true_false':
-        if isinstance(user_answer, str):
-            user_answer = user_answer.lower() in ('true', '1', 'yes')
-        return bool(user_answer) == bool(question.get('answer', False))
-    elif qtype == 'multi_select':
-        if not isinstance(user_answer, list):
-            user_answer = [int(user_answer)] if user_answer is not None else []
-        correct = question.get('answer_indices', [])
-        return set(int(x) for x in user_answer) == set(correct)
-    elif qtype == 'fill_blank':
-        if not isinstance(user_answer, str):
-            return False
-        ua = user_answer.strip()
-        if not ua or ' ' in ua:
-            return False
-        acceptable = question.get('acceptable_answers', [question.get('answer', '')])
-        return ua.lower() in [a.strip().lower() for a in acceptable if isinstance(a, str)]
-    return False
+@bp.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
+
+        if not username or not email or not password:
+            flash('All fields are required.', 'error')
+            return redirect(url_for('main.signup'))
+
+        if User.query.filter_by(username=username).first():
+            flash('Username already taken.', 'error')
+            return redirect(url_for('main.signup'))
+
+        if User.query.filter_by(email=email).first():
+            flash('Email already registered.', 'error')
+            return redirect(url_for('main.signup'))
+
+        user = User(username=username, email=email)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+        login_user(user)
+        flash('Account created successfully!', 'success')
+        return redirect(url_for('main.index'))
+
+    return render_template('signup.html')
 
 
-def _get_correct_answer(question: dict):
-    qtype = question.get('type', '')
-    if qtype == 'mcq':
-        return question.get('answer_index')
-    elif qtype == 'true_false':
-        return question.get('answer')
-    elif qtype == 'multi_select':
-        return question.get('answer_indices')
-    elif qtype == 'fill_blank':
-        return question.get('answer')
-    return None
+@bp.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+
+        user = User.query.filter_by(username=username).first()
+        if user and user.check_password(password):
+            login_user(user, remember=True)
+            flash('Welcome back!', 'success')
+            return redirect(url_for('main.index'))
+
+        flash('Invalid username or password.', 'error')
+        return redirect(url_for('main.login'))
+
+    return render_template('login.html')
+
+
+@bp.route('/logout')
+def logout():
+    logout_user()
+    flash('You have been logged out.', 'success')
+    return redirect(url_for('main.index'))

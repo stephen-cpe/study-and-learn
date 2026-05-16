@@ -169,7 +169,10 @@ Build the smallest working version first, then iterate:
 **User Stories:** US-027, US-028, US-029, US-030, US-031
 
 **Tasks:**
-- [ ] Integrate Flask-Login, Flask-SQLAlchemy, PostgreSQL
+- [x] Purge all SQLite references; lock PostgreSQL-only (schemas, docs, configs, tests)
+- [x] Extract lesson orchestrator, grader, and session repository seam (Phase 0.2 refactors)
+- [x] Fix ai_client.py indirection (env AI_BACKEND) and add happy-path smoke test (Phase 0.3)
+- [ ] Integrate Flask-Login, Flask-SQLAlchemy, PostgreSQL only
 - [ ] Build sign-up, sign-in, logout routes and templates
 - [ ] Store user credentials securely (hashed passwords)
 - [ ] Build learner dashboard showing active lessons and completion status
