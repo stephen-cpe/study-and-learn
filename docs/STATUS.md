@@ -1,7 +1,7 @@
 # STATUS.md
 Last Updated: 2026-05-15
 Sprint: 5
-Last Task Completed: Sprint 5 Phase 1.4 — Build sign-up, login, logout routes and templates
+Last Task Completed: Sprint 5 Phase 1.4 — Build sign-up, login, logout routes and templates + Facebook-style Intro Layout and Navbar Avatar with Retro Theme
 Commit Message Suggestion: feat(auth): add signup, login, logout routes and templates with tests
 Known Issues:
   - AI output consistency: qwen3:0.6b is placeholder-only; upgrade to gemma3:12b-cloud for production quality

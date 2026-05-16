@@ -2,8 +2,45 @@
 {% block title %}Study-and-Learn{% endblock %}
 
 {% block content %}
-<h1 class="mt-4">Study-and-Learn</h1>
 
+{% if not current_user.is_authenticated %}
+<!-- Facebook-style Intro Layout: Hero Left, Auth Right -->
+<div class="fb-layout-container">
+    <!-- Left Column: Hero -->
+    <div class="fb-hero-col">
+        <img src="{{ url_for('static', filename='images/main.png') }}" alt="Study-and-Learn Hero" class="hero-image">
+        <p class="hero-tagline">
+            Study-and-Learn helps you convert uploaded materials into structured, interactive study paths.
+        </p>
+    </div>
+
+    <!-- Right Column: Auth Card -->
+    <div class="fb-auth-col">
+        <h1 class="mt-4">Welcome!</h1>
+        <div class="auth-card">
+            <form action="{{ url_for('main.login') }}" method="POST">
+                <div class="mb-3">
+                    <input type="text" class="form-control form-control-lg" name="username"
+                           placeholder="Username" required>
+                </div>
+                <div class="mb-3">
+                    <input type="password" class="form-control form-control-lg" name="password"
+                           placeholder="Password" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-lg w-100">Log In</button>
+            </form>
+
+            <div class="auth-divider"></div>
+
+            <a href="{{ url_for('main.signup') }}" class="btn btn-success btn-lg w-100">
+                Create New Account
+            </a>
+        </div>
+    </div>
+</div>
+
+{% else %}
+<!-- Authenticated: Show existing learning form -->
 <div class="form-section">
     <h2 class="section-title mb-4">Start Your Learning Journey</h2>
     <form id="unified-form" action="{{ url_for('main.process') }}" method="POST" enctype="multipart/form-data">
@@ -27,7 +64,7 @@
         <ul id="selected-files-list" class="list-unstyled mb-3"></ul>
 
         <div class="d-flex gap-2">
-            <button type="submit" class="btn btn-primary btn-lg flex-grow-1">
+            <button type="submit" class="btn btn-accent btn-lg flex-grow-1">
                 Process My Learning Materials
             </button>
         </div>
@@ -44,6 +81,9 @@
     </div>
 </div>
 {% endif %}
+
+{% endif %}
+
 {% endblock %}
 
 {% block extra_footer %}

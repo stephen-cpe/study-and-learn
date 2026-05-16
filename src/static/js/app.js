@@ -105,6 +105,9 @@
         fileInput.focus();
         return;
       }
+      var submitBtn = form.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Processing...';
       var taskId = generateTaskId();
       setBubblePersistent('Receiving your study materials...');
       showBubbleBar(0);
@@ -126,22 +129,28 @@
                   _mascotTalk(data.error);
                   showBubbleBar(0);
                   _progressActive = false;
+                  submitBtn.disabled = false;
+                  submitBtn.textContent = 'Process My Learning Materials';
                 }
               });
             }
             window.location.href = response.url;
             return;
           }
-          response.json().then(function (data) {
-            var msg = (data && data.error) ? data.error : 'Upload failed. Please try again.';
-            _mascotTalk(msg);
-            showBubbleBar(0);
-            _progressActive = false;
-          }).catch(function () {
-            _mascotTalk('Upload failed. Please try again.');
-            showBubbleBar(0);
-            _progressActive = false;
-          });
+            response.json().then(function (data) {
+              var msg = (data && data.error) ? data.error : 'Upload failed. Please try again.';
+              _mascotTalk(msg);
+              showBubbleBar(0);
+              _progressActive = false;
+              submitBtn.disabled = false;
+              submitBtn.textContent = 'Process My Learning Materials';
+            }).catch(function () {
+              _mascotTalk('Upload failed. Please try again.');
+              showBubbleBar(0);
+              _progressActive = false;
+              submitBtn.disabled = false;
+              submitBtn.textContent = 'Process My Learning Materials';
+            });
         })
         .catch(function () {
           _mascotTalk('Network error. Please try again.');

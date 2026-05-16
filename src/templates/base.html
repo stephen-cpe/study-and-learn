@@ -13,11 +13,23 @@
     <div class="scanlines" aria-hidden="true"></div>
 
     <nav class="navbar navbar-expand-lg az-navbar sticky-top">
-        <div class="container-fluid d-flex">
+        <div class="container-fluid d-flex justify-content-between align-items-center">
             <a class="navbar-brand d-flex align-items-center gap-2" href="/">
                 <img src="{% block navbar_logo %}{{ url_for('static', filename='images/logo.png') }}{% endblock %}" alt="Logo" class="brand-logo">
                 <span class="brand-title">Study-and-Learn</span>
             </a>
+            {% if current_user.is_authenticated %}
+            <div class="dropdown">
+                <a href="#" class="user-avatar-toggle d-flex align-items-center" data-bs-toggle="dropdown" aria-expanded="false">
+                    <img src="{{ url_for('static', filename='images/avatar.png') }}" alt="User Avatar" class="user-avatar">
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end retro-dropdown-menu">
+                    <li><span class="dropdown-item-text">Hi, {{ current_user.username }}!</span></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="{{ url_for('main.logout') }}">Logout</a></li>
+                </ul>
+            </div>
+            {% endif %}
         </div>
     </nav>
 
