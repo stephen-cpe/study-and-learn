@@ -20,10 +20,7 @@ def test_call_ollama_without_mock(monkeypatch):
     monkeypatch.delenv('AI_MOCK', raising=False)
     monkeypatch.delenv('AI_BACKEND', raising=False)
 
-    import importlib
-    import src.services.ai_client as ai_client_module
     import requests
-    importlib.reload(ai_client_module)
 
     class MockResponse:
         def json(self):
@@ -37,5 +34,6 @@ def test_call_ollama_without_mock(monkeypatch):
 
     monkeypatch.setattr(requests, 'post', mock_post)
 
-    response = ai_client_module.call_ollama("test prompt")
+    from src.services.ai_client import call_ollama
+    response = call_ollama("test prompt")
     assert "This is a mocked local Ollama response" in response

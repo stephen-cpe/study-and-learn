@@ -24,4 +24,7 @@ jobs:
           pip install pytest
 
       - name: Run tests
+        env:
+          DATABASE_URL: postgresql+psycopg2://test:test@localhost:5432/test
+          AI_MOCK: "true"
         run: pytest -v tests/

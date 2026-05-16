@@ -44,7 +44,8 @@ def dummy_retriever(query: str) -> str:
     return "dummy context"
 
 
-def test_build_module_artifacts_returns_expected_keys():
+def test_build_module_artifacts_returns_expected_keys(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
     module = {"title": "Test Module"}
     result = build_module_artifacts(module, "goal", dummy_retriever)
     assert set(result.keys()) >= {"lesson", "quiz", "checkpoints"}
@@ -64,7 +65,9 @@ def test_build_module_artifacts_reuses_existing_slides():
     assert result["lesson"]["slides"] == existing_slides
 
 
-def test_make_retriever_returns_context_when_texts_present():
+@patch('src.services.lesson_orchestrator.build_rag_context')
+def test_make_retriever_returns_context_when_texts_present(mock_build_rag):
+    mock_build_rag.return_value = "text one text two"
     retriever = make_retriever("goal", ["text one", "text two"])
     ctx = retriever("query")
     assert "text one" in ctx

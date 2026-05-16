@@ -2,12 +2,16 @@
 SQLAlchemy models for Study-and-Learn — PostgreSQL-only.
 """
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, Boolean, Integer, DateTime
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
 
 from src import db
+
+
+def _utcnow():
+    return datetime.now(timezone.utc)
 
 
 class User(db.Model, UserMixin):
@@ -20,8 +24,8 @@ class User(db.Model, UserMixin):
     password_hash = db.Column(String(255), nullable=False)
     is_admin = db.Column(Boolean, default=False, nullable=False)
     active_lessons = db.Column(Integer, default=0, nullable=False)
-    created_at = db.Column(DateTime, default=datetime.utcnow)
-    updated_at = db.Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(DateTime, default=_utcnow)
+    updated_at = db.Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     def set_password(self, password: str) -> None:
         """Hash and store the user's password."""

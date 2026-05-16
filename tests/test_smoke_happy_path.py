@@ -22,6 +22,7 @@ from src import create_app
 @pytest.fixture
 def client(monkeypatch):
     monkeypatch.setenv('DATABASE_URL', 'postgresql+psycopg2://test:test@localhost:5432/test')
+    monkeypatch.setenv('AI_MOCK', 'true')
     with tempfile.TemporaryDirectory() as temp_dir:
         app = create_app()
         app.config.update({
