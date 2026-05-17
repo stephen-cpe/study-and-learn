@@ -27,7 +27,7 @@ def _call_ollama_local(prompt: str, model: str = None) -> str:
 
     base_url = os.environ.get('OLLAMA_BASE_URL', 'http://localhost:11434')
     url = f"{base_url}/api/generate"
-    timeout = int(os.environ.get('OLLAMA_TIMEOUT', '180'))
+    timeout = int(os.environ.get('OLLAMA_TIMEOUT', '300'))
 
     payload = {
         "model": model,
