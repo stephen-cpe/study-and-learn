@@ -5,7 +5,7 @@ A Flask web application that converts uploaded study materials into structured s
 ## Prerequisites
 
 1. Install Python 3.13 from https://python.org
-2. Install Ollama from https://ollama.com/download (for local AI serving)
+2. Install Ollama from https://ollama.com/download
 3. Install PostgreSQL from https://www.postgresql.org/download/windows
 
 ## Setup
@@ -33,43 +33,53 @@ pip install -r requirements.txt
 
 ### 4. Set up PostgreSQL database
 
-Open PowerShell as Administrator and run:
+Open PowerShell as Administrator:
 
 ```bash
-# Connect to PostgreSQL as postgres superuser
-psql -U postgres -h localhost -d postgres
+psql -U postgres
+```
 
-# Inside psql, run these commands:
-CREATE DATABASE study_and_learn;
+Inside psql:
+
+```sql
+-- Only run these if you want to start from scratch
+DROP DATABASE IF EXISTS study_and_learn;
+DROP OWNED BY study_user CASCADE;
+DROP USER IF EXISTS study_user;
+
 CREATE USER study_user WITH PASSWORD 'study_pass';
-GRANT ALL PRIVILEGES ON DATABASE study_and_learn TO study_user;
+CREATE DATABASE study_and_learn;
+ALTER DATABASE study_and_learn OWNER TO study_user;
 GRANT CREATE ON SCHEMA public TO study_user;
-GRANT USAGE ON SCHEMA public TO study_user;
 \q
 ```
 
-**Quick start with init_db.sql:**
-
-If you already created the database and user, you can skip alembic migrations and load the complete schema in one command:
+Initialize database schema:
 
 ```bash
 psql -U postgres -d study_and_learn -f init_db.sql
 ```
 
-This creates all tables (`users`, `study_paths`, `lesson_progress`), indexes, foreign keys, and stamps the alembic version so `flask db upgrade` sees the database as current.
+This creates all tables, indexes, foreign keys, stamps the alembic version, and seeds three pre-configured accounts:
 
-### 5. Pull Ollama models (for local AI serving)
+| Username | Password       | Role  | Can generate lessons |
+|----------|---------------|-------|----------------------|
+| admin    | ADMINpassword | ADMIN | Yes                  |
+| bob      | BOBpassword   | USER  | Yes                  |
+| alice    | ALICEpassword | USER  | Yes                  |
+
+### 5. Pull Ollama models
 
 ```bash
 ollama pull qwen3:0.6b
 ollama pull qwen3-embedding:0.6b
 ```
 
-The default models are placeholders. For better results, use larger models such as `qwen3:8b` or `gemma3:4b` if your hardware can accommodate them. Alternatively, configure the application to use Ollama Cloud (see section below).
+The default models are placeholders. For better results, use larger models such as `qwen3:8b` or `gemma3:4b` if your hardware can accommodate them.
 
 ### 6. Create .env file
 
-Create a `.env` file in the project root. Refer to `.env.example` for a complete reference:
+Create a `.env` file in the project root:
 
 ```
 SECRET_KEY=your-secret-key-here
@@ -78,52 +88,13 @@ OLLAMA_MODEL=qwen3:0.6b
 OLLAMA_EMBEDDING_MODEL=qwen3-embedding:0.6b
 ```
 
-### 7. Run database migrations (if not using init_db.sql)
-
-If you used `init_db.sql` above, skip this step. Otherwise, apply Alembic migrations:
-
-```bash
-flask db upgrade
-```
-
-### 8. Seed demo accounts and enable lesson generation
-
-New accounts have lesson generation **disabled by default** (security gate). To enable access:
-
-```bash
-flask shell
-```
-
-```python
-from src import db
-from src.models import User
-
-# Promote your account to admin
-me = User.query.filter_by(username='your-username').first()
-me.is_admin = True
-db.session.commit()
-
-# Seed demo accounts (Bob and Alice) with lesson generation enabled
-# (or visit /seed-demo in your browser once logged in as admin)
-```
-
-### 9. Run the application
+### 7. Run the application
 
 ```bash
 python app.py
 ```
 
 Open http://localhost:5000 in your browser.
-
-## First-Time Admin & Demo Setup
-
-After launching the app:
-
-1. **Sign up** a new account at `/signup`
-2. **Promote yourself to admin** (see Step 8 above or use `flask shell`)
-3. Log out and log back in so Flask-Login picks up the role change
-4. Visit `/seed-demo` to create Bob and Alice (password: `demo123`)
-5. Toggle lesson generation for any user at `/admin/toggle/<user_id>`
 
 ## Testing
 
@@ -133,9 +104,7 @@ pytest -v tests/
 
 ## Using Ollama Cloud (Optional)
 
-To use Ollama Cloud instead of local models:
-
-1. In `src/services/ai_client.py`, uncomment line 28:
+1. In `src/services/ai_client.py`, uncomment:
    ```python
    from .ai_client_cloud import call_ollama
    ```
