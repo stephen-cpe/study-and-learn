@@ -94,13 +94,19 @@ Core workflow:
 **Reason:** Prevents context window overflow, enables source-grounded outputs, scales to multiple documents, and aligns with modern AI engineering standards.
 **Tradeoffs:** ✅ Grounded, scalable, traceable • ❌ Adds vector DB dependency, requires embedding strategy
 
-### ADR-007: Use Single Configurable Ollama Model + Mock Fallback
-**Decision:** All AI services call one model via `OLLAMA_MODEL` env var (default: `qwen3:0.6b`). CI/testing uses `AI_MOCK=true`.
-**Reason:** Capstone MVP prioritizes reliability over model routing complexity. 1B–3B models run efficiently on target hardware. Mock fallback guarantees deterministic tests.
+### ADR-007: Configurable AI Model Provider with Mock Fallback
 
-### ADR-008: Dual Ollama Model Strategy (Chat + Embeddings)
-**Decision:** Chat uses `OLLAMA_MODEL` (default: qwen3:0.6b), Embeddings use `OLLAMA_EMBEDDING_MODEL` (default: qwen3-embedding:0.6b).
-**Reason:** Chat models don't support /api/embed. Separation prevents 501 errors and allows independent tuning of generation vs retrieval models.
+**Decision:** AI services use an environment-variable-driven model configuration (`OLLAMA_MODEL`, `AI_BACKEND`). CI/testing uses `AI_MOCK=true`.
+
+**Reason:** Capstone MVP prioritizes reliability over model routing complexity. A single configurable environment variable allows the developer to switch between small local models, larger local models, or cloud-based models without code changes. Mock fallback guarantees deterministic tests in CI regardless of GPU availability or network access.
+
+**Update:** Sprint 5 introduced the `AI_BACKEND` environment variable (`local` or `cloud`) to make the provider switch explicit and testable. A `ai_client.py` smoke test validates the indirection works correctly.
+
+### ADR-008: Separate Chat and Embedding Model Configuration
+
+**Decision:** Chat uses `OLLAMA_MODEL`, embeddings use `OLLAMA_EMBEDDING_MODEL`.
+
+**Reason:** Chat models typically do not expose embedding endpoints. Separating the two allows independent tuning — a smaller embedding model may suffice for retrieval while a larger chat model can be used for generation. Both are swappable via environment variables, and HuggingFace embedding models may be evaluated in Sprint 7 as an alternative for cloud deployment scenarios where running Ollama is not feasible.
 
 ### ADR-009: Custom CSS/JS Slide Deck Engine (Replaces reveal.js)
 
@@ -108,11 +114,15 @@ Core workflow:
 
 **Reason:** reveal.js introduced layout overflow bugs, scaling issues on the constrained viewport, and CSS conflicts with the project's retro theme (custom `@font-face` declarations, cyberpunk body styles). A custom engine gives full control over sizing, font application, checkpoint blocking logic, and responsive breakpoints. The custom engine renders slides from JSON, supports title/content/example/summary slide types, inline checkpoint blocking, and final quiz forms — all with Retrograde Bold and BoldPixels pixel fonts. This aligns with the "thin MVP" philosophy (build only what's needed) and avoids dependency bloat.
 
-### ADR-010: Server-Side Session Storage with Flask-Session + cachelib
+### ADR-010: Server-Side Session Storage with Flask-Session + cachelib (Phase 1); DB-Backed Lesson Repository (Phase 2)
 
-**Decision:** Use Flask-Session with cachelib's FileSystemCache for session storage.
+**Decision (Phase 1):** Use Flask-Session with cachelib's FileSystemCache for session storage.
 
 **Reason:** Flask's default signed-cookie sessions cap at ~4 KB. Full lesson JSON for 5 modules with slides, checkpoints, and quiz questions far exceeds this limit. Flask-Session's server-side storage keeps the per-request cookie small while storing large session data on disk. FileSystemCache was chosen over the deprecated filesystem backend to match Flask-Session 0.8's recommended pattern. Tradeoffs: ✅ No cookie size limits, transparent to app code • ❌ Requires `data/flask_session/` directory, sessions lost on server restart (acceptable for MVP demo).
+
+**Decision (Phase 2 — Sprint 5):** Replace the session-backed lesson storage with a PostgreSQL-backed `LessonRepository` using `StudyPath` and `LessonProgress` models.
+
+**Reason:** User accounts (Sprint 5) introduced persistent identity, making session-only lesson storage insufficient. A DB-backed repository (`lesson_repo.py`) persists lesson content (`StudyPath.content_data`) and per-module progress (`LessonProgress` rows) across sessions and server restarts. The repository seam pattern (`get_lessons()` / `save_lessons()`) was retained so that the storage backend can be swapped again in the future without changing route logic. Tradeoffs: ✅ Persistent across restarts, enables per-user lesson gating, progress tracking • ❌ Adds DB dependency for lesson storage, requires migration.
 
 ### ADR-011: Sequential Lesson Generation with Progress Feedback
 
@@ -140,7 +150,7 @@ Core workflow:
 
 ---
 
-## 3. Software & Architectural Patterns
+## 4. Software & Architectural Patterns
 - Model-View-Controller (MVC): Flask routes (Controller) delegate to `src/services/` (Model/Business Logic) and render Bootstrap templates (View). Separation keeps routing thin and services testable.
 - Service Layer Pattern: All AI, parsing, and RAG logic isolated in `src/services/`. Enables independent unit testing, easy mocking, and future provider swaps.
 - Repository/DAO Pattern: ChromaDB vector storage abstracted behind `vector_store.py`. Decouples ingestion from retrieval logic.
@@ -148,7 +158,7 @@ Core workflow:
 
 ---
 
-## 3. Testing Strategy
+## 5. Testing Strategy
 
 ### Unit Tests
     Unit tests cover isolated logic:
@@ -184,7 +194,7 @@ Integration tests cover routes and workflow behavior:
 - mocked generate-lessons flow: session data → lesson + quiz generation → redirect,
 - lesson deck route with pre-populated session lessons returns 200.
 
-Current test suite: **60 tests, 0 failures**.
+Current test suite: **60+ tests covering core MVP, 17 additional Sprint 5 tests for auth, models, dashboard, lesson repository, and admin access — 0 failures**.
 
 ### Smoke Tests
 
@@ -203,7 +213,7 @@ Smoke tests run before sprint demos and final recording:
 
 ---
 
-## 4. CI/CD
+## 6. CI/CD
 
 Initial GitHub Actions workflow:
 
@@ -220,7 +230,7 @@ Future additions:
 
 ---
 
-## 5. AI Tooling Use
+## 7. AI Tooling Use
 
 AI tooling may be used to:
 - refine specifications,
@@ -233,7 +243,7 @@ All AI-generated code must be reviewed before commit. Important project behavior
 
 ---
 
-## 6. Deployment Notes
+## 8. Deployment Notes
 
 Deployment target is undecided. Candidate platforms:
 - Render,
@@ -246,7 +256,7 @@ The deployed version should be stable enough for capstone demonstration and acce
 
 ---
 
-## 7. Deployment Strategy & Cost Analysis
+## 9. Deployment Strategy & Cost Analysis
 - Option A: Local-First Demo (Current)
   - Host: Developer laptop running Ollama + Flask
   - Cost: $0 (uses existing hardware)
@@ -264,16 +274,14 @@ Recommendation: Deploy to Render/Railway free tier with `AI_MOCK=true` for gradi
 
 ---
 
-## 8. Known Risks
+## 10. Known Risks
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| AI model too slow locally | Demo delay | Use small documents and cached/demo responses if needed |
+| AI model too slow locally or inconsistent output quality | Demo delay or poor pedagogical value | Use small documents and cached/demo responses; support cloud model fallback via `AI_BACKEND=cloud`; evaluate HuggingFace models in Sprint 7 |
 | File parsing issues | Failed workflow | Start with fewer file types and add more gradually |
 | Scope creep | Missed MVP | Keep optional features outside official sprint goals |
-| Deployment resource limits | App unavailable | Test deployment early |
+| Deployment resource limits | App unavailable | Test deployment early; maintain `AI_MOCK=true` path for free-tier hosting without GPU |
 | AI output inconsistency | Poor demo | Use controlled sample documents and structured prompts |
-| Quiz/lesson quality inadequate for learning | Poor pedagogical value | Prompt engineering research in Sprint 4; evaluate alternative models; set appropriate expectations for 0.6B model |
-| Session data loss on server restart | Lost lesson state | Acceptable for MVP demo; document limitation; persistent storage deferred to v2 |
-| Loading UX causes user abandonment | Dropped sessions during long generation | Background progress bar in mascot speech bubble (implemented Sprint 4) |
-| `/process` route still uses full-screen spinner | Blocks interaction during document processing | Replace with non-blocking progress indicator (Sprint 4) |
+| PostgreSQL privilege issues on live DB | Blocked migrations | Document `init_db.sql` workaround and `GRANT CREATE` procedure |
+| HuggingFace model evaluation inconclusive | Cloud deployment uncertainty | Maintain Ollama as primary path; document HF findings for future reference

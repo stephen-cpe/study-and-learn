@@ -5,7 +5,7 @@ A Flask web application that converts uploaded study materials into structured s
 ## Prerequisites
 
 1. Install Python 3.13 from https://python.org
-2. Install Ollama from https://ollama.com/download
+2. Install Ollama from https://ollama.com/download (for local AI serving)
 3. Install PostgreSQL from https://www.postgresql.org/download/windows
 
 ## Setup
@@ -58,18 +58,18 @@ psql -U postgres -d study_and_learn -f init_db.sql
 
 This creates all tables (`users`, `study_paths`, `lesson_progress`), indexes, foreign keys, and stamps the alembic version so `flask db upgrade` sees the database as current.
 
-### 5. Pull Ollama models
+### 5. Pull Ollama models (for local AI serving)
 
 ```bash
 ollama pull qwen3:0.6b
 ollama pull qwen3-embedding:0.6b
 ```
 
-Note: qwen3:0.6b is a placeholder model. For better results, use qwen3:8b or gemma3:12b if your system can handle it.
+The default models are placeholders. For better results, use larger models such as `qwen3:8b` or `gemma3:4b` if your hardware can accommodate them. Alternatively, configure the application to use Ollama Cloud (see section below).
 
 ### 6. Create .env file
 
-Create a `.env` file in the project root:
+Create a `.env` file in the project root. Refer to `.env.example` for a complete reference:
 
 ```
 SECRET_KEY=your-secret-key-here
@@ -105,7 +105,6 @@ db.session.commit()
 
 # Seed demo accounts (Bob and Alice) with lesson generation enabled
 # (or visit /seed-demo in your browser once logged in as admin)
-from src.routes import seed_demo  # call via browser /seed-demo instead
 ```
 
 ### 9. Run the application

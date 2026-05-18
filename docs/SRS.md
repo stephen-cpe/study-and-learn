@@ -1,12 +1,12 @@
 # Software Requirements Specification (SRS)
 # Study-and-Learn
 
-**Version:** 1.1  
+**Version:** 1.2  
 **Project type:** AI-assisted learning web application  
 **Capstone track:** Software system / AI system  
 **Repository name:** `study-and-learn`  
 **Primary development approach:** Spec-Driven Development with AI tooling support  
-**Last updated:** May 2026
+**Last updated:** May 18, 2026
 
 ---
 
@@ -218,15 +218,15 @@ study-and-learn/
 ├── README.md
 └── app.py
 ```
-### 4.4 AI Model Specification
-| Parameter | Value | Notes |
+### 4.4 AI Model Configuration
+
+| Parameter | Description | Notes |
 |---|---|---|
-| Serving framework | Ollama | Local-first, REST API compatible |
-| Default model | `qwen3:0.6b` (via `OLLAMA_MODEL` env var) | **Placeholder only** — minimal viability for testing. Replace with `gemma3:12b-cloud` (cloud) or `gemma3:4b` (local) for production-quality output. |
-| Embedding Model | `qwen3-embedding:0.6b` (via `OLLAMA_EMBEDDING_MODEL` env var) | Used exclusively for ChromaDB vector embeddings. Swappable via env var. |
-| Supported cloud models | `gemma3:12b-cloud`, `nemotron-3-nano:30b-cloud`, `rnj-1:8b-cloud` | Production-ready options; set via `OLLAMA_MODEL` env var. `gemma3:12b-cloud` recommended for best lesson/quiz quality. |
+| Serving framework | Ollama (default) | Local-first via Ollama; cloud API via `ai_client_cloud.py` import toggle or `AI_BACKEND=cloud` env var |
+| Chat model | Configured via `OLLAMA_MODEL` env var | Default: `qwen3:0.6b` (placeholder). Recommended: `qwen3:8b`, `gemma3:4b`, `gemma3:12b-cloud`, or any Ollama-compatible model. Cloud models generally yield higher quality. |
+| Embedding model | Configured via `OLLAMA_EMBEDDING_MODEL` env var | Used exclusively for ChromaDB vector embeddings. Swappable via env var. HuggingFace embedding models may be evaluated in Sprint 7 as an alternative for cloud deployment. |
 | Testing mode | `AI_MOCK=true` returns structured JSON stubs | Ensures deterministic CI/CD without GPU or cloud dependency |
-| Multimodal capability | Text + image support deferred to post-MVP | OCR for scanned PDFs remains stretch goal |
+| Multimodal capability | Text + image support deferred to post-MVP | OCR for scanned PDFs remains a stretch goal, evaluated in Sprint 7 via Tesseract or HuggingFace vision-language models |
 
 ### 4.5 RAG & Multi-Document Architecture
 - **Chunking**: `RecursiveCharacterTextSplitter` (LangChain) with configurable size/overlap
@@ -490,51 +490,60 @@ study-and-learn/
 Ranked from easier to harder. Items above the line are implemented; items below are candidates for future sprints.
 
 ### ✅ Implemented
-1. Static mascot image or pixel avatar — done (mascot-robot.png placed bottom-right with click-to-talk)
-2. Retro theme improvements — done (Retrograde Bold, BoldPixels fonts, cyberpunk theme)
-3. Better prompt templates — done
-4. Simple quiz generation — done (4 question types: mcq, true_false, multi_select, fill_blank)
-5. Slide-style lesson pages — done (custom CSS/JS deck engine with inline checkpoints)
-6. Cloud model toggle — done (ai_client_cloud.py with import-override pattern)
-7. JS refactored into external app.js — done
-8. Package renamed app/ → src/ — done
-9. Gated module progression with pass/fail — done (80% threshold)
-10. Retake with regenerated questions — done
-11. Server-side session storage — done (Flask-Session + cachelib FileSystemCache)
-12. Loading/progress UI — full-screen spinner replaced with background progress bar in mascot speech bubble
-13. Fill-in-the-blank one-word validation — done (inline inputs, per-blank grading, case-insensitive)
-14. Lesson/quiz prompt engineering refinement — done (active-working mascot messages)
+1. Multi-user accounts (Flask-Login + PostgreSQL) — done (User model, sign-up, login, logout, hashed passwords)
+2. Learner dashboard with progress tracking — done (DB-backed lesson repository, StudyPath/LessonProgress models, progress bars)
+3. Max 3 active lessons gating — done (active_lesson_count, cap warning banner, blocked generation)
+4. Admin access control for lesson generation — done (is_admin flag, can_generate_lessons toggle, /admin/toggle route)
+5. Bob/Alice demo account seeding — done (/seed-demo route, can_generate_lessons=True)
+6. Static mascot image with progress-aware speech bubble — done (mascot-robot.png, click-to-talk, progress bar)
+7. Retro theme improvements — done (Retrograde Bold, BoldPixels fonts, cyberpunk theme)
+8. Better prompt templates — done
+9. Simple quiz generation — done (4 question types: mcq, true_false, multi_select, fill_blank)
+10. Slide-style lesson pages — done (custom CSS/JS deck engine with inline checkpoints)
+11. Cloud model toggle — done (ai_client_cloud.py with import-override pattern)
+12. JS refactored into external app.js — done
+13. Gated module progression with pass/fail — done (80% threshold)
+14. Retake with regenerated questions — done
+15. Server-side session storage — done (Flask-Session + cachelib FileSystemCache)
+16. Loading/progress UI — full-screen spinner replaced with background progress bar in mascot speech bubble
+17. Fill-in-the-blank one-word validation — done (inline inputs, per-blank grading, case-insensitive)
+18. Lesson/quiz prompt engineering refinement — done
+19. Non-blocking progress on `/process` route — done
+20. PostgreSQL-only migration — done (schemas, docs, configs, tests)
+21. Codebase refactoring (orchestrator/grader/repo seams) — done
+22. AI_BACKEND env var indirection — done
 
-### Sprint 4 (In Progress)
-15. Replace full-screen loading overlay on `/process` route with non-blocking background progress indicator
-16. Lesson/quiz prompt engineering refinement for pedagogical consistency
+### Sprint 6 (Planned)
+23. UI and UX refinement across all views
+24. Defect remediation and performance optimization
+25. Expanded automated test coverage
+26. Text-to-speech narration (opt-in)
+27. PDF export for completed lessons
+28. Mascot animation frames (idle/waiting/done)
+29. Session cleanup (remove extracted_texts after lessons generated)
 
-### Sprint 5–6 (Planned)
-17. Multi-user accounts (Flask-Login + PostgreSQL)
-18. Learner dashboard with progress tracking
-19. Max 3 active lessons gating
-20. Admin access control for lesson generation
-21. Text-to-speech narration (opt-in)
-22. PDF export for completed lessons
-23. Mascot animation frames (idle/waiting/done)
-24. Session cleanup (remove extracted_texts after lessons generated)
+### Sprint 7 (Planned)
+30. OCR for scanned PDFs (Tesseract or HuggingFace vision-language models)
+31. HuggingFace embedding model evaluation for cloud deployment readiness
+32. Badges/trophies for completed lessons
+33. Source document referencing in lessons
+34. Cloud ChromaDB and cloud AI provider testing
+35. General application refinement and test expansion
 
-### Sprint 7–8 (Planned)
-25. OCR for scanned PDFs
-26. Badges/trophies for completed lessons
-27. Source document referencing in lessons
-28. Deployment to free-tier host
-29. Final documentation and demo recording
+### Sprint 8 (Planned)
+36. Deployment to free-tier host (Render or Railway)
+37. Final documentation and demo recording
+38. Capstone submission
 
 ### Post-Capstone / Stretch
-30. Difficulty level selector (Easy/Moderate/Hard) — high effort, low impact for MVP
-31. Extended file type support (.docx, .html, .odt) — limited practical benefit for demo
-32. YouTube or external resource integration
-33. Short-answer (free-text) AI grading
-34. Spaced repetition and review scheduling
-35. Full adaptive study planner
-36. Social features (friends, chat, share lessons)
-37. Full offline mode (C/C++ rewrite without Ollama)
+39. Difficulty level selector (Easy/Moderate/Hard) — high effort, low impact for MVP
+40. Extended file type support (.docx, .html, .odt) — limited practical benefit for demo
+41. YouTube or external resource integration
+42. Short-answer (free-text) AI grading
+43. Spaced repetition and review scheduling
+44. Full adaptive study planner
+45. Social features (friends, chat, share lessons)
+46. Full offline mode (C/C++ rewrite without Ollama)
 
 ---
 

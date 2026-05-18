@@ -162,7 +162,7 @@ Build the smallest working version first, then iterate:
 
 ---
 
-### Sprint 5: User Accounts & Session Persistence ⬜ CURRENT
+### Sprint 5: User Accounts & Session Persistence ✅ COMPLETE
 
 **Goal:** Add learner accounts (Flask-Login + PostgreSQL), dashboard with progress tracking, max 3 active lessons gating, admin access control, and demo accounts.
 
@@ -172,20 +172,20 @@ Build the smallest working version first, then iterate:
 - [x] Purge all SQLite references; lock PostgreSQL-only (schemas, docs, configs, tests)
 - [x] Extract lesson orchestrator, grader, and session repository seam (Phase 0.2 refactors)
 - [x] Fix ai_client.py indirection (env AI_BACKEND) and add happy-path smoke test (Phase 0.3)
-- [ ] Integrate Flask-Login, Flask-SQLAlchemy, PostgreSQL only
-- [ ] Build sign-up, sign-in, logout routes and templates
-- [ ] Store user credentials securely (hashed passwords)
-- [ ] Build learner dashboard showing active lessons and completion status
-- [ ] Track completed vs abandoned/cancelled lessons
-- [ ] Enforce max 3 active lessons per user
-- [ ] Require abandon/cancel before creating new lesson when at limit
-- [ ] Create super admin role with per-user lesson generation toggle
-- [ ] Deny lesson generation by default for new registrations
-- [ ] Landing page shows access-denied message for unauthorized users
-- [ ] Seed demo accounts (Bob, Alice) with lesson generation access
-- [ ] Allow public registration but auto-deny lesson access
-- [ ] Write unit and integration tests for auth flow
-- [ ] Update task board with sprint progress
+- [x] Integrate Flask-Login, Flask-SQLAlchemy, PostgreSQL only
+- [x] Build sign-up, sign-in, logout routes and templates
+- [x] Store user credentials securely (hashed passwords)
+- [x] Build learner dashboard showing active lessons and completion status
+- [x] Track completed vs abandoned/cancelled lessons
+- [x] Enforce max 3 active lessons per user
+- [x] Require abandon/cancel before creating new lesson when at limit
+- [x] Create super admin role with per-user lesson generation toggle
+- [x] Deny lesson generation by default for new registrations
+- [x] Landing page shows access-denied message for unauthorized users
+- [x] Seed demo accounts (Bob, Alice) with lesson generation access
+- [x] Allow public registration but auto-deny lesson access
+- [x] Write unit and integration tests for auth flow
+- [x] Update task board with sprint progress
 
 **Sprint 5 Definition of Done:**
 - Registration, login, logout working with Flask-Login
@@ -197,13 +197,17 @@ Build the smallest working version first, then iterate:
 
 ---
 
-### Sprint 6: Polish, Maintenance & Enhancement ⬜ FUTURE
+### Sprint 6: Polish, Maintenance, and Enhancement ⬜ CURRENT
 
-**Goal:** Stabilize Sprint 5 work, add refinements, fix bugs, and enhance with TTS + PDF export.
+**Goal:** Stabilize the application through comprehensive UI and UX refinement, defect remediation, performance optimization, and expanded automated testing coverage.
 
 **User Stories:** US-032, US-033, US-034, US-035
 
 **Tasks:**
+- [ ] Perform comprehensive UI and UX refinement across all templates and components
+- [ ] Address and resolve known defects across the application
+- [ ] Conduct code-level performance optimization (database queries, AI call efficiency, session management)
+- [ ] Expand automated test coverage; ensure all existing tests continue to pass
 - [ ] Polish dashboard UI with mascot placeholder
 - [ ] Add mascot basic animation frames (idle/waiting/done) — if feasible
 - [ ] Display mascot state changes during loading operations
@@ -217,6 +221,10 @@ Build the smallest working version first, then iterate:
 - [ ] Update task board with sprint progress
 
 **Sprint 6 Definition of Done:**
+- UI and UX refinements applied across all views
+- All known defects triaged and resolved
+- Performance profiling completed with measurable improvements
+- Test suite expanded and fully passing
 - Dashboard polished with mascot
 - TTS functional (opt-in)
 - PDF export working for completed lessons
@@ -225,14 +233,14 @@ Build the smallest working version first, then iterate:
 
 ---
 
-### Sprint 7: Advanced Features & OCR ⬜ FUTURE
+### Sprint 7: Advanced Features, Cloud Preparation, and Refinement ⬜ FUTURE
 
-**Goal:** OCR for scanned documents, achievement badges, source document references, and cloud deployment preparation.
+**Goal:** Integrate OCR for scanned documents, implement achievement badges, link lessons to source documents, and conduct cloud deployment preparation including HuggingFace model evaluation and general application refinement.
 
 **User Stories:** US-036, US-037, US-038
 
 **Tasks:**
-- [ ] Integrate OCR engine (Tesseract or similar)
+- [ ] Integrate OCR engine (Tesseract or similar) for scanned PDF text extraction
 - [ ] Detect images in uploaded documents and run OCR analysis
 - [ ] Feed OCR output into chunking pipeline after text extraction
 - [ ] Design badge/trophy system for completed modules
@@ -240,8 +248,13 @@ Build the smallest working version first, then iterate:
 - [ ] Display achievement badges on dashboard
 - [ ] Link generated lesson content back to source PDF/document
 - [ ] Add citations showing which document a slide references
+- [ ] Evaluate HuggingFace embedding models as an alternative to Ollama for cloud deployment readiness
+- [ ] Evaluate HuggingFace OCR and vision-language models for potential cloud-based document processing
 - [ ] Test cloud ChromaDB (optional parallel track)
-- [ ] Test cloud Ollama models (optional parallel track)
+- [ ] Test cloud AI model providers (optional parallel track)
+- [ ] Conduct general application refinement: UX polish, defect remediation, and performance optimization
+- [ ] Expand test coverage; ensure all existing tests continue to pass
+- [ ] Run full test suite and maintain 60+ passing tests
 - [ ] Write tests for OCR integration
 - [ ] Update task board with sprint progress
 
@@ -249,7 +262,10 @@ Build the smallest working version first, then iterate:
 - OCR pipeline processes scanned PDFs
 - Badges displayed for completed lessons
 - Source document references visible in lessons
+- HuggingFace embedding and OCR models evaluated for cloud deployment feasibility
 - Cloud deployment dependencies identified and tested
+- General refinement tasks completed
+- Test suite expanded and fully passing
 
 ---
 
@@ -351,16 +367,21 @@ Build the smallest working version first, then iterate:
 ### Upcoming (Sprint 4–8)
 - [x] Non-blocking progress on `/process` route (Sprint 4)
 - [x] Lesson/quiz prompt engineering refinement (Sprint 4)
-- [ ] User accounts (Flask-Login + PostgreSQL) (Sprint 5)
-- [ ] Learner dashboard with progress tracking (Sprint 5)
-- [ ] Max 3 active lessons gating (Sprint 5)
-- [ ] Admin access control (Sprint 5)
+- [x] User accounts (Flask-Login + PostgreSQL) (Sprint 5)
+- [x] Learner dashboard with progress tracking (Sprint 5)
+- [x] Max 3 active lessons gating (Sprint 5)
+- [x] Admin access control (Sprint 5)
+- [ ] UI and UX refinement (Sprint 6)
+- [ ] Defect remediation and performance optimization (Sprint 6)
+- [ ] Expanded test coverage (Sprint 6)
 - [ ] TTS narration (opt-in) (Sprint 6)
 - [ ] PDF export for completed lessons (Sprint 6)
 - [ ] Mascot animation frames (Sprint 6)
+- [ ] Session cleanup (Sprint 6)
 - [ ] OCR for scanned PDFs (Sprint 7)
 - [ ] Badges/trophies for completed lessons (Sprint 7)
 - [ ] Source document referencing in lessons (Sprint 7)
+- [ ] HuggingFace model evaluation for cloud deployment (Sprint 7)
 - [ ] Deployment, demo, and capstone submission (Sprint 8)
 
 ### Post-Capstone
@@ -430,8 +451,13 @@ Build the smallest working version first, then iterate:
 - [x] Progress integration tests (endpoint, generate-lessons progress flow)
 
 ### To Add (Sprint 5+)
+- [x] Auth route tests (Sprint 5)
+- [x] User model tests (Sprint 5)
+- [x] Dashboard route and access control tests (Sprint 5)
+- [x] Lesson repository unit and integration tests (Sprint 5)
+- [x] Admin role and seed-demo endpoint tests (Sprint 5)
 - [ ] Retake route test (quiz regeneration, state reset)
-- [ ] Auth route tests (Sprint 5)
+- [ ] OCR integration tests (Sprint 7)
 
 ### Manual Demo Tests
 - [ ] Demo document uploads successfully
