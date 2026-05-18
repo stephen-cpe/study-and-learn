@@ -95,9 +95,10 @@ def test_unique_email_constraint(app):
 
 def test_user_repr(app):
     with app.app_context():
-        user = User(username='charlie', email='charlie@example.com', is_admin=False)
+        user = User(username='charlie', email='charlie@example.com', is_admin=False,
+                    can_generate_lessons=False)
         user.set_password('x')
-        assert repr(user) == "<User charlie (charlie@example.com) admin=False>"
+        assert repr(user) == "<User charlie (charlie@example.com) admin=False gen=False>"
 
 
 def test_user_mixin_methods(app):

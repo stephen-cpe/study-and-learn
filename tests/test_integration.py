@@ -3,26 +3,48 @@ import tempfile
 import pytest
 from unittest.mock import patch
 from cachelib import FileSystemCache
-from src import create_app
+from src import create_app, db
+from src.models import User
 from src.services import progress_tracker
+
 
 @pytest.fixture
 def client(monkeypatch):
-    monkeypatch.setenv('DATABASE_URL', 'postgresql+psycopg2://test:test@localhost:5432/test')
+    monkeypatch.setenv(
+        'DATABASE_URL',
+        'postgresql+psycopg2://study_user:study_pass@localhost:5432/study_and_learn'
+    )
     with tempfile.TemporaryDirectory() as temp_dir:
-        app = create_app()
-        app.config['TESTING'] = True
-        app.config['UPLOAD_FOLDER'] = temp_dir
-        app.config['WTF_CSRF_ENABLED'] = False
-        app.config['SECRET_KEY'] = 'test-secret'
-        app.config['SESSION_TYPE'] = 'cachelib'
-        app.config['SESSION_CACHELIB'] = FileSystemCache(cache_dir=temp_dir, threshold=500, mode=0o700)
-        app.config['SESSION_PERMANENT'] = False
+        app_instance = create_app()
+        app_instance.config.update({
+            'TESTING': True,
+            'UPLOAD_FOLDER': temp_dir,
+            'WTF_CSRF_ENABLED': False,
+            'SECRET_KEY': 'test-secret',
+            'SESSION_TYPE': 'cachelib',
+            'SESSION_CACHELIB': FileSystemCache(
+                cache_dir=temp_dir, threshold=500, mode=0o700
+            ),
+            'SESSION_PERMANENT': False,
+        })
         from flask_session import Session
-        Session(app)
-        with app.test_client() as client:
-            with app.app_context():
-                yield client
+        Session(app_instance)
+        app_instance.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+        app_instance.extensions.pop('sqlalchemy', None)
+        db.init_app(app_instance)
+        with app_instance.app_context():
+            db.create_all()
+            user = User(username='tester', email='tester@example.com',
+                         can_generate_lessons=True)
+            user.set_password('pass')
+            db.session.add(user)
+            db.session.commit()
+            with app_instance.test_client() as c:
+                c.post('/login', data={'username': 'tester', 'password': 'pass'})
+                yield c
+            db.session.remove()
+            db.drop_all()
+
 
 @patch('src.services.rag_retriever.build_rag_context')
 @patch('src.services.summarizer.call_ollama')
@@ -46,6 +68,7 @@ def test_full_workflow(mock_curriculum, mock_relevance, mock_summarizer, mock_ra
     assert b'Strong' in response.data
     assert b'Start Over' in response.data
 
+
 @patch('src.services.lesson_generator.call_ollama')
 @patch('src.services.quiz_generator.call_ollama')
 def test_generate_lessons_flow(mock_quiz_ollama, mock_lesson_ollama, client):
@@ -65,6 +88,7 @@ def test_generate_lessons_flow(mock_quiz_ollama, mock_lesson_ollama, client):
     assert response.status_code == 200
     assert b'Generated' in response.data or b'successfully' in response.data
 
+
 @patch('src.services.lesson_generator.call_ollama')
 @patch('src.services.quiz_generator.call_ollama')
 def test_lesson_deck_route(mock_quiz_ollama, mock_lesson_ollama, client):
@@ -75,16 +99,13 @@ def test_lesson_deck_route(mock_quiz_ollama, mock_lesson_ollama, client):
         sess['learning_goal'] = 'Learn stuff'
         sess['study_path'] = {'modules': [{'title': 'M1', 'estimated_effort': '1h'}]}
         sess['extracted_texts'] = ['text']
-        sess['lessons'] = [{
-            'index': 0, 'module_title': 'M1', 'estimated_effort': '1h',
-            'lesson': {'module_title': 'M1', 'slides': [{'type': 'title', 'title': 'M1', 'subtitle': ''}]},
-            'quiz': {'questions': [{'id': 'q1', 'type': 'true_false', 'prompt': 'T?', 'answer': True, 'explanation': 'E'}]},
-            'checkpoints': {},
-            'completed': False, 'score': None, 'passed': False
-        }]
+
+    response = client.post('/generate-lessons', follow_redirects=True)
+    assert response.status_code == 200
 
     response = client.get('/lessons/0')
     assert response.status_code == 200
+    assert b'Hello' in response.data or b'test_id' in response.data or b'deck' in response.data
 
 
 @patch('src.services.lesson_generator.call_ollama')

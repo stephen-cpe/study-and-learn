@@ -16,16 +16,21 @@ import json
 import tempfile
 import pytest
 from cachelib import FileSystemCache
-from src import create_app
+from src import create_app, db
+from src.models import User
+from src.repositories.lesson_repo import get_lessons
 
 
 @pytest.fixture
 def client(monkeypatch):
-    monkeypatch.setenv('DATABASE_URL', 'postgresql+psycopg2://test:test@localhost:5432/test')
+    monkeypatch.setenv(
+        'DATABASE_URL',
+        'postgresql+psycopg2://study_user:study_pass@localhost:5432/study_and_learn'
+    )
     monkeypatch.setenv('AI_MOCK', 'true')
     with tempfile.TemporaryDirectory() as temp_dir:
-        app = create_app()
-        app.config.update({
+        app_instance = create_app()
+        app_instance.config.update({
             'TESTING': True,
             'UPLOAD_FOLDER': temp_dir,
             'WTF_CSRF_ENABLED': False,
@@ -37,10 +42,22 @@ def client(monkeypatch):
             'SESSION_PERMANENT': False,
         })
         from flask_session import Session
-        Session(app)
-        with app.test_client() as client_instance:
-            with app.app_context():
-                yield client_instance
+        Session(app_instance)
+        app_instance.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+        app_instance.extensions.pop('sqlalchemy', None)
+        db.init_app(app_instance)
+        with app_instance.app_context():
+            db.create_all()
+            user = User(username='smoker', email='smoke@example.com',
+                         can_generate_lessons=True)
+            user.set_password('pass')
+            db.session.add(user)
+            db.session.commit()
+            with app_instance.test_client() as c:
+                c.post('/login', data={'username': 'smoker', 'password': 'pass'})
+                yield c
+            db.session.remove()
+            db.drop_all()
 
 
 def test_full_happy_path_mocked(client):
@@ -56,7 +73,6 @@ def test_full_happy_path_mocked(client):
         'files': (io.BytesIO(b'Force equals mass times acceleration.'), 'physics.txt'),
     }
     rv = client.post('/process', data=data, content_type='multipart/form-data')
-    # Expect redirect to results (or AJAX redirect)
     assert rv.status_code in (200, 302)
     if rv.status_code == 200:
         payload = json.loads(rv.data)
@@ -78,28 +94,30 @@ def test_full_happy_path_mocked(client):
     rv = client.get('/lessons/0')
     assert rv.status_code == 200
 
-    # 5) Grade with fake answers (fetch quiz structure from session)
-    with client.session_transaction() as sess:
-        lesson = sess['lessons'][0]
-        quiz = lesson['quiz']
-        checkpoints = lesson.get('checkpoints', {})
-        questions = quiz.get('questions', [])
+    # 5) Grade with fake answers (fetch from DB-backed repo)
+    from src.models import User as U
+    user = U.query.filter_by(username='smoker').first()
+    lessons_data = get_lessons(user)
+    lesson = lessons_data[0]
+    quiz = lesson['quiz']
+    checkpoints = lesson.get('checkpoints', {})
+    questions = quiz.get('questions', [])
 
-        answers = []
-        fill_blank_answers = {}
-        for q in questions:
-            if q['type'] == 'fill_blank':
-                fill_blank_answers[q['id']] = 'answer'
-            elif q['type'] in ('mcq', 'true_false'):
-                answers.append(0)
-            elif q['type'] == 'multi_select':
-                answers.append([0])
-            else:
-                answers.append(None)
+    answers = []
+    fill_blank_answers = {}
+    for q in questions:
+        if q['type'] == 'fill_blank':
+            fill_blank_answers[q['id']] = 'answer'
+        elif q['type'] in ('mcq', 'true_false'):
+            answers.append(0)
+        elif q['type'] == 'multi_select':
+            answers.append([0])
+        else:
+            answers.append(None)
 
-        checkpoint_answers = {}
-        for k, v in checkpoints.items():
-            checkpoint_answers[k] = 0
+    checkpoint_answers = {}
+    for k, v in checkpoints.items():
+        checkpoint_answers[k] = 0
 
     payload = {
         'answers': answers,

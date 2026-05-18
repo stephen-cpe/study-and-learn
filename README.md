@@ -48,6 +48,16 @@ GRANT USAGE ON SCHEMA public TO study_user;
 \q
 ```
 
+**Quick start with init_db.sql:**
+
+If you already created the database and user, you can skip alembic migrations and load the complete schema in one command:
+
+```bash
+psql -U postgres -d study_and_learn -f init_db.sql
+```
+
+This creates all tables (`users`, `study_paths`, `lesson_progress`), indexes, foreign keys, and stamps the alembic version so `flask db upgrade` sees the database as current.
+
 ### 5. Pull Ollama models
 
 ```bash
@@ -68,13 +78,53 @@ OLLAMA_MODEL=qwen3:0.6b
 OLLAMA_EMBEDDING_MODEL=qwen3-embedding:0.6b
 ```
 
-### 7. Run the application
+### 7. Run database migrations (if not using init_db.sql)
+
+If you used `init_db.sql` above, skip this step. Otherwise, apply Alembic migrations:
+
+```bash
+flask db upgrade
+```
+
+### 8. Seed demo accounts and enable lesson generation
+
+New accounts have lesson generation **disabled by default** (security gate). To enable access:
+
+```bash
+flask shell
+```
+
+```python
+from src import db
+from src.models import User
+
+# Promote your account to admin
+me = User.query.filter_by(username='your-username').first()
+me.is_admin = True
+db.session.commit()
+
+# Seed demo accounts (Bob and Alice) with lesson generation enabled
+# (or visit /seed-demo in your browser once logged in as admin)
+from src.routes import seed_demo  # call via browser /seed-demo instead
+```
+
+### 9. Run the application
 
 ```bash
 python app.py
 ```
 
 Open http://localhost:5000 in your browser.
+
+## First-Time Admin & Demo Setup
+
+After launching the app:
+
+1. **Sign up** a new account at `/signup`
+2. **Promote yourself to admin** (see Step 8 above or use `flask shell`)
+3. Log out and log back in so Flask-Login picks up the role change
+4. Visit `/seed-demo` to create Bob and Alice (password: `demo123`)
+5. Toggle lesson generation for any user at `/admin/toggle/<user_id>`
 
 ## Testing
 

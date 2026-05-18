@@ -992,3 +992,117 @@ h2, .section-title {
         max-width: 80%;
     }
 }
+
+/* ===== DASHBOARD ===== */
+.cap-warning-banner {
+    background: rgba(255, 209, 102, 0.1);
+    border: 1px solid var(--az-warning);
+    border-left: 4px solid var(--az-warning);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--az-warning);
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.cap-warning-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.path-card {
+    transition: all 0.3s;
+}
+
+.path-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 30px rgba(0, 180, 216, 0.2);
+}
+
+.path-title {
+    color: var(--az-cyan-light);
+    font-weight: 800;
+    font-family: "BoldPixels", sans-serif;
+    margin-bottom: 0.4rem;
+    font-size: 1.1em;
+}
+
+.path-goal {
+    color: var(--az-muted);
+    font-size: 0.85em;
+    margin-bottom: 1rem;
+}
+
+.path-progress {
+    background: rgba(30, 58, 95, 0.4);
+    border: 1px solid var(--az-border);
+    border-radius: 8px;
+    padding: 0.6rem 0.8rem;
+}
+
+.path-meta {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    font-size: 0.8em;
+    color: var(--az-muted);
+    margin-bottom: 1rem;
+}
+
+.path-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.btn-danger-cancel {
+    background: rgba(255, 107, 107, 0.15);
+    border: 1px solid var(--az-danger);
+    color: var(--az-danger);
+    font-weight: 700;
+    border-radius: 8px;
+    padding: 0.375rem 0.75rem;
+    transition: all 0.2s;
+}
+
+.btn-danger-cancel:hover {
+    background: var(--az-danger);
+    color: var(--az-dark);
+    box-shadow: 0 0 12px rgba(255, 107, 107, 0.4);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    background: rgba(30, 58, 95, 0.4);
+    border: 1px solid var(--az-border);
+    border-radius: 18px;
+    margin-bottom: 1.5rem;
+}
+
+.empty-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+    color: var(--az-cyan-light);
+    font-family: "BoldPixels", sans-serif;
+    margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+    color: var(--az-muted);
+    margin-bottom: 1.5rem;
+}

@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Study-and-Learn{% endblock %}
+
+{% block content %}
+<h1 class="mt-4">My Learning Dashboard</h1>
+<p class="text-center" style="color: var(--az-muted); margin-bottom: 2rem;">
+    Welcome back, <strong>{{ current_user.username }}</strong>! Track your learning progress below.
+</p>
+
+{% if at_cap %}
+<div class="cap-warning-banner">
+    <div class="cap-warning-icon">&#9888;</div>
+    <div>
+        <strong>Lesson Cap Reached</strong><br>
+        You've reached the maximum of 3 active lessons. Cancel an ongoing lesson to start a new one.
+    </div>
+</div>
+{% endif %}
+
+{% if paths %}
+<div class="dashboard-grid">
+    {% for path in paths %}
+    <div class="card path-card">
+        <div class="card-body">
+            <h3 class="path-title">{{ path.title }}</h3>
+            <p class="path-goal">{{ path.learning_goal[:120] }}{% if path.learning_goal|length > 120 %}...{% endif %}</p>
+
+            <div class="path-progress mb-3">
+                <div class="progress-header d-flex justify-content-between">
+                    <span>Progress</span>
+                    <span>{{ path.progress_pct }}% ({{ path.completed_modules }}/{{ path.total_modules }} modules)</span>
+                </div>
+                <div class="progress progress-enhanced">
+                    <div class="progress-bar progress-bar-custom" style="width: {{ path.progress_pct }}%"></div>
+                </div>
+            </div>
+
+            <div class="path-meta">
+                <span>Created: {{ path.created_at.strftime('%b %d, %Y') if path.created_at else 'N/A' }}</span>
+                <span>{{ path.total_modules }} module{% if path.total_modules != 1 %}s{% endif %}</span>
+            </div>
+
+            <div class="path-actions">
+                <a href="{{ url_for('main.lessons') }}" class="btn btn-primary">View Lessons</a>
+                <form method="POST" action="{{ url_for('main.cancel_study_path', path_id=path.id) }}" style="display:inline;"
+                      onsubmit="return confirm('Cancel &quot;{{ path.title }}&quot;? This cannot be undone.')">
+                    <button type="submit" class="btn btn-danger-cancel">Cancel / Abandon</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <div class="empty-icon">&#128218;</div>
+    <h3>No active lessons</h3>
+    <p>Upload materials to start learning!</p>
+    <a href="{{ url_for('main.index') }}" class="btn btn-accent">Start New Lesson</a>
+</div>
+{% endif %}
+
+<div class="action-buttons mb-4">
+    {% if not at_cap %}
+    <a href="{{ url_for('main.index') }}" class="btn btn-primary">Start New Lesson</a>
+    {% endif %}
+    <a href="{{ url_for('main.lessons') }}" class="btn btn-outline-primary">My Lessons</a>
+</div>
+{% endblock %}

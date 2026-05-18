@@ -4,14 +4,14 @@
 {% block content %}
 <div class="fb-layout-container">
     <div class="fb-hero-col">
-        <img src="{{ url_for('static', filename='images/main.png') }}" alt="Study-and-Learn Hero" class="hero-image">
+        <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Study-and-Learn Hero" class="hero-image">
         <p class="hero-tagline">
             Study-and-Learn helps you convert uploaded materials into structured, interactive study paths.
         </p>
     </div>
 
     <div class="fb-auth-col">
-        <h1 class="mt-4">Log In</h1>
+        <h1 class="mt-4">Welcome!</h1>
         <div class="auth-card">
             <form action="{{ url_for('main.login') }}" method="POST">
                 <div class="mb-3">

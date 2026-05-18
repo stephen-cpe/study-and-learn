@@ -4,7 +4,7 @@ Route definitions for the Study-and-Learn MVP.
 import os
 import uuid
 from flask import (Blueprint, render_template, request, redirect,
-                   url_for, flash, session, current_app, jsonify)
+                   url_for, flash, session, current_app, jsonify, abort)
 from src.utils import allowed_file
 from src.services.document_parser import extract_text
 from src.services.summarizer import generate_summary
@@ -13,10 +13,10 @@ from src.services.curriculum_generator import generate_study_path
 from src.services.rag_retriever import build_rag_context
 from src.services.lesson_orchestrator import make_retriever, build_module_artifacts
 from src.services.grader import _grade_single_question, _get_correct_answer
-from src.repositories.session_repo import get_lessons, save_lessons
+from src.repositories.lesson_repo import get_lessons, save_lessons
 from src.services import progress_tracker
-from flask_login import login_user, logout_user
-from src.models import User
+from flask_login import login_user, logout_user, login_required, current_user
+from src.models import User, StudyPath, LessonProgress
 from src import db
 
 bp = Blueprint('main', __name__)
@@ -183,7 +183,12 @@ def progress():
 
 
 @bp.route('/generate-lessons', methods=['POST'])
+@login_required
 def generate_lessons():
+    if not current_user.is_admin and not current_user.can_generate_lessons:
+        flash('Lesson generation is disabled for your account. Contact an admin to enable access.', 'error')
+        return redirect(url_for('main.dashboard'))
+
     learning_goal = session.get('learning_goal', '')
     study_path = session.get('study_path', {})
 
@@ -191,12 +196,19 @@ def generate_lessons():
         flash('No study path found. Please upload materials first.', 'error')
         return redirect(url_for('main.index'))
 
+    existing_path = StudyPath.query.filter_by(
+        user_id=current_user.id, status='active'
+    ).first()
+    if existing_path is None and not current_user.can_start_new_lesson():
+        flash('You already have 3 active lessons. Complete or abandon one before starting a new one.', 'error')
+        return redirect(url_for('main.results'))
+
     body = request.get_json(silent=True) or {}
     task_id = body.get('task_id', '') or session.sid
     progress_tracker.create_task(task_id=task_id)
 
     modules = study_path['modules']
-    lessons = get_lessons()
+    lessons = get_lessons(current_user)
 
     extracted_texts = session.get('extracted_texts', [])
     retriever = make_retriever(learning_goal, extracted_texts)
@@ -222,15 +234,18 @@ def generate_lessons():
 
     progress_tracker.update_progress(task_id, 4)
 
-    save_lessons(lessons)
+    save_lessons(lessons, current_user,
+                 title=study_path.get('title', learning_goal[:50]),
+                 learning_goal=learning_goal)
 
     flash(f'Generated {len(modules)} lessons successfully!', 'success')
     return redirect(url_for('main.lessons'))
 
 
 @bp.route('/lessons')
+@login_required
 def lessons():
-    lessons_data = get_lessons()
+    lessons_data = get_lessons(current_user)
     if not lessons_data:
         flash('No lessons generated yet. Generate lessons from your results first.', 'info')
         return redirect(url_for('main.results'))
@@ -248,8 +263,9 @@ def lessons():
 
 
 @bp.route('/lessons/<int:module_index>')
+@login_required
 def lesson_deck(module_index):
-    lessons_data = get_lessons()
+    lessons_data = get_lessons(current_user)
     if not lessons_data:
         flash('No lessons generated yet.', 'error')
         return redirect(url_for('main.results'))
@@ -273,8 +289,9 @@ def lesson_deck(module_index):
 
 
 @bp.route('/lessons/<int:module_index>/grade', methods=['POST'])
+@login_required
 def grade_lesson(module_index):
-    lessons_data = get_lessons()
+    lessons_data = get_lessons(current_user)
     if not lessons_data:
         return jsonify({'error': 'No lessons found'}), 404
 
@@ -335,7 +352,7 @@ def grade_lesson(module_index):
     lessons_data[module_index]['completed'] = True
     lessons_data[module_index]['score'] = score_pct
     lessons_data[module_index]['passed'] = passed
-    save_lessons(lessons_data)
+    save_lessons(lessons_data, current_user)
 
     return jsonify({
         'score': score_pct,
@@ -349,8 +366,9 @@ def grade_lesson(module_index):
 
 
 @bp.route('/lessons/<int:module_index>/retake', methods=['POST'])
+@login_required
 def retake_lesson(module_index):
-    lessons_data = get_lessons()
+    lessons_data = get_lessons(current_user)
     if not lessons_data:
         return jsonify({'error': 'No lessons found'}), 404
 
@@ -377,7 +395,7 @@ def retake_lesson(module_index):
     lessons_data[module_index]['completed'] = False
     lessons_data[module_index]['score'] = None
     lessons_data[module_index]['passed'] = False
-    save_lessons(lessons_data)
+    save_lessons(lessons_data, current_user)
 
     return jsonify({'success': True})
 
@@ -435,3 +453,95 @@ def logout():
     logout_user()
     flash('You have been logged out.', 'success')
     return redirect(url_for('main.index'))
+
+
+@bp.route('/dashboard')
+@login_required
+def dashboard():
+    active_paths = StudyPath.query.filter_by(
+        user_id=current_user.id, status='active'
+    ).order_by(StudyPath.created_at.desc()).all()
+
+    paths_data = []
+    for path in active_paths:
+        progress_rows = LessonProgress.query.filter_by(
+            study_path_id=path.id
+        ).all()
+        total_modules = len(progress_rows)
+        completed_modules = sum(1 for r in progress_rows if r.passed)
+        pct = (
+            round((completed_modules / total_modules) * 100)
+            if total_modules > 0 else 0
+        )
+        paths_data.append({
+            'id': path.id,
+            'title': path.title,
+            'learning_goal': path.learning_goal,
+            'created_at': path.created_at,
+            'total_modules': total_modules,
+            'completed_modules': completed_modules,
+            'progress_pct': pct,
+        })
+
+    return render_template(
+        'dashboard.html',
+        paths=paths_data,
+        at_cap=current_user.active_lesson_count >= 3,
+    )
+
+
+@bp.route('/study-path/<path_id>/cancel', methods=['POST'])
+@login_required
+def cancel_study_path(path_id):
+    path = StudyPath.query.filter_by(id=path_id, user_id=current_user.id).first()
+    if not path:
+        flash('Study path not found.', 'error')
+        return redirect(url_for('main.dashboard'))
+
+    path.status = 'cancelled'
+    db.session.commit()
+    flash(f'"{path.title}" has been cancelled.', 'success')
+    return redirect(url_for('main.dashboard'))
+
+
+@bp.route('/admin/toggle/<user_id>')
+@login_required
+def admin_toggle_generation(user_id):
+    if not current_user.is_admin:
+        abort(403)
+
+    target = User.query.get(user_id)
+    if not target:
+        flash('User not found.', 'error')
+        return redirect(url_for('main.dashboard'))
+
+    target.can_generate_lessons = not target.can_generate_lessons
+    db.session.commit()
+    status = 'enabled' if target.can_generate_lessons else 'disabled'
+    flash(f'Lesson generation {status} for {target.username}.', 'success')
+    return redirect(url_for('main.dashboard'))
+
+
+@bp.route('/seed-demo')
+@login_required
+def seed_demo():
+    if not current_user.is_admin:
+        abort(403)
+
+    created = []
+    for username, password in [('alice', 'demo123'), ('bob', 'demo123')]:
+        existing = User.query.filter_by(username=username).first()
+        if not existing:
+            user = User(username=username, email=f'{username}@example.com',
+                        can_generate_lessons=True)
+            user.set_password(password)
+            db.session.add(user)
+            created.append(username)
+
+    if created:
+        db.session.commit()
+        flash(f'Demo accounts seeded: {", ".join(created)}.', 'success')
+    else:
+        flash('Demo accounts already exist.', 'info')
+
+    return redirect(url_for('main.dashboard'))

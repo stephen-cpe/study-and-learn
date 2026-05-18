@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Study-and-Learn{% endblock %}</title>
-    <link rel="icon" type="image/png" href="{% block favicon %}{{ url_for('static', filename='images/logo.png') }}{% endblock %}">
+    <link rel="icon" type="image/png" href="{% block favicon %}{{ url_for('static', filename='images/favicon.png') }}{% endblock %}">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/retro.css') }}">
     {% block extra_head %}{% endblock %}
@@ -19,15 +19,18 @@
                 <span class="brand-title">Study-and-Learn</span>
             </a>
             {% if current_user.is_authenticated %}
-            <div class="dropdown">
-                <a href="#" class="user-avatar-toggle d-flex align-items-center" data-bs-toggle="dropdown" aria-expanded="false">
-                    <img src="{{ url_for('static', filename='images/avatar.png') }}" alt="User Avatar" class="user-avatar">
-                </a>
-                <ul class="dropdown-menu dropdown-menu-end retro-dropdown-menu">
-                    <li><span class="dropdown-item-text">Hi, {{ current_user.username }}!</span></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="{{ url_for('main.logout') }}">Logout</a></li>
-                </ul>
+            <div class="d-flex align-items-center gap-3">
+                <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-primary btn-sm nav-dashboard-btn">Dashboard</a>
+                <div class="dropdown">
+                    <a href="#" class="user-avatar-toggle d-flex align-items-center" data-bs-toggle="dropdown" aria-expanded="false">
+                        <img src="{{ url_for('static', filename='images/avatar.png') }}" alt="User Avatar" class="user-avatar">
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end retro-dropdown-menu">
+                        <li><span class="dropdown-item-text">Hi, {{ current_user.username }}!</span></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ url_for('main.logout') }}">Logout</a></li>
+                    </ul>
+                </div>
             </div>
             {% endif %}
         </div>
