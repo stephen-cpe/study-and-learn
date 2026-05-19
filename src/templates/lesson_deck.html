@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/study-and-learn.css') }}">
 </head>
 <body>
-    <div class="deck-container" data-module-index="{{ module_index }}">
+    <div class="deck-container" data-module-index="{{ module_index }}" data-path-id="{{ path_id or '' }}">
         <div class="slides-wrapper">
 
             {% set slides = lesson.lesson.slides if lesson.lesson and lesson.lesson.slides else [] %}
@@ -135,7 +135,7 @@
 
                     <div class="results-actions">
                         <button class="btn-retake" id="btn-retake" style="display: none;">Retake Lesson</button>
-                        <a class="btn-modules" href="{{ url_for('main.lessons') }}">Back to Modules</a>
+                        <a class="btn-modules" href="{{ url_for('main.lessons', path_id=path_id) }}">Back to Modules</a>
                     </div>
                 </div>
             </section>

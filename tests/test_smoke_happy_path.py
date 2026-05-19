@@ -85,8 +85,11 @@ def test_full_happy_path_mocked(client):
 
     # 3) Trigger lesson generation
     rv = client.post('/generate-lessons')
-    assert rv.status_code == 302
-    rv = client.get('/lessons')
+    assert rv.status_code == 200
+    import json
+    redirect_url = rv.get_json().get('redirect', '')
+    assert redirect_url, 'Expected redirect URL in generate-lessons response'
+    rv = client.get(redirect_url)
     assert rv.status_code == 200
     assert b'pass' in rv.data.lower() or b'module' in rv.data.lower()
 

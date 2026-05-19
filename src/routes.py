@@ -13,7 +13,10 @@ from src.services.curriculum_generator import generate_study_path
 from src.services.rag_retriever import build_rag_context
 from src.services.lesson_orchestrator import make_retriever, build_module_artifacts
 from src.services.grader import _grade_single_question, _get_correct_answer
-from src.repositories.lesson_repo import get_lessons, save_lessons
+from src.repositories.lesson_repo import (
+    get_lessons, save_lessons, get_extracted_texts, get_learning_goal,
+    get_study_path_data, get_active_path
+)
 from src.services import progress_tracker
 from flask_login import login_user, logout_user, login_required, current_user
 from src.models import User, StudyPath, LessonProgress
@@ -26,9 +29,28 @@ MAX_FILES = 5
 PASS_THRESHOLD = 80
 
 
+def _get_goal():
+    """Return the current learning goal, preferring session, falling back to DB."""
+    from_session = session.get('learning_goal', '')
+    if from_session:
+        return from_session
+    return get_learning_goal(current_user) or ''
+
+
+def _get_texts():
+    """Return extracted texts, preferring session, falling back to DB."""
+    texts = session.get('extracted_texts', [])
+    if texts:
+        return texts
+    return get_extracted_texts(current_user) or []
+
+
 @bp.route('/')
 def index():
-    return render_template('index.html')
+    goal = None
+    if current_user.is_authenticated:
+        goal = _get_goal()
+    return render_template('index.html', learning_goal=goal)
 
 
 @bp.route('/process', methods=['POST'])
@@ -128,6 +150,12 @@ def process():
         session['uploaded_filenames'] = filenames
         session['extracted_texts'] = extracted_texts
 
+        if current_user.is_authenticated:
+            path_title = study_path.get('title', goal[:50])
+            path_goal = goal
+            save_lessons([], current_user, title=path_title,
+                         learning_goal=path_goal, extracted_texts=extracted_texts)
+
         if is_ajax:
             progress_tracker.update_progress(task_id, 6)
             progress_tracker.cleanup_task(task_id)
@@ -146,16 +174,21 @@ def process():
 
 @bp.route('/results')
 def results():
-    if 'summary' not in session:
-        flash('No results to display. Please upload a file first.', 'info')
-        return redirect(url_for('main.index'))
-
     summary = session.get('summary', '')
     relevance_result = session.get('relevance_result', {})
     study_path = session.get('study_path', {})
     filename = session.get('processed_filename', 'unknown file')
     filenames = session.get('uploaded_filenames', [])
     learning_goal = session.get('learning_goal', '')
+
+    if not summary and current_user.is_authenticated:
+        goal = get_learning_goal(current_user)
+        if goal:
+            learning_goal = goal
+
+    if not summary:
+        flash('No results to display. Please upload a file first.', 'info')
+        return redirect(url_for('main.index'))
 
     return render_template('results.html',
                            summary=summary,
@@ -168,6 +201,12 @@ def results():
 
 @bp.route('/reset')
 def reset():
+    if current_user.is_authenticated:
+        for path in StudyPath.query.filter_by(
+            user_id=current_user.id, status='active'
+        ).all():
+            path.status = 'cancelled'
+        db.session.commit()
     session.clear()
     flash('Session reset. You can start over.', 'info')
     return redirect(url_for('main.index'))
@@ -192,16 +231,19 @@ def generate_lessons():
     learning_goal = session.get('learning_goal', '')
     study_path = session.get('study_path', {})
 
+    if (not learning_goal or not study_path.get('modules')) and current_user.is_authenticated:
+        learning_goal = get_learning_goal(current_user) or ''
+        study_path = get_study_path_data(current_user) or {}
+
     if not learning_goal or not study_path.get('modules'):
         flash('No study path found. Please upload materials first.', 'error')
         return redirect(url_for('main.index'))
 
-    existing_path = StudyPath.query.filter_by(
-        user_id=current_user.id, status='active'
-    ).first()
-    if existing_path is None and not current_user.can_start_new_lesson():
+    active_count = current_user.active_lesson_count
+    existing_path = get_active_path(current_user)
+    if existing_path is None and active_count >= 3:
         flash('You already have 3 active lessons. Complete or abandon one before starting a new one.', 'error')
-        return redirect(url_for('main.results'))
+        return redirect(url_for('main.dashboard'))
 
     body = request.get_json(silent=True) or {}
     task_id = body.get('task_id', '') or session.sid
@@ -210,7 +252,7 @@ def generate_lessons():
     modules = study_path['modules']
     lessons = get_lessons(current_user)
 
-    extracted_texts = session.get('extracted_texts', [])
+    extracted_texts = _get_texts()
     retriever = make_retriever(learning_goal, extracted_texts)
 
     progress_tracker.update_progress(task_id, 1)
@@ -236,16 +278,18 @@ def generate_lessons():
 
     save_lessons(lessons, current_user,
                  title=study_path.get('title', learning_goal[:50]),
-                 learning_goal=learning_goal)
+                 learning_goal=learning_goal,
+                 extracted_texts=extracted_texts)
 
     flash(f'Generated {len(modules)} lessons successfully!', 'success')
-    return redirect(url_for('main.lessons'))
+    return jsonify({'redirect': url_for('main.lessons')})
 
 
 @bp.route('/lessons')
 @login_required
 def lessons():
-    lessons_data = get_lessons(current_user)
+    path_id = request.args.get('path_id', None)
+    lessons_data = get_lessons(current_user, path_id=path_id)
     if not lessons_data:
         flash('No lessons generated yet. Generate lessons from your results first.', 'info')
         return redirect(url_for('main.results'))
@@ -259,13 +303,15 @@ def lessons():
 
     return render_template('lessons.html',
                            lessons=lessons_data,
-                           pass_threshold=PASS_THRESHOLD)
+                           pass_threshold=PASS_THRESHOLD,
+                           path_id=path_id)
 
 
 @bp.route('/lessons/<int:module_index>')
 @login_required
 def lesson_deck(module_index):
-    lessons_data = get_lessons(current_user)
+    path_id = request.args.get('path_id', None)
+    lessons_data = get_lessons(current_user, path_id=path_id)
     if not lessons_data:
         flash('No lessons generated yet.', 'error')
         return redirect(url_for('main.results'))
@@ -285,13 +331,15 @@ def lesson_deck(module_index):
                            lesson=lesson,
                            module_index=module_index,
                            total_modules=len(lessons_data),
-                           pass_threshold=PASS_THRESHOLD)
+                           pass_threshold=PASS_THRESHOLD,
+                           path_id=path_id)
 
 
 @bp.route('/lessons/<int:module_index>/grade', methods=['POST'])
 @login_required
 def grade_lesson(module_index):
-    lessons_data = get_lessons(current_user)
+    path_id = request.args.get('path_id', None)
+    lessons_data = get_lessons(current_user, path_id=path_id)
     if not lessons_data:
         return jsonify({'error': 'No lessons found'}), 404
 
@@ -368,7 +416,8 @@ def grade_lesson(module_index):
 @bp.route('/lessons/<int:module_index>/retake', methods=['POST'])
 @login_required
 def retake_lesson(module_index):
-    lessons_data = get_lessons(current_user)
+    path_id = request.args.get('path_id', None)
+    lessons_data = get_lessons(current_user, path_id=path_id)
     if not lessons_data:
         return jsonify({'error': 'No lessons found'}), 404
 
@@ -378,8 +427,8 @@ def retake_lesson(module_index):
     lesson = lessons_data[module_index]
     module_title = lesson.get('module_title', '')
     slides = lesson.get('lesson', {}).get('slides', [])
-    learning_goal = session.get('learning_goal', '')
-    extracted_texts = session.get('extracted_texts', [])
+    learning_goal = _get_goal()
+    extracted_texts = _get_texts()
 
     retriever = make_retriever(learning_goal, extracted_texts)
 

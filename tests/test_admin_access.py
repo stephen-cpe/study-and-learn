@@ -85,9 +85,11 @@ def test_can_generate_lessons_user_can_access(monkeypatch, client):
     db.session.commit()
 
     _set_study_path_in_session(client)
-    rv = client.post('/generate-lessons', follow_redirects=True)
+    rv = client.post('/generate-lessons')
     assert rv.status_code == 200
-    assert b'Generated' in rv.data
+    data = rv.get_json()
+    assert data is not None
+    assert '/lessons' in data.get('redirect', '')
 
 
 def test_admin_bypass_generation(monkeypatch, client):
@@ -100,9 +102,11 @@ def test_admin_bypass_generation(monkeypatch, client):
     assert user.can_generate_lessons is False
 
     _set_study_path_in_session(client)
-    rv = client.post('/generate-lessons', follow_redirects=True)
+    rv = client.post('/generate-lessons')
     assert rv.status_code == 200
-    assert b'Generated' in rv.data
+    data = rv.get_json()
+    assert data is not None
+    assert '/lessons' in data.get('redirect', '')
 
 
 def test_admin_toggle_enables_access(client):

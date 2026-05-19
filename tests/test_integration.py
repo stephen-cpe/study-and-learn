@@ -84,9 +84,11 @@ def test_generate_lessons_flow(mock_quiz_ollama, mock_lesson_ollama, client):
         }
         sess['extracted_texts'] = ['Sample text']
 
-    response = client.post('/generate-lessons', follow_redirects=True)
+    response = client.post('/generate-lessons')
     assert response.status_code == 200
-    assert b'Generated' in response.data or b'successfully' in response.data
+    data = response.get_json()
+    assert data is not None
+    assert '/lessons' in data.get('redirect', '')
 
 
 @patch('src.services.lesson_generator.call_ollama')
@@ -119,9 +121,10 @@ def test_generate_lessons_progress_updates(mock_quiz_ollama, mock_lesson_ollama,
         sess['study_path'] = {'modules': [{'title': 'M1', 'estimated_effort': '1h'}]}
         sess['extracted_texts'] = ['text']
 
-    response = client.post('/generate-lessons', follow_redirects=True)
+    response = client.post('/generate-lessons')
     assert response.status_code == 200
-    assert b'Generated' in response.data or b'successfully' in response.data
+    data = response.get_json()
+    assert data is not None or b'Generated' in response.data or b'successfully' in response.data
 
     progress_resp = client.get('/progress')
     assert progress_resp.status_code == 200

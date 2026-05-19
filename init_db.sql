@@ -33,6 +33,7 @@ CREATE TABLE study_paths (
     learning_goal   TEXT         NOT NULL,
     status          VARCHAR(20)  NOT NULL DEFAULT 'active',
     content_data    TEXT         NULL,
+    extracted_texts TEXT         NULL,
     created_at      TIMESTAMP    NULL,
     updated_at      TIMESTAMP    NULL,
     CONSTRAINT pk_study_paths PRIMARY KEY (id),

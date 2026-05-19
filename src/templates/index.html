@@ -48,7 +48,7 @@
             <label for="learning_goal" class="form-label">What do you want to learn?</label>
             <input type="text" class="form-control form-control-lg" id="learning_goal" name="learning_goal"
                    placeholder="e.g., Learn about machine learning algorithms"
-                   value="{{ session.learning_goal or '' }}" required>
+                   value="{{ learning_goal or '' }}" required>
             <div class="form-text">Describe your learning goal clearly to get the best results</div>
         </div>
 
@@ -71,12 +71,12 @@
     </form>
 </div>
 
-{% if session.learning_goal %}
+{% if learning_goal %}
 <div class="form-section current-goal-section">
     <h2 class="section-title mb-3">Current Learning Goal</h2>
     <div class="current-goal-display">
         <span class="hex-accent"></span>
-        <span class="goal-text">{{ session.learning_goal }}</span>
+        <span class="goal-text">{{ learning_goal }}</span>
         <span class="hex-accent"></span>
     </div>
 </div>

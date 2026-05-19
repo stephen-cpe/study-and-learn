@@ -41,7 +41,7 @@
             </div>
 
             <div class="path-actions">
-                <a href="{{ url_for('main.lessons') }}" class="btn btn-primary">View Lessons</a>
+                <a href="{{ url_for('main.lessons', path_id=path.id) }}" class="btn btn-primary">View Lessons</a>
                 <form method="POST" action="{{ url_for('main.cancel_study_path', path_id=path.id) }}" style="display:inline;"
                       onsubmit="return confirm('Cancel &quot;{{ path.title }}&quot;? This cannot be undone.')">
                     <button type="submit" class="btn btn-danger-cancel">Cancel / Abandon</button>

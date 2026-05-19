@@ -3,12 +3,18 @@
 
   /* ── Helpers ─────────────────────────────────────────── */
 
+  var pathId = null;
   var moduleIndex = null;
   var checkpointAnswers = {};
 
   function getModuleIndex() {
     var el = document.querySelector('.deck-container');
     return el ? parseInt(el.dataset.moduleIndex) : null;
+  }
+
+  function getPathId() {
+    var el = document.querySelector('.deck-container');
+    return el ? (el.dataset.pathId || null) : null;
   }
 
   /* ── Format slide text (lesson_deck) ─────────────────── */
@@ -179,7 +185,9 @@
     });
 
     window.gradeCheckpoint = function (slideIndex, userValue, feedbackEl, callback) {
-      fetch('/lessons/' + moduleIndex + '/grade', {
+      var url = '/lessons/' + moduleIndex + '/grade';
+      if (pathId) url += '?path_id=' + encodeURIComponent(pathId);
+      fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -213,7 +221,9 @@
       if (fillBlankAnswers && Object.keys(fillBlankAnswers).length > 0) {
         body.fill_blank_answers = fillBlankAnswers;
       }
-      fetch('/lessons/' + moduleIndex + '/grade', {
+      var url = '/lessons/' + moduleIndex + '/grade';
+      if (pathId) url += '?path_id=' + encodeURIComponent(pathId);
+      fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
@@ -281,7 +291,8 @@
 
     fetch('/lessons/' + mIdx + '/retake', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path_id: pathId })
     })
       .then(function (r) { return r.json(); })
       .then(function (data) {

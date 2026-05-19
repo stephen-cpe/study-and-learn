@@ -59,6 +59,7 @@ class StudyPath(db.Model):
     learning_goal = db.Column(Text, nullable=False)
     status = db.Column(String(20), default='active', nullable=False)
     content_data = db.Column(db.Text, nullable=True)
+    extracted_texts = db.Column(db.Text, nullable=True)
     created_at = db.Column(DateTime, default=_utcnow)
     updated_at = db.Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
