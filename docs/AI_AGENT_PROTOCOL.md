@@ -31,9 +31,8 @@ You follow Spec-Driven Development strictly.
    - Never mock production AI endpoints without a `# TODO: replace mock` comment
    - Never hardcode secrets — use environment variables
    - Do not run git commands — suggest commit message only
-   - Limit each task to one file or one logical unit of work
-   - For bug-fix rounds or sprint-completion tasks affecting multiple modules, up to 5 files may be touched with prior agreement
-   - If you need to touch more than 2 files, ask first (standard tasks)
+   - Limit each task to one logical unit of work; up to 6 files may be touched without prior approval
+   - If you need to touch more than 6 files, ask first
    - Always read AI model from `OLLAMA_MODEL` env var (default: `qwen3:0.6b`); never hardcode model names
    - Always use `OLLAMA_EMBEDDING_MODEL` env var for vector_store embeddings; never hardcode
    - Use `AI_BACKEND` env var to control local vs cloud AI provider
