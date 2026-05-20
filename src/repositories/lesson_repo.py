@@ -47,7 +47,6 @@ def get_lessons(user=None, path_id: str = None) -> List[Dict[str, Any]]:
 
 
 def get_active_path(user=None) -> Optional[StudyPath]:
-    """Return the user's active StudyPath or None."""
     if user is None:
         user = current_user
     if not user or not user.is_authenticated:
@@ -55,8 +54,15 @@ def get_active_path(user=None) -> Optional[StudyPath]:
     return StudyPath.query.filter_by(user_id=user.id, status='active').first()
 
 
+def get_most_recent_active_path(user=None) -> Optional[StudyPath]:
+    if user is None:
+        user = current_user
+    if not user or not user.is_authenticated:
+        return None
+    return StudyPath.query.filter_by(user_id=user.id, status='active').order_by(StudyPath.created_at.desc()).first()
+
+
 def get_extracted_texts(user=None, path_id: str = None) -> List[str]:
-    """Return persisted extracted texts from the user's active StudyPath."""
     if user is None:
         user = current_user
     if not user or not user.is_authenticated:
@@ -74,7 +80,6 @@ def get_extracted_texts(user=None, path_id: str = None) -> List[str]:
 
 
 def get_learning_goal(user=None, path_id: str = None) -> Optional[str]:
-    """Return the learning goal from the user's active StudyPath."""
     if user is None:
         user = current_user
     if not user or not user.is_authenticated:
@@ -89,11 +94,21 @@ def get_learning_goal(user=None, path_id: str = None) -> Optional[str]:
 
 
 def get_study_path_data(user=None) -> Optional[Dict[str, Any]]:
-    """Return the study_path dict (with modules) from the user's active StudyPath content_data."""
+    """Return the study_path dict (with modules) from the user's most recent active StudyPath."""
     if user is None:
         user = current_user
     if not user or not user.is_authenticated:
         return None
+    path = StudyPath.query.filter_by(user_id=user.id, status='active').order_by(StudyPath.created_at.desc()).first()
+    if not path or not path.content_data:
+        return None
+    try:
+        data = json.loads(path.content_data)
+        if 'modules' in data:
+            return data
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return None
     path = StudyPath.query.filter_by(user_id=user.id, status='active').first()
     if not path or not path.content_data:
         return None
@@ -106,29 +121,40 @@ def get_study_path_data(user=None) -> Optional[Dict[str, Any]]:
     return None
 
 
+def create_study_path(user, title: str, learning_goal: str,
+                      extracted_texts: List[str] = None) -> StudyPath:
+    path = StudyPath(
+        user_id=user.id,
+        title=title,
+        learning_goal=learning_goal,
+        status='active',
+    )
+    if extracted_texts is not None:
+        path.extracted_texts = json.dumps(extracted_texts)
+    db.session.add(path)
+    db.session.commit()
+    return path
+
+
 def save_lessons(lessons: List[Dict[str, Any]], user=None,
                  title: str = None, learning_goal: str = None,
-                 extracted_texts: List[str] = None) -> None:
+                 extracted_texts: List[str] = None,
+                 path_id: str = None) -> None:
     if user is None:
         user = current_user
     if not user or not user.is_authenticated:
         return
 
-    if not title:
-        existing = get_active_path(user)
-        if existing:
-            title = existing.title
-        else:
-            title = 'Study Path'
-    if not learning_goal:
-        existing = get_active_path(user)
-        if existing:
-            learning_goal = existing.learning_goal
-        else:
-            learning_goal = ''
+    if path_id:
+        path = StudyPath.query.filter_by(id=path_id, user_id=user.id).first()
+    else:
+        path = StudyPath.query.filter_by(user_id=user.id, status='active').order_by(StudyPath.created_at.desc()).first()
 
-    path = StudyPath.query.filter_by(user_id=user.id, status='active').first()
     if not path:
+        if not title:
+            title = 'Study Path'
+        if not learning_goal:
+            learning_goal = ''
         path = StudyPath(
             user_id=user.id,
             title=title,
@@ -137,8 +163,10 @@ def save_lessons(lessons: List[Dict[str, Any]], user=None,
         )
         db.session.add(path)
     else:
-        path.title = title
-        path.learning_goal = learning_goal
+        if title:
+            path.title = title
+        if learning_goal:
+            path.learning_goal = learning_goal
 
     path.content_data = json.dumps(lessons)
     if extracted_texts is not None:

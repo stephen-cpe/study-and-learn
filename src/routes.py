@@ -15,7 +15,8 @@ from src.services.lesson_orchestrator import make_retriever, build_module_artifa
 from src.services.grader import _grade_single_question, _get_correct_answer
 from src.repositories.lesson_repo import (
     get_lessons, save_lessons, get_extracted_texts, get_learning_goal,
-    get_study_path_data, get_active_path
+    get_study_path_data, get_active_path, create_study_path,
+    get_most_recent_active_path,
 )
 from src.services import progress_tracker
 from flask_login import login_user, logout_user, login_required, current_user
@@ -34,7 +35,8 @@ def _get_goal():
     from_session = session.get('learning_goal', '')
     if from_session:
         return from_session
-    return get_learning_goal(current_user) or ''
+    path = get_most_recent_active_path(current_user)
+    return path.learning_goal if path else ''
 
 
 def _get_texts():
@@ -47,10 +49,14 @@ def _get_texts():
 
 @bp.route('/')
 def index():
-    goal = None
+    goals = []
     if current_user.is_authenticated:
-        goal = _get_goal()
-    return render_template('index.html', learning_goal=goal)
+        paths = StudyPath.query.filter_by(
+            user_id=current_user.id, status='active'
+        ).order_by(StudyPath.created_at.desc()).all()
+        goals = [{'id': p.id, 'title': p.learning_goal or p.title} for p in paths]
+    return render_template('index.html', goals=goals,
+                           session_goal=session.get('learning_goal', ''))
 
 
 @bp.route('/process', methods=['POST'])
@@ -152,9 +158,8 @@ def process():
 
         if current_user.is_authenticated:
             path_title = study_path.get('title', goal[:50])
-            path_goal = goal
-            save_lessons([], current_user, title=path_title,
-                         learning_goal=path_goal, extracted_texts=extracted_texts)
+            create_study_path(current_user, path_title, goal,
+                              extracted_texts=extracted_texts)
 
         if is_ajax:
             progress_tracker.update_progress(task_id, 6)
@@ -250,7 +255,10 @@ def generate_lessons():
     progress_tracker.create_task(task_id=task_id)
 
     modules = study_path['modules']
-    lessons = get_lessons(current_user)
+
+    most_recent = get_most_recent_active_path(current_user)
+    path_id_val = most_recent.id if most_recent else None
+    lessons = get_lessons(current_user, path_id=path_id_val)
 
     extracted_texts = _get_texts()
     retriever = make_retriever(learning_goal, extracted_texts)
@@ -279,10 +287,11 @@ def generate_lessons():
     save_lessons(lessons, current_user,
                  title=study_path.get('title', learning_goal[:50]),
                  learning_goal=learning_goal,
-                 extracted_texts=extracted_texts)
+                 extracted_texts=extracted_texts,
+                 path_id=path_id_val)
 
     flash(f'Generated {len(modules)} lessons successfully!', 'success')
-    return jsonify({'redirect': url_for('main.lessons')})
+    return jsonify({'redirect': url_for('main.lessons', path_id=path_id_val)})
 
 
 @bp.route('/lessons')
@@ -400,7 +409,7 @@ def grade_lesson(module_index):
     lessons_data[module_index]['completed'] = True
     lessons_data[module_index]['score'] = score_pct
     lessons_data[module_index]['passed'] = passed
-    save_lessons(lessons_data, current_user)
+    save_lessons(lessons_data, current_user, path_id=path_id)
 
     return jsonify({
         'score': score_pct,
@@ -444,7 +453,7 @@ def retake_lesson(module_index):
     lessons_data[module_index]['completed'] = False
     lessons_data[module_index]['score'] = None
     lessons_data[module_index]['passed'] = False
-    save_lessons(lessons_data, current_user)
+    save_lessons(lessons_data, current_user, path_id=path_id)
 
     return jsonify({'success': True})
 
@@ -487,14 +496,19 @@ def login():
 
         user = User.query.filter_by(username=username).first()
         if user and user.check_password(password):
+            for key in ('learning_goal', 'summary', 'relevance_result',
+                        'study_path', 'processed_filename', 'uploaded_filenames',
+                        'extracted_texts'):
+                session.pop(key, None)
             login_user(user, remember=True)
             flash('Welcome back!', 'success')
+            next_page = request.args.get('next')
+            if next_page:
+                return redirect(next_page)
             return redirect(url_for('main.index'))
 
         flash('Invalid username or password.', 'error')
-        return redirect(url_for('main.login'))
-
-    return render_template('login.html')
+        return redirect(url_for('main.index'))
 
 
 @bp.route('/logout')

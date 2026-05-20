@@ -17,6 +17,10 @@
     return el ? (el.dataset.pathId || null) : null;
   }
 
+  /* Initialize from DOM on load */
+  pathId = getPathId();
+  moduleIndex = getModuleIndex();
+
   /* ── Format slide text (lesson_deck) ─────────────────── */
 
   function formatSlideText() {
@@ -389,6 +393,7 @@
   var _receivedValidProgress = false;
   var _progressActive = false;
   var _mascotIntervalId = null;
+  var _generateRedirectUrl = '/lessons';
 
   function generateTaskId() {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -436,7 +441,14 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ task_id: taskId })
-    }).catch(function () {});
+    })
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (resp) {
+        if (resp.redirect) {
+          _generateRedirectUrl = resp.redirect;
+        }
+      })
+      .catch(function () {});
 
     var startTime = Date.now();
     var STALE_TIMEOUT_MS = 60000;
@@ -461,7 +473,7 @@
           showBubbleBar(data.pct);
           if (data.stage >= 4) {
             stopProgressPoll();
-            window.location.href = '/lessons';
+            window.location.href = _generateRedirectUrl;
           }
         })
         .catch(function () {});
