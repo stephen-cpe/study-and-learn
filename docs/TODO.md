@@ -204,11 +204,11 @@ Build the smallest working version first, then iterate:
 **User Stories:** US-032, US-033, US-034, US-035
 
 **Tasks:**
-- [ ] Perform comprehensive UI and UX refinement across all templates and components
-- [ ] Address and resolve known defects across the application
-- [ ] Conduct code-level performance optimization (database queries, AI call efficiency, session management)
-- [ ] Expand automated test coverage; ensure all existing tests continue to pass
-- [ ] Polish dashboard UI with mascot placeholder
+- [x] Perform comprehensive UI and UX refinement across all templates and components
+- [x] Address and resolve known defects across the application
+- [x] Conduct code-level performance optimization (database queries, AI call efficiency, session management)
+- [x] Expand automated test coverage; ensure all existing tests continue to pass
+- [x] Polish dashboard UI with mascot placeholder
 - [ ] Add mascot basic animation frames (idle/waiting/done) — if feasible
 - [ ] Display mascot state changes during loading operations
 - [ ] Integrate Web Speech API or TTS library for lesson narration
@@ -216,8 +216,8 @@ Build the smallest working version first, then iterate:
 - [ ] Generate PDF from completed lesson slides and quiz results
 - [ ] Add PDF export button on completed lesson page
 - [ ] Remove `extracted_texts` from session after lessons generated
-- [ ] Fix bugs discovered during Sprint 5 testing
-- [ ] Run full test suite and maintain 45+ passing tests
+- [x] Fix bugs discovered during Sprint 5 testing
+- [x] Run full test suite and maintain 143+ passing tests
 - [ ] Update task board with sprint progress
 
 **Sprint 6 Definition of Done:**
@@ -371,9 +371,9 @@ Build the smallest working version first, then iterate:
 - [x] Learner dashboard with progress tracking (Sprint 5)
 - [x] Max 3 active lessons gating (Sprint 5)
 - [x] Admin access control (Sprint 5)
-- [ ] UI and UX refinement (Sprint 6)
-- [ ] Defect remediation and performance optimization (Sprint 6)
-- [ ] Expanded test coverage (Sprint 6)
+- [x] UI and UX refinement (Sprint 6)
+- [x] Defect remediation and performance optimization (Sprint 6)
+- [x] Expanded test coverage (Sprint 6)
 - [ ] TTS narration (opt-in) (Sprint 6)
 - [ ] PDF export for completed lessons (Sprint 6)
 - [ ] Mascot animation frames (Sprint 6)

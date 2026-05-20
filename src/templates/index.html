@@ -40,7 +40,8 @@
 </div>
 
 {% else %}
-<!-- Authenticated: Show existing learning form -->
+<!-- Authenticated: Check access level -->
+{% if current_user.is_admin or current_user.can_generate_lessons %}
 <div class="form-section">
     <h2 class="section-title mb-4">Start Your Learning Journey</h2>
     <form id="unified-form" action="{{ url_for('main.process') }}" method="POST" enctype="multipart/form-data">
@@ -82,6 +83,18 @@
         </a>
     </div>
     {% endfor %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="access-denied-section">
+    <h2 class="section-title mb-4">Access Restricted</h2>
+    <p class="access-denied-text">
+        Your account does not have lesson generation privileges. Please reach out to the administrator to request access to this application.
+    </p>
+    <div class="access-denied-actions">
+        <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-primary">View Dashboard</a>
+    </div>
 </div>
 {% endif %}
 

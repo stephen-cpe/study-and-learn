@@ -28,6 +28,7 @@
                     <ul class="dropdown-menu dropdown-menu-end retro-dropdown-menu">
                         <li><span class="dropdown-item-text">Hi, {{ current_user.username }}!</span></li>
                         <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ url_for('main.reset_password') }}">Reset Password</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('main.logout') }}">Logout</a></li>
                     </ul>
                 </div>

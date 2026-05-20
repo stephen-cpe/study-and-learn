@@ -1,7 +1,7 @@
 # Design and Testing Document
 # Study-and-Learn
 
-**Version:** 0.2  
+**Version:** 0.3  
 **Status:** Living document  
 **Last updated:** May 2026
 
@@ -122,7 +122,9 @@ Core workflow:
 
 **Decision (Phase 2 — Sprint 5):** Replace the session-backed lesson storage with a PostgreSQL-backed `LessonRepository` using `StudyPath` and `LessonProgress` models.
 
-**Reason:** User accounts (Sprint 5) introduced persistent identity, making session-only lesson storage insufficient. A DB-backed repository (`lesson_repo.py`) persists lesson content (`StudyPath.content_data`) and per-module progress (`LessonProgress` rows) across sessions and server restarts. The repository seam pattern (`get_lessons()` / `save_lessons()`) was retained so that the storage backend can be swapped again in the future without changing route logic. Tradeoffs: ✅ Persistent across restarts, enables per-user lesson gating, progress tracking • ❌ Adds DB dependency for lesson storage, requires migration.
+**Reason:** User accounts (Sprint 5) introduced persistent identity, making session-only lesson storage insufficient. A DB-backed repository (`lesson_repo.py`) persists lesson content (`StudyPath.content_data`), extracted text corpora (`StudyPath.extracted_texts`), and per-module progress (`LessonProgress` rows) across sessions and server restarts. The repository seam pattern (`get_lessons()` / `save_lessons()`) was retained so that the storage backend can be swapped again in the future without changing route logic.
+
+**Post-Sprint 5 Update:** Multi-path support was added in Sprint 5 bug-fix rounds. Each learning goal creates an independent `StudyPath` row (via `create_study_path()`), enabling users to maintain up to 3 active study paths simultaneously. All lesson routes are path-aware (accept `path_id` query parameter), and the dashboard renders a navigable grid of all active paths with per-path progress bars. `save_lessons()` targets a specific path when `path_id` is provided; without it, falls back to the most recently created active path. Tradeoffs: ✅ Persistent across restarts, enables per-user lesson gating, multi-path navigation, progress tracking • ❌ Adds DB dependency for lesson storage, requires migration.
 
 ### ADR-011: Sequential Lesson Generation with Progress Feedback
 
@@ -147,6 +149,18 @@ Core workflow:
 **Decision:** On lesson retake, regenerate entirely new quiz questions and checkpoints rather than reusing the originals.
 
 **Reason:** Reusing the same questions on retake allows learners to memorize answers without understanding the material — the worst pedagogical outcome. Regenerating questions each retake tests real comprehension and is pedagogically strongest. The tradeoff is additional Ollama calls and generation time per retake, but this is acceptable on a per-module basis (5 questions + ~2 checkpoints per retake, < 60 seconds each on qwen3:0.6b).
+
+### ADR-015: Multi-Path Study Support (Independent StudyPath per Learning Goal)
+
+**Decision:** Each learning goal processed via `POST /process` creates an independent `StudyPath` row (via `create_study_path()`), enabling up to 3 concurrent active study paths per user.
+
+**Reason:** Sprint 5 testing revealed that the initial single-path architecture overwrote previous learning goals when a new one was processed. Multi-path support allows learners to study multiple subjects simultaneously (e.g., "Computer Science" and "Software Engineering") with independent progress tracking per subject. The dashboard renders all active paths as a navigable grid, and all lesson routes accept a `path_id` query parameter to target specific paths. The session-leak bug (user A's session data appearing for user B) was also fixed by clearing session data on login rather than logout. Tradeoffs: ✅ Multi-subject study, independent progress, cleaner UX • ❌ More DB rows, path-aware routing complexity.
+
+### ADR-016: Admin Panel, Access Control, Password Reset, and Error Handlers
+
+**Decision:** Add an admin-only dashboard (`/admin`), per-user lesson generation toggle, self-service password reset, admin-initiated password reset, custom HTTP error pages, and a 3-tier access model (unauthenticated / privileged / unprivileged).
+
+**Reason:** Sprint 5 introduced user accounts but left admin functionality incomplete. Admins need a centralized view to manage user access (toggle `can_generate_lessons`, reset passwords). The access model was refined to three tiers: unauthenticated users see the login form, privileged users (`can_generate_lessons=True` or `is_admin=True`) see the full learning form, and unprivileged users see an access-denied message. Custom error handlers (400/403/404/500) provide retro-themed error pages instead of raw Werkzeug debug output. Tradeoffs: ✅ Role-based access control, user management, polished error UX • ❌ Removed dead `login.html` template (index.html handles unauthenticated login inline).
 
 ---
 
@@ -194,7 +208,7 @@ Integration tests cover routes and workflow behavior:
 - mocked generate-lessons flow: session data → lesson + quiz generation → redirect,
 - lesson deck route with pre-populated session lessons returns 200.
 
-Current test suite: **60+ tests covering core MVP, 17 additional Sprint 5 tests for auth, models, dashboard, lesson repository, and admin access — 0 failures**.
+Current test suite: **143 tests across 18 test modules covering core MVP, auth, models, dashboard, lesson repository, admin access, multi-path workflows, and access control — 0 failures**.
 
 ### Smoke Tests
 
@@ -283,5 +297,6 @@ Recommendation: Deploy to Render/Railway free tier with `AI_MOCK=true` for gradi
 | Scope creep | Missed MVP | Keep optional features outside official sprint goals |
 | Deployment resource limits | App unavailable | Test deployment early; maintain `AI_MOCK=true` path for free-tier hosting without GPU |
 | AI output inconsistency | Poor demo | Use controlled sample documents and structured prompts |
-| PostgreSQL privilege issues on live DB | Blocked migrations | Document `init_db.sql` workaround and `GRANT CREATE` procedure |
+| PostgreSQL privilege issues on live DB | Blocked migrations | Document `init_db.sql` workaround (includes DROP IF EXISTS + full schema + seed accounts) and `GRANT CREATE` procedure |
+| Session leakage between users | User A sees User B's data after logout/login swap | Fixed in Sprint 5 bug-fix rounds: clear session-scoped keys on login via `session.pop()` |
 | HuggingFace model evaluation inconclusive | Cloud deployment uncertainty | Maintain Ollama as primary path; document HF findings for future reference

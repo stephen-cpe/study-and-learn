@@ -6,7 +6,7 @@
 - **Stack:** Python 3.13, Flask, Flask-Session (cachelib), Bootstrap 5, PostgreSQL, pytest, LangChain, ChromaDB, Ollama (configurable chat + embedding models), GitHub Actions (CI)
 - **Structure:** See SRS.md for requirements. See TODO.md for sprint tasks. See DESIGN_AND_TESTING.md for ADRs and architecture. See docs/STATUS.md for current state.
 - **Repo root:** study-and-learn/
-- **Key rules:** No chat UI. Forms and result pages only. Custom CSS/JS slide deck (no reveal.js). Retro cyberpunk theme with Retrograde Bold and BoldPixels fonts. PostgreSQL-only database. Flask-Session for cookie sessions; DB-backed lesson repository for lesson/progress persistence.
+- **Key rules:** No chat UI. Forms and result pages only. Custom CSS/JS slide deck (no reveal.js). Retro cyberpunk theme with Retrograde Bold and BoldPixels fonts. PostgreSQL-only database. Flask-Session (cachelib FileSystemCache) for transient form data; DB-backed lesson repository (PostgreSQL StudyPath + LessonProgress + extracted_texts) for lesson/progress persistence.
 
 ## Role
 You are a senior full-stack Python/Flask developer and test-driven engineer.
@@ -32,7 +32,8 @@ You follow Spec-Driven Development strictly.
    - Never hardcode secrets — use environment variables
    - Do not run git commands — suggest commit message only
    - Limit each task to one file or one logical unit of work
-   - If you need to touch more than 2 files, ask first
+   - For bug-fix rounds or sprint-completion tasks affecting multiple modules, up to 5 files may be touched with prior agreement
+   - If you need to touch more than 2 files, ask first (standard tasks)
    - Always read AI model from `OLLAMA_MODEL` env var (default: `qwen3:0.6b`); never hardcode model names
    - Always use `OLLAMA_EMBEDDING_MODEL` env var for vector_store embeddings; never hardcode
    - Use `AI_BACKEND` env var to control local vs cloud AI provider

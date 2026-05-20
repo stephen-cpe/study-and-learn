@@ -513,14 +513,18 @@ Ranked from easier to harder. Items above the line are implemented; items below 
 21. Codebase refactoring (orchestrator/grader/repo seams) — done
 22. AI_BACKEND env var indirection — done
 
+23. Admin panel with user management — done (admin.html, per-user toggle, password reset, seed-demo)
+24. Access-denied page for unprivileged users — done (3-tier access model on index.html)
+25. Custom error handlers (400/403/404/500) — done (error.html with retro theme)
+26. Password reset (self-service + admin-initiated) — done (/reset-password, /admin/reset-password)
+27. Multi-path study support — done (independent StudyPath per learning goal, up to 3 concurrent)
+28. Session leakage fix (user A's data appearing for user B) — done (session.pop on login)
+
 ### Sprint 6 (Planned)
-23. UI and UX refinement across all views
-24. Defect remediation and performance optimization
-25. Expanded automated test coverage
-26. Text-to-speech narration (opt-in)
-27. PDF export for completed lessons
-28. Mascot animation frames (idle/waiting/done)
-29. Session cleanup (remove extracted_texts after lessons generated)
+29. Mascot animation frames (idle/waiting/done)
+30. Text-to-speech narration (opt-in)
+31. PDF export for completed lessons
+32. Session cleanup (remove extracted_texts after lessons generated)
 
 ### Sprint 7 (Planned)
 30. OCR for scanned PDFs (Tesseract or HuggingFace vision-language models)

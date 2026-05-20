@@ -1,15 +1,14 @@
 # STATUS.md
 Last Updated: 2026-05-18
-Sprint: 5
-Last Task Completed: Sprint 5 Bug Fix Round 3 — Session leak between users, multi-goal index page, path-aware redirects, JS pathId initialization
-Commit Message Suggestion: fix(session): clear session on logout, show all active goals on index, path-aware generate redirect, init pathId from DOM
+Sprint: 6
+Last Task Completed: Sprint 6 Phase 1 — Admin Panel, Password Reset, Access Control, Error Handlers, delete dead login.html
+Commit Message Suggestion: feat(sprint6): admin panel with user management, password reset (self + admin), access-denied for unprivileged users, custom error pages, remove dead login.html
 Known Issues:
   - AI output consistency: qwen3:0.6b is placeholder-only; upgrade to gemma3:12b-cloud for production quality
-  - Mascot animation: Image placed (done), animation frames deferred to Sprint 6
-  - DB migration needed for existing databases: `extracted_texts` column added to study_paths; use `init_db.sql` for fresh install
+  - Mascot animation: Image placed (done), animation frames deferred
 Pending Decisions:
   - Deployment target: Confirm Render vs Railway free tier for final submission (Sprint 8)
 Next 3 Tasks:
-  1. Admin dashboard (admin.html) with user management interface
-  2. Access-denied page for users without generate privileges
-  3. Password reset functionality in user dropdown
+  1. Mascot animation frames (idle/waiting/done)
+  2. TTS integration (opt-in narration button on slide deck)
+  3. PDF export for completed lessons

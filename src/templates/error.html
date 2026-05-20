@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}{{ code }} — Study-and-Learn{% endblock %}
+
+{% block content %}
+<div class="error-section text-center" style="padding: 4rem 1rem;">
+    <h1 class="error-code" style="font-size: 6rem; color: var(--az-cyan); font-family: 'BoldPixels', sans-serif; margin-bottom: 0;">{{ code }}</h1>
+    <h2 class="section-title mb-4">{{ message }}</h2>
+    <p style="color: var(--az-muted); font-size: 1.1em; margin-bottom: 2rem;">{{ detail }}</p>
+    <a href="{{ url_for('main.index') }}" class="btn btn-primary btn-lg">Return Home</a>
+</div>
+{% endblock %}

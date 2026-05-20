@@ -1106,3 +1106,85 @@ h2, .section-title {
     color: var(--az-muted);
     margin-bottom: 1.5rem;
 }
+
+/* ===== ADMIN PANEL ===== */
+.admin-table {
+    border: 1px solid var(--az-border);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.admin-table thead th {
+    background: var(--az-blue-2);
+    color: var(--az-cyan-light);
+    font-family: "BoldPixels", sans-serif;
+    font-size: 0.8em;
+    border-bottom: 2px solid var(--az-cyan);
+}
+
+.admin-table tbody td {
+    color: var(--az-silver);
+    vertical-align: middle;
+}
+
+.badge-admin {
+    background: rgba(0, 180, 216, 0.2);
+    color: var(--az-cyan);
+    border: 1px solid var(--az-cyan);
+}
+
+.badge-user {
+    background: rgba(202, 240, 248, 0.1);
+    color: var(--az-silver);
+    border: 1px solid var(--az-border);
+}
+
+.btn-outline-warning {
+    color: var(--az-warning);
+    border-color: var(--az-warning);
+    border-radius: 8px;
+}
+
+.btn-outline-warning:hover {
+    background: var(--az-warning);
+    color: var(--az-dark);
+}
+
+.btn-warning {
+    background: var(--az-warning);
+    border-color: var(--az-warning);
+    color: var(--az-dark);
+    font-weight: 700;
+    border-radius: 8px;
+}
+
+.btn-warning:hover {
+    background: #ffe08a;
+    border-color: #ffe08a;
+    color: var(--az-dark);
+}
+
+/* ===== ACCESS DENIED ===== */
+.access-denied-section {
+    text-align: center;
+    padding: 3rem 1rem;
+    background: rgba(255, 209, 102, 0.05);
+    border: 1px solid var(--az-warning);
+    border-radius: 18px;
+    margin-top: 2rem;
+}
+
+.access-denied-text {
+    color: var(--az-muted);
+    font-size: 1.1em;
+    max-width: 600px;
+    margin: 0 auto 2rem auto;
+    line-height: 1.6;
+}
+
+.access-denied-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}

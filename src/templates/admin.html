@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Admin — Study-and-Learn{% endblock %}
+
+{% block content %}
+<h1 class="mt-4">Admin Panel</h1>
+<p class="text-center" style="color: var(--az-muted); margin-bottom: 2rem;">
+    Manage users and lesson generation access.
+</p>
+
+<div class="table-responsive">
+    <table class="table table-dark admin-table">
+        <thead>
+            <tr>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Can Generate Lessons</th>
+                <th>Joined</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td>{{ user.username }}</td>
+                <td style="word-break: break-all;">{{ user.email }}</td>
+                <td>
+                    {% if user.is_admin %}
+                    <span class="badge badge-admin">Admin</span>
+                    {% else %}
+                    <span class="badge badge-user">User</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if user.can_generate_lessons %}
+                    <span style="color: var(--az-success);">Yes</span>
+                    {% else %}
+                    <span style="color: var(--az-danger);">No</span>
+                    {% endif %}
+                </td>
+                <td style="white-space: nowrap;">{{ user.created_at.strftime('%b %d, %Y') if user.created_at else 'N/A' }}</td>
+                <td>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <a href="{{ url_for('main.admin_toggle_generation', user_id=user.id) }}" class="btn btn-sm btn-outline-primary">
+                            {% if user.can_generate_lessons %}Revoke{% else %}Allow{% endif %}
+                        </a>
+                        <button class="btn btn-sm btn-outline-warning"
+                                onclick="showResetForm('{{ user.id }}', '{{ user.username }}')">
+                            Reset PW
+                        </button>
+                    </div>
+                    <form id="reset-form-{{ user.id }}" method="POST"
+                          action="{{ url_for('main.admin_reset_password', user_id=user.id) }}"
+                          style="display: none; margin-top: 0.5rem;">
+                        <div class="input-group input-group-sm">
+                            <input type="text" class="form-control form-control-sm" name="new_password"
+                                   placeholder="New password (min 6 chars)" minlength="6">
+                            <button type="submit" class="btn btn-sm btn-warning">Set</button>
+                        </div>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="action-buttons mb-4">
+    <a href="{{ url_for('main.seed_demo') }}" class="btn btn-outline-primary">Seed Demo Accounts</a>
+    <a href="{{ url_for('main.index') }}" class="btn btn-primary">Home</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showResetForm(userId, username) {
+    var forms = document.querySelectorAll('[id^="reset-form-"]');
+    forms.forEach(function(f) { f.style.display = 'none'; });
+    var form = document.getElementById('reset-form-' + userId);
+    if (form) {
+        form.style.display = 'block';
+        form.querySelector('input[name="new_password"]').focus();
+    }
+}
+</script>
+{% endblock %}

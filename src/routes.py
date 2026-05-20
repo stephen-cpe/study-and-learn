@@ -49,6 +49,8 @@ def _get_texts():
 
 @bp.route('/')
 def index():
+    if current_user.is_authenticated and current_user.is_admin:
+        return redirect(url_for('main.admin'))
     goals = []
     if current_user.is_authenticated:
         paths = StudyPath.query.filter_by(
@@ -159,6 +161,9 @@ def process():
         if current_user.is_authenticated:
             if not current_user.can_start_new_lesson():
                 flash('You already have 3 active lessons. Complete or cancel one before starting a new one.', 'error')
+                if is_ajax:
+                    progress_tracker.cleanup_task(task_id)
+                    return jsonify({'redirect': url_for('main.dashboard')})
                 return redirect(url_for('main.dashboard'))
             path_title = study_path.get('title', goal[:50])
             create_study_path(current_user, path_title, goal,
@@ -178,6 +183,103 @@ def process():
             return jsonify({'error': str(e)}), 500
         flash(f'Processing error: {str(e)}', 'error')
         return redirect(url_for('main.index'))
+
+
+@bp.route('/admin')
+@login_required
+def admin():
+    if not current_user.is_admin:
+        abort(403)
+    users = User.query.order_by(User.created_at.desc()).all()
+    return render_template('admin.html', users=users)
+
+
+@bp.route('/admin/toggle/<user_id>')
+@login_required
+def admin_toggle_generation(user_id):
+    if not current_user.is_admin:
+        abort(403)
+
+    target = db.session.get(User, user_id)
+    if not target:
+        flash('User not found.', 'error')
+        return redirect(url_for('main.admin'))
+
+    target.can_generate_lessons = not target.can_generate_lessons
+    db.session.commit()
+    status = 'enabled' if target.can_generate_lessons else 'disabled'
+    flash(f'Lesson generation {status} for {target.username}.', 'success')
+    return redirect(url_for('main.admin'))
+
+
+@bp.route('/admin/reset-password/<user_id>', methods=['POST'])
+@login_required
+def admin_reset_password(user_id):
+    if not current_user.is_admin:
+        abort(403)
+
+    target = db.session.get(User, user_id)
+    if not target:
+        flash('User not found.', 'error')
+        return redirect(url_for('main.admin'))
+
+    new_password = request.form.get('new_password', '').strip()
+    if not new_password or len(new_password) < 6:
+        flash('Password must be at least 6 characters.', 'error')
+        return redirect(url_for('main.admin'))
+
+    target.set_password(new_password)
+    db.session.commit()
+    flash(f'Password reset for {target.username}.', 'success')
+    return redirect(url_for('main.admin'))
+
+
+@bp.route('/reset-password', methods=['GET', 'POST'])
+@login_required
+def reset_password():
+    if request.method == 'POST':
+        new_password = request.form.get('new_password', '').strip()
+        if not new_password or len(new_password) < 6:
+            flash('Password must be at least 6 characters.', 'error')
+            return redirect(url_for('main.reset_password'))
+
+        current_user.set_password(new_password)
+        db.session.commit()
+        flash('Your password has been updated.', 'success')
+        return redirect(url_for('main.index'))
+
+    return render_template('reset_password.html')
+
+
+# ── Error Handlers ──────────────────────────────────────────────────────
+
+@bp.app_errorhandler(400)
+def bad_request(e):
+    return render_template('error.html', code=400,
+                           message='Bad Request',
+                           detail='The server could not understand the request.'), 400
+
+
+@bp.app_errorhandler(403)
+def forbidden(e):
+    return render_template('error.html', code=403,
+                           message='Access Denied',
+                           detail='You do not have permission to access this page.'), 403
+
+
+@bp.app_errorhandler(404)
+def not_found(e):
+    return render_template('error.html', code=404,
+                           message='Page Not Found',
+                           detail='The page you are looking for does not exist.'), 404
+
+
+@bp.app_errorhandler(500)
+def internal_error(e):
+    db.session.rollback()
+    return render_template('error.html', code=500,
+                           message='Internal Server Error',
+                           detail='Something went wrong on our end. Please try again later.'), 500
 
 
 @bp.route('/results')
@@ -570,24 +672,6 @@ def cancel_study_path(path_id):
     return redirect(url_for('main.dashboard'))
 
 
-@bp.route('/admin/toggle/<user_id>')
-@login_required
-def admin_toggle_generation(user_id):
-    if not current_user.is_admin:
-        abort(403)
-
-    target = User.query.get(user_id)
-    if not target:
-        flash('User not found.', 'error')
-        return redirect(url_for('main.dashboard'))
-
-    target.can_generate_lessons = not target.can_generate_lessons
-    db.session.commit()
-    status = 'enabled' if target.can_generate_lessons else 'disabled'
-    flash(f'Lesson generation {status} for {target.username}.', 'success')
-    return redirect(url_for('main.dashboard'))
-
-
 @bp.route('/seed-demo')
 @login_required
 def seed_demo():
@@ -610,4 +694,4 @@ def seed_demo():
     else:
         flash('Demo accounts already exist.', 'info')
 
-    return redirect(url_for('main.dashboard'))
+    return redirect(url_for('main.admin'))
