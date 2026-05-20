@@ -53,7 +53,7 @@ def index():
     if current_user.is_authenticated:
         paths = StudyPath.query.filter_by(
             user_id=current_user.id, status='active'
-        ).order_by(StudyPath.created_at.desc()).all()
+        ).order_by(StudyPath.created_at.asc()).all()
         goals = [{'id': p.id, 'title': p.learning_goal or p.title} for p in paths]
     return render_template('index.html', goals=goals,
                            session_goal=session.get('learning_goal', ''))
@@ -157,6 +157,9 @@ def process():
         session['extracted_texts'] = extracted_texts
 
         if current_user.is_authenticated:
+            if not current_user.can_start_new_lesson():
+                flash('You already have 3 active lessons. Complete or cancel one before starting a new one.', 'error')
+                return redirect(url_for('main.dashboard'))
             path_title = study_path.get('title', goal[:50])
             create_study_path(current_user, path_title, goal,
                               extracted_texts=extracted_texts)
