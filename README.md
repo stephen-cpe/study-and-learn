@@ -125,6 +125,11 @@ Set `AI_MOCK=true` in your `.env` file to use mock responses (no Ollama required
 - TODO.md - Sprint plan and task backlog
 - DESIGN_AND_TESTING.md - Architecture and testing strategy
 
+## Links
+- [Public Task Board](https://stephen-cpe.github.io/task-board-v1/)
+- [Task Board Repository](https://github.com/stephen-cpe/task-board-v1/)
+- [Deployed App](#) *(coming soon — Sprint 7)*
+
 ## License
 
 MIT - For educational purposes only.

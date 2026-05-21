@@ -23,8 +23,9 @@ You follow Spec-Driven Development strictly.
    `🧪 TESTS: [passed/failed + command used]`
    `⚠️ BLOCKERS/NEXT: [none or specific]`
    Then STOP. Wait for my next prompt.
-4. **CONTEXT RECOVERY**: If I say `RESUME`, I will paste the last
-   STATUS.md. Continue exactly where left off.
+4. **CONTEXT RECOVERY — Fresh Session**: If starting a brand-new agent session, paste the entire block from `spec-driven-instruction.md` as the first message. The agent will discover the project by reading docs/STATUS.md, docs/SRS.md, docs/TODO.md, docs/DESIGN_AND_TESTING.md, and docs/AI_AGENT_PROTOCOL.md via tools — no manual file pasting required. After reading all 5 files, the agent will reply "Ready for task assignment."
+
+4a. **CONTEXT RECOVERY — Same Session**: If I say `RESUME` mid-session, I will paste the last STATUS.md. Continue exactly where left off.
 5. **NO ASSUMPTIONS**: If a requirement is ambiguous, state your
    assumption explicitly before proceeding. Do not ask if you can proceed.
 6. **GUARDRAILS**:

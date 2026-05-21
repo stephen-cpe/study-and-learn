@@ -400,20 +400,6 @@ Build the smallest working version first, then iterate:
 - [ ] Companion that reacts to progress
 - [ ] Full teacher/admin content management workflow
 
-### Hard / Future
-- [ ] YouTube/video transcript integration
-- [ ] External learning resource search
-- [ ] Short-answer AI grading
-- [ ] Spaced repetition scheduling
-- [ ] Learner profile adaptation
-
-### Very Hard / Post-Capstone
-- [ ] Social features (friends, chat, share lessons)
-- [ ] Full offline mode (C/C++ rewrite without Ollama)
-- [ ] Adaptive difficulty based on performance
-- [ ] Companion that reacts to progress
-- [ ] Full teacher/admin content management workflow
-
 ---
 
 ## 6. Testing TODO
