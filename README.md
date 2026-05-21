@@ -79,14 +79,13 @@ The default models are placeholders. For better results, use larger models such 
 
 ### 6. Create .env file
 
-Create a `.env` file in the project root:
+Copy the provided template and edit it:
 
+```bash
+copy .env.example .env
 ```
-SECRET_KEY=your-secret-key-here
-DATABASE_URL=postgresql+psycopg2://study_user:study_pass@localhost:5432/study_and_learn
-OLLAMA_MODEL=qwen3:0.6b
-OLLAMA_EMBEDDING_MODEL=qwen3-embedding:0.6b
-```
+
+Open `.env` and update `SECRET_KEY` with a random string and verify `DATABASE_URL` matches your PostgreSQL credentials.
 
 ### 7. Run the application
 
@@ -104,20 +103,18 @@ pytest -v tests/
 
 ## Using Ollama Cloud (Optional)
 
-1. In `src/services/ai_client.py`, uncomment:
-   ```python
-   from .ai_client_cloud import call_ollama
+1. In your `.env` file, set:
    ```
-
-2. Add to your `.env` file:
-   ```
+   AI_BACKEND=cloud
    OLLAMA_CLOUD_API_KEY=your-api-key-here
    OLLAMA_MODEL=gemma3:12b-cloud
    ```
 
-## Testing without GPU
+2. Restart the application. All AI calls will route through the Ollama Cloud API instead of your local Ollama instance.
 
-Set `AI_MOCK=true` in your `.env` file to use mock responses (no Ollama required).
+## Mock AI Mode (No Ollama Required)
+
+Set `AI_MOCK=true` in your `.env` file to use mock responses. This is useful for testing or running the app without Ollama installed.
 
 ## Documentation
 
