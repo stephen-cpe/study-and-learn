@@ -40,7 +40,7 @@ def test_generate_stages_have_mascot_messages():
 
 
 def test_process_stages_enumeration():
-    assert len(PROCESS_STAGES) == 7
+    assert len(PROCESS_STAGES) == 9
     for s in PROCESS_STAGES:
         assert 'stage' in s
         assert 'label' in s
@@ -58,16 +58,18 @@ def test_process_stages_pct_monotonic():
 def test_process_stages_labels():
     assert PROCESS_STAGES[0]['label'] == 'Uploading files'
     assert PROCESS_STAGES[1]['label'] == 'Parsing documents'
-    assert PROCESS_STAGES[2]['label'] == 'Building knowledge index'
-    assert PROCESS_STAGES[3]['label'] == 'Generating summary'
-    assert PROCESS_STAGES[4]['label'] == 'Checking relevance'
-    assert PROCESS_STAGES[5]['label'] == 'Creating study path'
-    assert PROCESS_STAGES[6]['label'] == 'Complete'
+    assert PROCESS_STAGES[2]['label'] == 'OCR scanning pages'
+    assert PROCESS_STAGES[3]['label'] == 'Analyzing figures'
+    assert PROCESS_STAGES[4]['label'] == 'Building knowledge index'
+    assert PROCESS_STAGES[5]['label'] == 'Generating summary'
+    assert PROCESS_STAGES[6]['label'] == 'Checking relevance'
+    assert PROCESS_STAGES[7]['label'] == 'Creating study path'
+    assert PROCESS_STAGES[8]['label'] == 'Complete'
 
 
 def test_process_stages_mascot_messages():
     assert 'Receiving your study materials' in PROCESS_STAGES[0]['mascot']
-    assert PROCESS_STAGES[6]['pct'] == 100
+    assert PROCESS_STAGES[8]['pct'] == 100
 
 
 def test_stages_alias():
@@ -106,10 +108,10 @@ def test_update_progress():
 
 def test_update_progress_process_stages():
     task_id = create_task(stages=PROCESS_STAGES)
-    update_progress(task_id, 3)
+    update_progress(task_id, 5)
     progress = get_progress(task_id)
-    assert progress['stage'] == 3
-    assert progress['pct'] == 55
+    assert progress['stage'] == 5
+    assert progress['pct'] == 70
     assert progress['label'] == 'Generating summary'
     assert 'Summarizing what your materials cover' in progress['mascot']
 
@@ -142,7 +144,7 @@ def test_complete_task_process_stages():
     task_id = create_task(stages=PROCESS_STAGES)
     complete_task(task_id)
     progress = get_progress(task_id)
-    assert progress['stage'] == 6
+    assert progress['stage'] == 8
     assert progress['pct'] == 100
     assert progress['label'] == 'Complete'
 

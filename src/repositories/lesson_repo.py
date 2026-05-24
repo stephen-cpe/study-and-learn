@@ -109,20 +109,11 @@ def get_study_path_data(user=None) -> Optional[Dict[str, Any]]:
     except (json.JSONDecodeError, TypeError):
         pass
     return None
-    path = StudyPath.query.filter_by(user_id=user.id, status='active').first()
-    if not path or not path.content_data:
-        return None
-    try:
-        data = json.loads(path.content_data)
-        if 'modules' in data:
-            return data
-    except (json.JSONDecodeError, TypeError):
-        pass
-    return None
 
 
 def create_study_path(user, title: str, learning_goal: str,
-                      extracted_texts: List[str] = None) -> StudyPath:
+                      extracted_texts: List[str] = None,
+                      file_hashes: List[str] = None) -> StudyPath:
     path = StudyPath(
         user_id=user.id,
         title=title,
@@ -131,6 +122,8 @@ def create_study_path(user, title: str, learning_goal: str,
     )
     if extracted_texts is not None:
         path.extracted_texts = json.dumps(extracted_texts)
+    if file_hashes is not None:
+        path.file_hashes = json.dumps(file_hashes)
     db.session.add(path)
     db.session.commit()
     return path
@@ -139,6 +132,7 @@ def create_study_path(user, title: str, learning_goal: str,
 def save_lessons(lessons: List[Dict[str, Any]], user=None,
                  title: str = None, learning_goal: str = None,
                  extracted_texts: List[str] = None,
+                 file_hashes_val: List[str] = None,
                  path_id: str = None) -> None:
     if user is None:
         user = current_user
@@ -162,6 +156,8 @@ def save_lessons(lessons: List[Dict[str, Any]], user=None,
             status='active',
         )
         db.session.add(path)
+        if file_hashes_val is not None:
+            path.file_hashes = json.dumps(file_hashes_val)
     else:
         if title:
             path.title = title
@@ -171,6 +167,8 @@ def save_lessons(lessons: List[Dict[str, Any]], user=None,
     path.content_data = json.dumps(lessons)
     if extracted_texts is not None:
         path.extracted_texts = json.dumps(extracted_texts)
+    if file_hashes_val is not None:
+        path.file_hashes = json.dumps(file_hashes_val)
     path.updated_at = db.func.now()
 
     existing_rows = {

@@ -19,13 +19,15 @@ GENERATE_STAGES = [
 ]
 
 PROCESS_STAGES = [
-    {"stage": 0, "label": "Uploading files", "pct": 0, "mascot": "Receiving your study materials..."},
-    {"stage": 1, "label": "Parsing documents", "pct": 15, "mascot": "Reading through your uploaded materials and extracting text..."},
-    {"stage": 2, "label": "Building knowledge index", "pct": 35, "mascot": "Chunking and indexing your content for smart retrieval..."},
-    {"stage": 3, "label": "Generating summary", "pct": 55, "mascot": "Summarizing what your materials cover..."},
-    {"stage": 4, "label": "Checking relevance", "pct": 70, "mascot": "Checking how well your materials match your learning goal..."},
-    {"stage": 5, "label": "Creating study path", "pct": 85, "mascot": "Building your personalized study path..."},
-    {"stage": 6, "label": "Complete", "pct": 100, "mascot": "All done! Your results are ready."},
+    {"stage": 0, "label": "Uploading files",          "pct": 0,   "mascot": "Receiving your study materials..."},
+    {"stage": 1, "label": "Parsing documents",         "pct": 10,  "mascot": "Reading through your uploaded materials and extracting text..."},
+    {"stage": 2, "label": "OCR scanning pages",        "pct": 25,  "mascot": "Scanning each page for text, tables, and figures using AI vision..."},
+    {"stage": 3, "label": "Analyzing figures",         "pct": 40,  "mascot": "Understanding diagrams and charts with AI vision..."},
+    {"stage": 4, "label": "Building knowledge index",  "pct": 55,  "mascot": "Chunking and indexing your content for smart retrieval..."},
+    {"stage": 5, "label": "Generating summary",        "pct": 70,  "mascot": "Summarizing what your materials cover..."},
+    {"stage": 6, "label": "Checking relevance",        "pct": 80,  "mascot": "Checking how well your materials match your learning goal..."},
+    {"stage": 7, "label": "Creating study path",       "pct": 90,  "mascot": "Building your personalized study path..."},
+    {"stage": 8, "label": "Complete",                  "pct": 100, "mascot": "All done! Your results are ready."},
 ]
 
 STAGES = GENERATE_STAGES

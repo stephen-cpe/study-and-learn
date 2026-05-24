@@ -5,7 +5,7 @@ route handlers thin and testable.
 """
 from typing import Callable, Dict, Any, List
 
-from src.services.rag_retriever import build_rag_context
+from src.services.rag_retriever import build_rag_context, build_rag_context_from_hashes
 from src.services.lesson_generator import generate_lesson
 from src.services.quiz_generator import generate_quiz, generate_inline_checkpoint
 
@@ -14,6 +14,16 @@ def make_retriever(goal: str, extracted_texts: List[str]) -> Callable[[str], str
     """Build a simple retriever that returns RAG context for a query."""
     def retrieve(query: str) -> str:
         return build_rag_context(goal, extracted_texts) if extracted_texts else ""
+    return retrieve
+
+
+def make_retriever_from_hashes(goal: str, file_hashes: List[str]) -> Callable[[str], str]:
+    """Build a retriever that queries content-keyed ChromaDB collections."""
+    def retrieve(query: str) -> str:
+        try:
+            return build_rag_context_from_hashes(goal, file_hashes)
+        except Exception:
+            return ""
     return retrieve
 
 
@@ -60,7 +70,7 @@ def _build_checkpoints(
     module_title: str,
     retriever: Callable[[str], str],
 ) -> Dict[str, Any]:
-    """Insert inline comprehension checkpoints at ~⅓ intervals."""
+    """Insert inline comprehension checkpoints at ~1/3 intervals."""
     checkpoints: Dict[str, Any] = {}
     if len(slides) > 2:
         interval = max(1, len(slides) // 3)

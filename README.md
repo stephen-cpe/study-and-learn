@@ -73,9 +73,12 @@ This creates all tables, indexes, foreign keys, stamps the alembic version, and 
 ```bash
 ollama pull qwen3:0.6b
 ollama pull qwen3-embedding:0.6b
+ollama pull glm-ocr
 ```
 
 The default models are placeholders. For better results, use larger models such as `qwen3:8b` or `gemma3:4b` if your hardware can accommodate them.
+
+`glm-ocr` (0.9B) enables AI-powered OCR for PDFs and images. If you skip this step, the app falls back to traditional text-only extraction.
 
 ### 6. Create .env file
 

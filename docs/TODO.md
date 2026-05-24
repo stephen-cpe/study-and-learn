@@ -197,72 +197,74 @@ Build the smallest working version first, then iterate:
 
 ---
 
-### Sprint 6: Polish, Maintenance, and Enhancement ⬜ CURRENT
+### Sprint 6: OCR/Vision Integration & Global Content Deduplication ✅ COMPLETE
 
-**Goal:** Stabilize the application through comprehensive UI and UX refinement, defect remediation, performance optimization, and expanded automated testing coverage.
+**Goal:** Integrate AI-powered OCR for scanned PDFs and images, implement global content-addressable deduplication, extend file type support, and transition to content-keyed multi-collection ChromaDB retrieval.
 
 **User Stories:** US-032, US-033, US-034, US-035
 
 **Tasks:**
-- [x] Perform comprehensive UI and UX refinement across all templates and components
-- [x] Address and resolve known defects across the application
-- [x] Conduct code-level performance optimization (database queries, AI call efficiency, session management)
-- [x] Expand automated test coverage; ensure all existing tests continue to pass
-- [x] Polish dashboard UI with mascot placeholder
-- [ ] Add mascot basic animation frames (idle/waiting/done) — if feasible
+- [x] Pull GLM-OCR model (local, 0.9B) for page-level text/table/figure OCR
+- [x] Integrate pdf2image for PDF page-to-image rendering via Poppler
+- [x] Implement DOCX embedded image extraction via python-docx inline shapes
+- [x] Implement PPTX text extraction via python-pptx
+- [x] Add `.docx`, `.pptx`, `.png`, `.jpg`, `.jpeg` to allowed extensions
+- [x] Build `src/services/vision_parser.py` — OCR pipeline with file hashing, content registry, page rendering, and Qwen3-VL cloud figure descriptions
+- [x] Add SHA-256 content-addressable deduplication via `ContentRegistry` DB model
+- [x] Transition ChromaDB from session-keyed (`study_{uuid}`) to content-keyed (`doc_{hash[:59]}`) collections shared across users
+- [x] Implement multi-collection retrieval with score-based merging (`retrieve_from_multiple_collections`)
+- [x] Add metadata propagation to chunk storage (source_hash, content_type)
+- [x] Extend progress tracking to 9 stages (added OCR scanning + figure analysis stages)
+- [x] Add `force_local` parameter to `call_ollama` for OCR models with no cloud variant
+- [x] Write 20 test cases in `tests/test_vision_parser.py` (all pass with `AI_MOCK=true`)
+- [x] Write 5 additional parser tests (pptx, image, dedup)
+- [x] Write 4 additional RAG tests (multi-collection retrieval, metadata)
+- [x] Add `ollama pull glm-ocr` to README setup instructions
+- [x] Run full test suite — 172 passing tests (143 original + 29 new)
+
+**Sprint 6 Definition of Done:**
+- OCR pipeline processes scanned PDFs with text/table/figure recognition
+- DOCX embedded images and PPTX files extracted and processed
+- Global content deduplication prevents redundant OCR/embedding for identical files
+- Multi-collection retrieval merges results across all uploaded documents
+- Progress bar shows 9 stages including OCR progress
+- All new features gated behind env vars (OCR_FULL, OCR_FIGURE_DESCRIPTION, AI_MOCK)
+- 172 tests passing
+- README updated with OCR setup instructions
+
+---
+
+### Sprint 7: Polish, Mascot Animation, TTS & PDF Export ⬜ FUTURE
+
+**Goal:** Add mascot animation frames, TTS narration, PDF export, session cleanup, and remaining Sprint 6 polish tasks.
+
+**User Stories:** US-036, US-037, US-038
+
+**Tasks:**
+- [ ] Add mascot basic animation frames (idle/waiting/done)
 - [ ] Display mascot state changes during loading operations
 - [ ] Integrate Web Speech API or TTS library for lesson narration
 - [ ] Add TTS toggle button on slide deck (disabled by default)
 - [ ] Generate PDF from completed lesson slides and quiz results
 - [ ] Add PDF export button on completed lesson page
 - [ ] Remove `extracted_texts` from session after lessons generated
-- [x] Fix bugs discovered during Sprint 5 testing
-- [x] Run full test suite and maintain 143+ passing tests
-- [ ] Update task board with sprint progress
-
-**Sprint 6 Definition of Done:**
-- UI and UX refinements applied across all views
-- All known defects triaged and resolved
-- Performance profiling completed with measurable improvements
-- Test suite expanded and fully passing
-- Dashboard polished with mascot
-- TTS functional (opt-in)
-- PDF export working for completed lessons
-- Session bloat fixed (extracted_texts cleaned up)
-- All existing tests pass
-
----
-
-### Sprint 7: Advanced Features, Cloud Preparation, and Refinement ⬜ FUTURE
-
-**Goal:** Integrate OCR for scanned documents, implement achievement badges, link lessons to source documents, and conduct cloud deployment preparation including HuggingFace model evaluation and general application refinement.
-
-**User Stories:** US-036, US-037, US-038
-
-**Tasks:**
-- [ ] Integrate OCR engine (Tesseract or similar) for scanned PDF text extraction
-- [ ] Detect images in uploaded documents and run OCR analysis
-- [ ] Feed OCR output into chunking pipeline after text extraction
 - [ ] Design badge/trophy system for completed modules
 - [ ] Track abandoned lessons separately from completions
 - [ ] Display achievement badges on dashboard
 - [ ] Link generated lesson content back to source PDF/document
 - [ ] Add citations showing which document a slide references
-- [ ] Evaluate HuggingFace embedding models as an alternative to Ollama for cloud deployment readiness
-- [ ] Evaluate HuggingFace OCR and vision-language models for potential cloud-based document processing
 - [ ] Test cloud ChromaDB (optional parallel track)
 - [ ] Test cloud AI model providers (optional parallel track)
 - [ ] Conduct general application refinement: UX polish, defect remediation, and performance optimization
 - [ ] Expand test coverage; ensure all existing tests continue to pass
-- [ ] Run full test suite and maintain 60+ passing tests
-- [ ] Write tests for OCR integration
-- [ ] Update task board with sprint progress
 
 **Sprint 7 Definition of Done:**
-- OCR pipeline processes scanned PDFs
+- Mascot animation frames working (idle/waiting/done states)
+- TTS functional (opt-in)
+- PDF export working for completed lessons
+- Session bloat fixed (extracted_texts cleaned up)
 - Badges displayed for completed lessons
 - Source document references visible in lessons
-- HuggingFace embedding and OCR models evaluated for cloud deployment feasibility
 - Cloud deployment dependencies identified and tested
 - General refinement tasks completed
 - Test suite expanded and fully passing
@@ -310,7 +312,7 @@ Build the smallest working version first, then iterate:
 - [x] Learning goal form
 - [x] Document upload (≤5 files)
 - [x] File validation
-- [x] Text extraction (.txt, .md, .pdf)
+- [x] Text extraction (.txt, .md, .pdf, .docx, .pptx, .png, .jpg, .jpeg)
 - [x] RAG pipeline (chunk → embed → store → retrieve)
 - [x] AI summary generation
 - [x] Relevance check (strong/partial/weak)
@@ -326,7 +328,10 @@ Build the smallest working version first, then iterate:
 - [x] Results page with improved hierarchy
 - [x] Lesson listing page with progress bar
 - [x] Markdown rendering for AI outputs
-- [x] 60+ automated tests
+- [x] AI-powered OCR/vision (GLM-OCR local + Qwen3-VL cloud)
+- [x] Content-addressable global deduplication
+- [x] Multi-collection ChromaDB retrieval
+- [x] 172 automated tests
 - [x] GitHub Actions CI
 - [x] Static task board
 - [x] Design/testing document
@@ -374,14 +379,13 @@ Build the smallest working version first, then iterate:
 - [x] UI and UX refinement (Sprint 6)
 - [x] Defect remediation and performance optimization (Sprint 6)
 - [x] Expanded test coverage (Sprint 6)
-- [ ] TTS narration (opt-in) (Sprint 6)
-- [ ] PDF export for completed lessons (Sprint 6)
-- [ ] Mascot animation frames (Sprint 6)
-- [ ] Session cleanup (Sprint 6)
-- [ ] OCR for scanned PDFs (Sprint 7)
+- [x] OCR/Vision integration with content deduplication (Sprint 6)
+- [ ] Mascot animation frames (Sprint 7)
+- [ ] TTS narration (opt-in) (Sprint 7)
+- [ ] PDF export for completed lessons (Sprint 7)
+- [ ] Session cleanup (Sprint 7)
 - [ ] Badges/trophies for completed lessons (Sprint 7)
 - [ ] Source document referencing in lessons (Sprint 7)
-- [ ] HuggingFace model evaluation for cloud deployment (Sprint 7)
 - [ ] Deployment, demo, and capstone submission (Sprint 8)
 
 ### Post-Capstone
@@ -442,8 +446,10 @@ Build the smallest working version first, then iterate:
 - [x] Dashboard route and access control tests (Sprint 5)
 - [x] Lesson repository unit and integration tests (Sprint 5)
 - [x] Admin role and seed-demo endpoint tests (Sprint 5)
+- [x] OCR/vision parser tests (Sprint 6 — 20 tests)
+- [x] Parser expansion tests (Sprint 6 — 5 tests for pptx, image, dedup)
+- [x] RAG service expansion tests (Sprint 6 — 4 tests for multi-collection, metadata)
 - [ ] Retake route test (quiz regeneration, state reset)
-- [ ] OCR integration tests (Sprint 7)
 
 ### Manual Demo Tests
 - [ ] Demo document uploads successfully

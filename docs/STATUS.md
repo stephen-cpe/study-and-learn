@@ -1,11 +1,11 @@
 # STATUS.md
-Last Updated: 2026-05-18
+Last Updated: 2026-05-24
 Sprint: 6
-Last Task Completed: Sprint 6 Phase 1 — Admin Panel, Password Reset, Access Control, Error Handlers, delete dead login.html
-Commit Message Suggestion: feat(sprint6): admin panel with user management, password reset (self + admin), access-denied for unprivileged users, custom error pages, remove dead login.html
+Last Task Completed: Sprint 6 — OCR/Vision Integration & Global Content Deduplication (GLM-OCR, Qwen3-VL, pdf2image, ContentRegistry, content-keyed ChromaDB, multi-collection retrieval, 172 tests passing)
+Commit Message Suggestion: feat(sprint6): OCR/vision integration with GLM-OCR local + Qwen3-VL cloud, global content deduplication, content-keyed ChromaDB, 8 file types, 172 tests
 Known Issues:
-  - AI output consistency: qwen3:0.6b is placeholder-only; upgrade to gemma3:12b-cloud for production quality
-  - Mascot animation: Image placed (done), animation frames deferred
+  - AI output consistency: qwen3:0.6b is placeholder-only; use cloud models (gemma3:12b-cloud, nemotron-3-nano:30b-cloud) for production quality
+  - Mascot animation: Image placed (done), animation frames deferred to Sprint 7
 Pending Decisions:
   - Deployment target: Confirm Render vs Railway free tier for final submission (Sprint 8)
 Next 3 Tasks:

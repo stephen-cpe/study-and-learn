@@ -1,12 +1,12 @@
 # Software Requirements Specification (SRS)
 # Study-and-Learn
 
-**Version:** 1.2  
+**Version:** 1.3  
 **Project type:** AI-assisted learning web application  
 **Capstone track:** Software system / AI system  
 **Repository name:** `study-and-learn`  
 **Primary development approach:** Spec-Driven Development with AI tooling support  
-**Last updated:** May 18, 2026
+**Last updated:** May 24, 2026
 
 ---
 
@@ -38,7 +38,7 @@ The MVP is a web application that allows a learner or admin user to:
 
 1. enter a learning goal and upload documents in a single unified form,
 2. upload one or more supported study documents,
-3. extract text from those documents, if time permits, do an OCR as well for the documents,
+3. extract text from those documents using both traditional parsers and AI-powered OCR for images and scanned content,
 4. generate an AI-assisted summary, relevance check, and recommended study path,
 5. generate interactive slide-based lessons with inline comprehension checkpoints,
 6. generate mixed-type quizzes (multiple choice, true/false, multi-select, fill-in-the-blank) per module,
@@ -224,9 +224,9 @@ study-and-learn/
 |---|---|---|
 | Serving framework | Ollama (default) | Local-first via Ollama; cloud API via `ai_client_cloud.py` import toggle or `AI_BACKEND=cloud` env var |
 | Chat model | Configured via `OLLAMA_MODEL` env var | Default: `qwen3:0.6b` (placeholder). Recommended: `qwen3:8b`, `gemma3:4b`, `gemma3:12b-cloud`, or any Ollama-compatible model. Cloud models generally yield higher quality. |
-| Embedding model | Configured via `OLLAMA_EMBEDDING_MODEL` env var | Used exclusively for ChromaDB vector embeddings. Swappable via env var. HuggingFace embedding models may be evaluated in Sprint 7 as an alternative for cloud deployment. |
+| Embedding model | Configured via `OLLAMA_EMBEDDING_MODEL` env var | Used exclusively for ChromaDB vector embeddings. Swappable via env var. |
 | Testing mode | `AI_MOCK=true` returns structured JSON stubs | Ensures deterministic CI/CD without GPU or cloud dependency |
-| Multimodal capability | Text + image support deferred to post-MVP | OCR for scanned PDFs remains a stretch goal, evaluated in Sprint 7 via Tesseract or HuggingFace vision-language models |
+| OCR model | GLM-OCR (0.9B, local-only) | AI-powered text/table/figure recognition for scanned PDFs and images |
 
 ### 4.5 RAG & Multi-Document Architecture
 - **Chunking**: `RecursiveCharacterTextSplitter` (LangChain) with configurable size/overlap
@@ -252,7 +252,7 @@ study-and-learn/
 | ID | Requirement | Priority |
 |---|---|---|
 | FR-004 | The system shall allow the user to upload up to 5 documents simultaneously. | Must |
-| FR-005 | The system shall support `.txt`, `.md`, and `.pdf` file uploads. | Must |
+| FR-005 | The system shall support `.txt`, `.md`, `.pdf`, `.docx`, `.pptx`, `.png`, `.jpg`, and `.jpeg` file uploads. | Must |
 | FR-006 | The system shall reject unsupported file types with a clear message. | Must |
 | FR-007 | The system should show uploaded file names and processing status. | Should |
 
@@ -263,7 +263,7 @@ study-and-learn/
 | FR-008 | The system shall chunk, embed, and store extracted text in a local vector database using OllamaEmbeddings. | Must |
 | FR-009 | The system shall retrieve top-k relevant chunks using goal-aligned similarity search before AI prompt injection. | Must |
 | FR-010 | The system should handle extraction failures gracefully. | Should |
-| FR-011 | The system may support OCR for scanned PDFs. | Could |
+| FR-011 | The system shall perform AI-powered OCR on uploaded images, scanned PDFs, and embedded document images using local vision models, with graceful fallback to traditional text extraction. | Must |
 
 ### 5.4 AI Summary Generation
 
@@ -438,7 +438,8 @@ study-and-learn/
 - Bootstrap UI + custom retro CSS theme.
 - Unified learning goal + document upload form (single submission).
 - File type validation.
-- Text extraction for `.txt`, `.md`, and `.pdf`.
+- Text extraction for `.txt`, `.md`, `.pdf`, `.docx`, `.pptx`, `.png`, `.jpg`, `.jpeg`.
+- AI-powered OCR for scanned PDFs and images (GLM-OCR local + Qwen3-VL cloud).
 - Retrieval-Augmented Generation (RAG) pipeline (ChromaDB persistent vector store).
 - Multi-file upload (≤5).
 - AI summary generation through Ollama.
@@ -454,7 +455,8 @@ study-and-learn/
 - Lesson listing page with progress bar.
 - Server-side session storage (Flask-Session + cachelib).
 - Custom CSS/JS slide-deck engine (retro-themed).
-- pytest test suite (60+ tests).
+- Content-addressable global deduplication (SHA-256 + ContentRegistry).
+- pytest test suite (172 tests).
 - GitHub Actions test workflow.
 - Static public task board.
 - Design and testing document.
@@ -469,9 +471,8 @@ study-and-learn/
 - Demo seed files.
 - Error handling for AI/model unavailable.
 
-### 8.3 Not Official MVP / Stretch
+### 8.3 Deferred / Stretch
 
-- OCR for scanned PDFs.
 - YouTube integration.
 - AI-generated TTS narration.
 - Export to PDF, PPTX, or SCORM.
@@ -519,25 +520,23 @@ Ranked from easier to harder. Items above the line are implemented; items below 
 26. Password reset (self-service + admin-initiated) — done (/reset-password, /admin/reset-password)
 27. Multi-path study support — done (independent StudyPath per learning goal, up to 3 concurrent)
 28. Session leakage fix (user A's data appearing for user B) — done (session.pop on login)
-
-### Sprint 6 (Planned)
-29. Mascot animation frames (idle/waiting/done)
-30. Text-to-speech narration (opt-in)
-31. PDF export for completed lessons
-32. Session cleanup (remove extracted_texts after lessons generated)
+29. AI-powered OCR/vision integration — done (GLM-OCR local for text/table/figure recognition, Qwen3-VL cloud for figure descriptions, pdf2image page rendering, DOCX/PPTX image extraction, image file support)
+30. Global content-addressable deduplication — done (SHA-256 ContentRegistry, content-keyed ChromaDB collections, multi-collection retrieval, 172 tests)
 
 ### Sprint 7 (Planned)
-30. OCR for scanned PDFs (Tesseract or HuggingFace vision-language models)
-31. HuggingFace embedding model evaluation for cloud deployment readiness
-32. Badges/trophies for completed lessons
-33. Source document referencing in lessons
-34. Cloud ChromaDB and cloud AI provider testing
-35. General application refinement and test expansion
+31. Mascot animation frames (idle/waiting/done)
+32. Text-to-speech narration (opt-in)
+33. PDF export for completed lessons
+34. Session cleanup (remove extracted_texts after lessons generated)
+35. Badges/trophies for completed lessons
+36. Source document referencing in lessons
+37. Cloud ChromaDB and cloud AI provider testing
+38. General application refinement and test expansion
 
 ### Sprint 8 (Planned)
-36. Deployment to free-tier host (Render or Railway)
-37. Final documentation and demo recording
-38. Capstone submission
+39. Deployment to free-tier host (Render or Railway)
+40. Final documentation and demo recording
+41. Capstone submission
 
 ### Post-Capstone / Stretch
 39. Difficulty level selector (Easy/Moderate/Hard) — high effort, low impact for MVP
@@ -609,7 +608,7 @@ Later additions:
 1. ~~Should the first prototype use pgvector or ChromaDB?~~ → **ChromaDB** (chosen, implemented)
 2. ~~Which Ollama model gives acceptable local results on the target hardware?~~ → **qwen3:0.6b (chat) + qwen3-embedding:0.6b (embeddings)** (placeholder; upgrade path: `qwen3:1.7b`, `gemma3:4b`, or Ollama Cloud)
 3. ~~How many file types should be truly supported in the first sprint?~~ → **txt, md, pdf** (MVP); docx deferred to post-capstone
-4. ~~Should OCR be postponed until after the main workflow works?~~ → **Postponed** to Sprint 7
+4. ~~Should OCR be postponed until after the main workflow works?~~ → **Implemented in Sprint 6** (GLM-OCR local + Qwen3-VL cloud, content-addressable dedup)
 5. ~~Should generated outputs be stored as JSON, Markdown, or database records?~~ → **JSON in Flask session (server-side via cachelib)**
 6. ~~Should the companion be purely visual or tied to progress?~~ → Visual feedback with click-to-talk implemented; animation frames deferred to Sprint 6
 7. ~~Which deployment platform is easiest for the final capstone demo?~~ → Render or Railway free tier TBD in Sprint 8

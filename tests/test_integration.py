@@ -165,7 +165,7 @@ def test_process_with_progress_tracking(mock_curriculum, mock_relevance, mock_su
     assert '/results' in json_data['redirect']
 
     progress_data = progress_tracker.get_progress(task_id)
-    assert progress_data is None or progress_data['stage'] == 6
+    assert progress_data is None or progress_data['stage'] == 8
 
 
 @patch('src.services.rag_retriever.build_rag_context')
@@ -192,7 +192,7 @@ def test_process_progress_stages_advance(mock_curriculum, mock_relevance, mock_s
     progress_resp = client.get('/progress?task_id=' + task_id)
     assert progress_resp.status_code == 200
     progress_json = progress_resp.get_json()
-    assert progress_json['stage'] == -1 or progress_json['stage'] >= 6
+    assert progress_json['stage'] == -1 or progress_json['stage'] >= 8
 
 
 def test_process_non_blocking_no_overlay(client):

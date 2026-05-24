@@ -3,6 +3,7 @@
 -- Usage: psql -U postgres -d study_and_learn -f init_db.sql
 
 -- Drop existing tables if they exist (for clean migration)
+DROP TABLE IF EXISTS content_registry CASCADE;
 DROP TABLE IF EXISTS lesson_progress CASCADE;
 DROP TABLE IF EXISTS study_paths CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
@@ -34,6 +35,7 @@ CREATE TABLE study_paths (
     status          VARCHAR(20)  NOT NULL DEFAULT 'active',
     content_data    TEXT         NULL,
     extracted_texts TEXT         NULL,
+    file_hashes     TEXT         NULL,
     created_at      TIMESTAMP    NULL,
     updated_at      TIMESTAMP    NULL,
     CONSTRAINT pk_study_paths PRIMARY KEY (id),
@@ -43,7 +45,21 @@ CREATE TABLE study_paths (
 
 CREATE INDEX ix_study_paths_user_id ON study_paths (user_id);
 
--- 3. lesson_progress
+-- 3. content_registry
+CREATE TABLE content_registry (
+    id                VARCHAR(36)  NOT NULL,
+    file_hash         VARCHAR(64)  NOT NULL,
+    chroma_collection VARCHAR(128) NOT NULL,
+    extracted_text    TEXT         NULL,
+    ocr_text          TEXT         NULL,
+    created_at        TIMESTAMP    NULL,
+    CONSTRAINT pk_content_registry PRIMARY KEY (id)
+);
+
+CREATE UNIQUE INDEX ix_content_registry_file_hash ON content_registry (file_hash);
+CREATE UNIQUE INDEX ix_content_registry_chroma_collection ON content_registry (chroma_collection);
+
+-- 4. lesson_progress
 CREATE TABLE lesson_progress (
     id              VARCHAR(36)  NOT NULL,
     study_path_id   VARCHAR(36)  NOT NULL,
@@ -60,15 +76,15 @@ CREATE TABLE lesson_progress (
 
 CREATE INDEX ix_lesson_progress_study_path_id ON lesson_progress (study_path_id);
 
--- 4. alembic_version stamp
+-- 5. alembic_version stamp
 CREATE TABLE alembic_version (
     version_num VARCHAR(32) NOT NULL,
     CONSTRAINT pk_alembic_version PRIMARY KEY (version_num)
 );
 
-INSERT INTO alembic_version (version_num) VALUES ('c1d0e553b531');
+INSERT INTO alembic_version (version_num) VALUES ('7477e6809a28');
 
--- 5. Seed users (development only -- not for production)
+-- 6. Seed users (development only -- not for production)
 --
 -- Passwords (plaintext for reference only; stored as scrypt hashes below):
 --   admin  → ADMINpassword
@@ -108,6 +124,6 @@ VALUES
     TRUE
 );
 
--- 6. Permissions
+-- 7. Permissions
 GRANT ALL PRIVILEGES ON ALL TABLES    IN SCHEMA public TO study_user;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO study_user;

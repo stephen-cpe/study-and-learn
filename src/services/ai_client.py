@@ -58,16 +58,20 @@ def _call_ollama_local(prompt: str, model: str = None) -> str:
         raise RuntimeError(f"Failed to reach Ollama at {url}: {str(e)}")
 
 
-def call_ollama(prompt: str, model: str = None) -> str:
+def call_ollama(prompt: str, model: str = None, force_local: bool = False) -> str:
     """Return an AI response for *prompt*, checking AI_MOCK at call time.
 
-    * If ``AI_MOCK=true`` → deterministic stub (used in CI/tests).
-    * If ``AI_BACKEND=cloud`` → delegates to :func:`ai_client_cloud.call_ollama`.
-    * Otherwise → local Ollama via :func:`_call_ollama_local`.
+    * If ``AI_MOCK=true`` -> deterministic stub (used in CI/tests).
+    * If ``force_local=True`` -> always uses local Ollama via :func:`_call_ollama_local`.
+    * If ``AI_BACKEND=cloud`` -> delegates to :func:`ai_client_cloud.call_ollama`.
+    * Otherwise -> local Ollama via :func:`_call_ollama_local`.
     """
     if os.environ.get('AI_MOCK', '').lower() == 'true':
         logger.info("Using MOCK response")
         return f"Mock response for prompt: {prompt[:50]}..."
+
+    if force_local:
+        return _call_ollama_local(prompt, model)
 
     backend = os.environ.get('AI_BACKEND', 'local').lower()
     if backend == 'cloud':

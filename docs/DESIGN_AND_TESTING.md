@@ -106,7 +106,7 @@ Core workflow:
 
 **Decision:** Chat uses `OLLAMA_MODEL`, embeddings use `OLLAMA_EMBEDDING_MODEL`.
 
-**Reason:** Chat models typically do not expose embedding endpoints. Separating the two allows independent tuning — a smaller embedding model may suffice for retrieval while a larger chat model can be used for generation. Both are swappable via environment variables, and HuggingFace embedding models may be evaluated in Sprint 7 as an alternative for cloud deployment scenarios where running Ollama is not feasible.
+**Reason:** Chat models typically do not expose embedding endpoints. Separating the two allows independent tuning — a smaller embedding model may suffice for retrieval while a larger chat model can be used for generation. Both are swappable via environment variables.
 
 ### ADR-009: Custom CSS/JS Slide Deck Engine (Replaces reveal.js)
 
@@ -292,11 +292,11 @@ Recommendation: Deploy to Render/Railway free tier with `AI_MOCK=true` for gradi
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| AI model too slow locally or inconsistent output quality | Demo delay or poor pedagogical value | Use small documents and cached/demo responses; support cloud model fallback via `AI_BACKEND=cloud`; evaluate HuggingFace models in Sprint 7 |
+| AI model too slow locally or inconsistent output quality | Demo delay or poor pedagogical value | Use small documents and cached/demo responses; support cloud model fallback via `AI_BACKEND=cloud` |
 | File parsing issues | Failed workflow | Start with fewer file types and add more gradually |
 | Scope creep | Missed MVP | Keep optional features outside official sprint goals |
 | Deployment resource limits | App unavailable | Test deployment early; maintain `AI_MOCK=true` path for free-tier hosting without GPU |
 | AI output inconsistency | Poor demo | Use controlled sample documents and structured prompts |
 | PostgreSQL privilege issues on live DB | Blocked migrations | Document `init_db.sql` workaround (includes DROP IF EXISTS + full schema + seed accounts) and `GRANT CREATE` procedure |
 | Session leakage between users | User A sees User B's data after logout/login swap | Fixed in Sprint 5 bug-fix rounds: clear session-scoped keys on login via `session.pop()` |
-| HuggingFace model evaluation inconclusive | Cloud deployment uncertainty | Maintain Ollama as primary path; document HF findings for future reference
+| OCR model unavailable (GLM-OCR not pulled) | OCR pipeline fails for scanned PDFs | Graceful fallback to traditional text extraction; clear warning logged |

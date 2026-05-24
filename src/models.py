@@ -60,6 +60,7 @@ class StudyPath(db.Model):
     status = db.Column(String(20), default='active', nullable=False)
     content_data = db.Column(db.Text, nullable=True)
     extracted_texts = db.Column(db.Text, nullable=True)
+    file_hashes = db.Column(db.Text, nullable=True)
     created_at = db.Column(DateTime, default=_utcnow)
     updated_at = db.Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
@@ -67,6 +68,20 @@ class StudyPath(db.Model):
 
     def __repr__(self) -> str:
         return f"<StudyPath {self.title} status={self.status}>"
+
+
+class ContentRegistry(db.Model):
+    __tablename__ = 'content_registry'
+
+    id = db.Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), nullable=False)
+    file_hash = db.Column(String(64), unique=True, index=True, nullable=False)
+    chroma_collection = db.Column(String(128), unique=True, nullable=False)
+    extracted_text = db.Column(db.Text, nullable=True)
+    ocr_text = db.Column(db.Text, nullable=True)
+    created_at = db.Column(DateTime, default=_utcnow)
+
+    def __repr__(self) -> str:
+        return f"<ContentRegistry hash={self.file_hash} collection={self.chroma_collection}>"
 
 
 class LessonProgress(db.Model):

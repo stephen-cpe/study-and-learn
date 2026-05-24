@@ -2,16 +2,18 @@
 Route definitions for the Study-and-Learn MVP.
 """
 import os
+import json
 import uuid
 from flask import (Blueprint, render_template, request, redirect,
                    url_for, flash, session, current_app, jsonify, abort)
 from src.utils import allowed_file
-from src.services.document_parser import extract_text
+from src.services.document_parser import extract_text, extract_text_with_vision
 from src.services.summarizer import generate_summary
 from src.services.relevance_checker import check_relevance
 from src.services.curriculum_generator import generate_study_path
-from src.services.rag_retriever import build_rag_context
-from src.services.lesson_orchestrator import make_retriever, build_module_artifacts
+from src.services.rag_retriever import build_rag_context, build_rag_context_from_hashes
+from src.services.vision_parser import hash_file, is_content_registered
+from src.services.lesson_orchestrator import make_retriever, make_retriever_from_hashes, build_module_artifacts
 from src.services.grader import _grade_single_question, _get_correct_answer
 from src.repositories.lesson_repo import (
     get_lessons, save_lessons, get_extracted_texts, get_learning_goal,
@@ -20,12 +22,12 @@ from src.repositories.lesson_repo import (
 )
 from src.services import progress_tracker
 from flask_login import login_user, logout_user, login_required, current_user
-from src.models import User, StudyPath, LessonProgress
+from src.models import User, StudyPath, LessonProgress, ContentRegistry
 from src import db
 
 bp = Blueprint('main', __name__)
 
-ALLOWED_EXTENSIONS = {'txt', 'md', 'pdf', 'docx'}
+ALLOWED_EXTENSIONS = {'txt', 'md', 'pdf', 'docx', 'pptx', 'png', 'jpg', 'jpeg'}
 MAX_FILES = 5
 PASS_THRESHOLD = 80
 
@@ -45,6 +47,20 @@ def _get_texts():
     if texts:
         return texts
     return get_extracted_texts(current_user) or []
+
+
+def _get_hashes():
+    """Return file hashes, preferring session, falling back to DB."""
+    hashes = session.get('file_hashes', [])
+    if hashes:
+        return hashes
+    path = get_most_recent_active_path(current_user)
+    if path and path.file_hashes:
+        try:
+            return json.loads(path.file_hashes)
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return []
 
 
 @bp.route('/')
@@ -95,14 +111,54 @@ def process():
 
     extracted_texts = []
     filenames = []
+    file_hashes = []
+
+    if is_ajax:
+        progress_tracker.update_progress(task_id, 1)
 
     for file in valid_files:
         if allowed_file(file.filename):
             filename = file.filename
             file_path = os.path.join(upload_folder, filename)
             file.save(file_path)
+
+            file_hash = hash_file(file_path)
+            file_hashes.append(file_hash)
+
+            ext = os.path.splitext(filename)[1].lower()
+            if ext in ('.txt', '.md'):
+                try:
+                    text = extract_text(file_path)
+                    extracted_texts.append(text)
+                    filenames.append(filename)
+                except ValueError as e:
+                    if is_ajax:
+                        progress_tracker.cleanup_task(task_id)
+                        return jsonify({'error': f'Error extracting {filename}: {str(e)}'}), 400
+                    flash(f'Error extracting {filename}: {str(e)}', 'error')
+                    return redirect(url_for('main.index'))
+                continue
+
             try:
-                text = extract_text(file_path)
+                existing_collection = is_content_registered(file_hash)
+                if existing_collection:
+                    entry = ContentRegistry.query.filter_by(file_hash=file_hash).first()
+                    if entry and entry.extracted_text:
+                        extracted_texts.append(entry.extracted_text)
+                        filenames.append(filename)
+                        continue
+            except Exception:
+                pass
+
+            def ocr_progress(stage_name, current, total):
+                if is_ajax and task_id:
+                    if stage_name == "ocr":
+                        progress_tracker.update_progress(task_id, 2)
+                    elif stage_name == "figure":
+                        progress_tracker.update_progress(task_id, 3)
+
+            try:
+                text = extract_text_with_vision(file_path, progress_callback=ocr_progress)
                 extracted_texts.append(text)
                 filenames.append(filename)
             except ValueError as e:
@@ -126,29 +182,27 @@ def process():
 
     try:
         if is_ajax:
-            progress_tracker.update_progress(task_id, 0)
+            progress_tracker.update_progress(task_id, 4)
 
-        rag_context = build_rag_context(goal, extracted_texts)
+        if file_hashes:
+            rag_context = build_rag_context_from_hashes(goal, file_hashes)
+        else:
+            rag_context = build_rag_context(goal, extracted_texts)
         if not rag_context:
             rag_context = "\n\n".join(extracted_texts)
 
         if is_ajax:
-            progress_tracker.update_progress(task_id, 1)
-
-        if is_ajax:
-            progress_tracker.update_progress(task_id, 2)
+            progress_tracker.update_progress(task_id, 5)
 
         summary = generate_summary(rag_context)
         if is_ajax:
-            progress_tracker.update_progress(task_id, 3)
+            progress_tracker.update_progress(task_id, 6)
 
         relevance_result = check_relevance(goal, rag_context, summary)
         if is_ajax:
-            progress_tracker.update_progress(task_id, 4)
+            progress_tracker.update_progress(task_id, 7)
 
         study_path = generate_study_path(goal, rag_context, summary)
-        if is_ajax:
-            progress_tracker.update_progress(task_id, 5)
 
         session['learning_goal'] = goal
         session['summary'] = summary
@@ -157,6 +211,7 @@ def process():
         session['processed_filename'] = ', '.join(filenames)
         session['uploaded_filenames'] = filenames
         session['extracted_texts'] = extracted_texts
+        session['file_hashes'] = file_hashes
 
         if current_user.is_authenticated:
             if not current_user.can_start_new_lesson():
@@ -167,10 +222,11 @@ def process():
                 return redirect(url_for('main.dashboard'))
             path_title = study_path.get('title', goal[:50])
             create_study_path(current_user, path_title, goal,
-                              extracted_texts=extracted_texts)
+                              extracted_texts=extracted_texts,
+                              file_hashes=file_hashes)
 
         if is_ajax:
-            progress_tracker.update_progress(task_id, 6)
+            progress_tracker.update_progress(task_id, 8)
             progress_tracker.cleanup_task(task_id)
             return jsonify({'redirect': url_for('main.results')})
 
@@ -366,7 +422,11 @@ def generate_lessons():
     lessons = get_lessons(current_user, path_id=path_id_val)
 
     extracted_texts = _get_texts()
-    retriever = make_retriever(learning_goal, extracted_texts)
+    file_hashes_data = _get_hashes()
+    if file_hashes_data:
+        retriever = make_retriever_from_hashes(learning_goal, file_hashes_data)
+    else:
+        retriever = make_retriever(learning_goal, extracted_texts)
 
     progress_tracker.update_progress(task_id, 1)
 
@@ -393,6 +453,7 @@ def generate_lessons():
                  title=study_path.get('title', learning_goal[:50]),
                  learning_goal=learning_goal,
                  extracted_texts=extracted_texts,
+                 file_hashes_val=file_hashes_data,
                  path_id=path_id_val)
 
     flash(f'Generated {len(modules)} lessons successfully!', 'success')
@@ -543,8 +604,12 @@ def retake_lesson(module_index):
     slides = lesson.get('lesson', {}).get('slides', [])
     learning_goal = _get_goal()
     extracted_texts = _get_texts()
+    file_hashes_data = _get_hashes()
 
-    retriever = make_retriever(learning_goal, extracted_texts)
+    if file_hashes_data:
+        retriever = make_retriever_from_hashes(learning_goal, file_hashes_data)
+    else:
+        retriever = make_retriever(learning_goal, extracted_texts)
 
     artifacts = build_module_artifacts(
         {'title': module_title},
@@ -603,7 +668,7 @@ def login():
         if user and user.check_password(password):
             for key in ('learning_goal', 'summary', 'relevance_result',
                         'study_path', 'processed_filename', 'uploaded_filenames',
-                        'extracted_texts'):
+                        'extracted_texts', 'file_hashes'):
                 session.pop(key, None)
             login_user(user, remember=True)
             flash('Welcome back!', 'success')
