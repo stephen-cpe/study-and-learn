@@ -1,8 +1,8 @@
 # STATUS.md
 Last Updated: 2026-05-24
 Sprint: 6
-Last Task Completed: Sprint 6 — OCR/Vision Integration & Global Content Deduplication (GLM-OCR, Qwen3-VL, pdf2image, ContentRegistry, content-keyed ChromaDB, multi-collection retrieval, 172 tests passing)
-Commit Message Suggestion: feat(sprint6): OCR/vision integration with GLM-OCR local + Qwen3-VL cloud, global content deduplication, content-keyed ChromaDB, 8 file types, 172 tests
+Last Task Completed: Sprint 6 — Error handling improvements: typed exception hierarchy (AIServiceError, AIModelUnavailableError, AICloudAPIError, AITimeoutError), exponential-backoff retry for transient Ollama failures, user-facing error messages, graceful fallbacks in all AI services, silent exception logging
+Commit Message Suggestion: fix(sprint6): typed AI exception hierarchy with retry, user-facing error messages, graceful service fallbacks
 Known Issues:
   - AI output consistency: qwen3:0.6b is placeholder-only; use cloud models (gemma3:12b-cloud, nemotron-3-nano:30b-cloud) for production quality
   - Mascot animation: Image placed (done), animation frames deferred to Sprint 7

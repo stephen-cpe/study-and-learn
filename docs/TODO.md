@@ -390,7 +390,7 @@ Build the smallest working version first, then iterate:
 
 ### Post-Capstone
 - [ ] Difficulty level selector (Easy/Moderate/Hard)
-- [ ] Extended file type support (.docx, .html, .odt)
+- [ ] Extended file type support (.html, .odt)
 - [ ] YouTube/video transcript integration
 - [ ] External learning resource search
 - [ ] Short-answer AI grading

@@ -7,15 +7,9 @@ from PIL import Image
 from src.models import ContentRegistry
 from src import db
 from src.services.ai_client import call_ollama
+from src.services.vector_store import get_collection_name
 
 logger = logging.getLogger(__name__)
-
-COLLECTION_PREFIX = "doc_"
-MAX_HASH_LENGTH = 59
-
-
-def _get_collection_name(file_hash: str) -> str:
-    return f"{COLLECTION_PREFIX}{file_hash[:MAX_HASH_LENGTH]}"
 
 
 def hash_file(file_path: str) -> str:
@@ -37,7 +31,7 @@ def is_content_registered(file_hash: str) -> Optional[str]:
 
 
 def register_content(file_hash: str, extracted_text: str, ocr_text: str = "") -> str:
-    collection_name = _get_collection_name(file_hash)
+    collection_name = get_collection_name(file_hash)
     existing = ContentRegistry.query.filter_by(file_hash=file_hash).first()
     if existing:
         existing.extracted_text = extracted_text
@@ -65,19 +59,19 @@ def register_content(file_hash: str, extracted_text: str, ocr_text: str = "") ->
 
 
 def _get_poppler_path() -> Optional[str]:
+    env_poppler = os.environ.get("POPPLER_PATH", "")
+    if env_poppler and os.path.isdir(env_poppler):
+        return env_poppler
+
     possible = [
-        r"C:\Program Files\poppler-24.08.0\Library\bin",
-        r"C:\Program Files\poppler\bin",
         r"C:\Program Files\poppler\Library\bin",
-        r"C:\poppler\bin",
+        r"C:\Program Files\poppler\bin",
         r"C:\poppler\Library\bin",
+        r"C:\poppler\bin",
     ]
     for p in possible:
         if os.path.isdir(p):
             return p
-    env_poppler = os.environ.get("POPPLER_PATH", "")
-    if env_poppler and os.path.isdir(env_poppler):
-        return env_poppler
     return None
 
 
@@ -160,6 +154,7 @@ def extract_docx_images(file_path: str, output_dir: str) -> List[str]:
 def extract_pptx_content(file_path: str, output_dir: str) -> Tuple[str, List[str]]:
     try:
         from pptx import Presentation
+        from pptx.enum.shapes import MSO_SHAPE_TYPE
     except ImportError:
         logger.warning("python-pptx not available")
         return "", []
@@ -176,19 +171,30 @@ def extract_pptx_content(file_path: str, output_dir: str) -> Tuple[str, List[str
                     if paragraph.text.strip():
                         text_parts.append(paragraph.text)
 
-        try:
-            from pptx.util import Inches, Pt
-            from pptx.enum.shapes import MSO_SHAPE_TYPE
-            has_visual = any(
-                hasattr(shape, "image") or
-                (hasattr(shape, "shape_type") and shape.shape_type == MSO_SHAPE_TYPE.PICTURE)
-                for shape in slide.shapes
-            )
-            if has_visual:
-                slide_path = os.path.join(output_dir, f"slide_{i + 1}.png")
-                slide_images.append(slide_path)
-        except Exception:
-            pass
+            if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+                try:
+                    image = shape.image
+                    ext = image.content_type.split("/")[-1]
+                    if ext == "jpeg":
+                        ext = "jpg"
+                    img_path = os.path.join(
+                        output_dir, f"slide_{i + 1}_img_{len(slide_images)}.{ext}"
+                    )
+                    with open(img_path, "wb") as f:
+                        f.write(image.blob)
+                    try:
+                        img = Image.open(img_path)
+                        if img.mode != "RGB":
+                            img = img.convert("RGB")
+                        png_path = os.path.splitext(img_path)[0] + ".png"
+                        img.save(png_path, "PNG")
+                        if png_path != img_path:
+                            os.remove(img_path)
+                        slide_images.append(png_path)
+                    except Exception:
+                        slide_images.append(img_path)
+                except Exception:
+                    pass
 
     return "\n".join(text_parts), slide_images
 
@@ -210,6 +216,14 @@ def _resize_image_if_needed(image_path: str) -> str:
 
 
 def ocr_page(image_path: str, mode: str = "text") -> str:
+    max_bytes = int(os.environ.get("OCR_MAX_FILE_BYTES", str(50 * 1024 * 1024)))
+    file_size = os.path.getsize(image_path)
+    if file_size > max_bytes:
+        logger.warning(
+            "Skipping OCR for %s: file size %d exceeds OCR_MAX_FILE_BYTES (%d)",
+            image_path, file_size, max_bytes,
+        )
+        return ""
     _resize_image_if_needed(image_path)
     abs_path = os.path.abspath(image_path)
 

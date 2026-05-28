@@ -3,7 +3,11 @@ Quiz generation service for the Study-and-Learn MVP.
 """
 import json
 import random
+import logging
 from src.services.ai_client import call_ollama
+from src.services.exceptions import AIServiceError
+
+logger = logging.getLogger(__name__)
 
 
 def _shuffle_options(options, correct_indices, single_index=False):
@@ -78,8 +82,8 @@ def generate_quiz(module_title: str, slides: list, retriever, n_questions: int =
             result = retriever(query)
             if result:
                 rag_context = result
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("RAG retrieval failed for quiz '%s': %s", module_title, str(e))
 
     question_types = ['mcq', 'true_false', 'multi_select', 'fill_blank']
     type_mix = _build_type_mix(n_questions, question_types)
@@ -174,7 +178,11 @@ JSON FORMAT:
 
 Quiz:"""
 
-    response = call_ollama(prompt)
+    try:
+        response = call_ollama(prompt)
+    except AIServiceError as e:
+        logger.error("Quiz generation failed for module '%s': %s", module_title, str(e))
+        return _fallback_quiz(n_questions)
 
     try:
         start_idx = response.find('{')
@@ -202,8 +210,8 @@ def generate_inline_checkpoint(module_title: str, slides_subset: list, retriever
             result = retriever(f"{module_title}")
             if result:
                 rag_context = result
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("RAG retrieval failed for checkpoint '%s': %s", module_title, str(e))
 
     prompt = f"""You are an expert educator creating a quick comprehension checkpoint for high-school to early-college learners.
 
@@ -235,7 +243,11 @@ JSON FORMAT:
 
 Question:"""
 
-    response = call_ollama(prompt)
+    try:
+        response = call_ollama(prompt)
+    except AIServiceError as e:
+        logger.error("Checkpoint generation failed for module '%s': %s", module_title, str(e))
+        return _fallback_checkpoint()
 
     try:
         start_idx = response.find('{')
@@ -248,6 +260,10 @@ Question:"""
     except (json.JSONDecodeError, ValueError, KeyError, TypeError):
         pass
 
+    return _fallback_checkpoint()
+
+
+def _fallback_checkpoint() -> dict:
     fallback = {
         'id': 'checkpoint',
         'type': 'mcq',

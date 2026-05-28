@@ -75,8 +75,8 @@ def build_rag_context_from_hashes(goal: str, file_hashes: List[str]) -> str:
                 client.get_collection(name=coll_name)
                 collection_names.append(coll_name)
                 continue
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Collection '%s' not found, will rebuild from registry: %s", coll_name, str(e))
 
             entry = ContentRegistry.query.filter_by(file_hash=h).first()
             if entry and entry.extracted_text:

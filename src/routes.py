@@ -3,6 +3,7 @@ Route definitions for the Study-and-Learn MVP.
 """
 import os
 import json
+import logging
 import uuid
 from flask import (Blueprint, render_template, request, redirect,
                    url_for, flash, session, current_app, jsonify, abort)
@@ -15,6 +16,7 @@ from src.services.rag_retriever import build_rag_context, build_rag_context_from
 from src.services.vision_parser import hash_file, is_content_registered
 from src.services.lesson_orchestrator import make_retriever, make_retriever_from_hashes, build_module_artifacts
 from src.services.grader import _grade_single_question, _get_correct_answer
+from src.services.exceptions import StudyAndLearnError
 from src.repositories.lesson_repo import (
     get_lessons, save_lessons, get_extracted_texts, get_learning_goal,
     get_study_path_data, get_active_path, create_study_path,
@@ -24,6 +26,8 @@ from src.services import progress_tracker
 from flask_login import login_user, logout_user, login_required, current_user
 from src.models import User, StudyPath, LessonProgress, ContentRegistry
 from src import db
+
+logger = logging.getLogger(__name__)
 
 bp = Blueprint('main', __name__)
 
@@ -147,8 +151,8 @@ def process():
                         extracted_texts.append(entry.extracted_text)
                         filenames.append(filename)
                         continue
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("ContentRegistry lookup failed for hash %s: %s", file_hash[:8], str(e))
 
             def ocr_progress(stage_name, current, total):
                 if is_ajax and task_id:
@@ -233,11 +237,19 @@ def process():
         flash(f'Processed {len(filenames)} file(s) successfully!', 'success')
         return redirect(url_for('main.results'))
 
-    except Exception as e:
+    except StudyAndLearnError as e:
+        logger.error("Processing failed: %s", str(e))
         if is_ajax:
             progress_tracker.cleanup_task(task_id)
             return jsonify({'error': str(e)}), 500
-        flash(f'Processing error: {str(e)}', 'error')
+        flash(str(e), 'error')
+        return redirect(url_for('main.index'))
+    except Exception as e:
+        logger.error("Unexpected processing error", exc_info=True)
+        if is_ajax:
+            progress_tracker.cleanup_task(task_id)
+            return jsonify({'error': 'An unexpected error occurred. Please try again.'}), 500
+        flash('An unexpected error occurred. Please try again.', 'error')
         return redirect(url_for('main.index'))
 
 

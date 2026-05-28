@@ -13,8 +13,13 @@ import time, so tests can safely use ``monkeypatch.setenv`` before invoking
 ``call_ollama``.
 """
 import os
+import time
 import logging
 import requests
+
+from src.services.exceptions import (
+    AIServiceError, AIModelUnavailableError, AICloudAPIError, AITimeoutError,
+)
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -44,18 +49,33 @@ def _call_ollama_local(prompt: str, model: str = None) -> str:
         response_text = result.get('response', '')
         logger.info(f"Ollama success: received {len(response_text)} chars")
         return response_text
-    except requests.exceptions.Timeout:
-        logger.error(f"Ollama TIMEOUT after {timeout}s for model '{model}'")
-        raise RuntimeError(
-            f"Model '{model}' timed out after {timeout}s. "
-            f"Try pulling it first: ollama pull {model}"
+    except requests.exceptions.ConnectTimeout:
+        logger.error(f"Ollama CONNECT TIMEOUT for model '{model}' — is Ollama running?")
+        raise AIModelUnavailableError(
+            f"Could not connect to local Ollama at {base_url}. "
+            f"Ensure Ollama is running and reachable."
+        )
+    except requests.exceptions.ReadTimeout:
+        logger.error(f"Ollama READ TIMEOUT after {timeout}s for model '{model}'")
+        raise AITimeoutError(
+            f"Model '{model}' took too long to respond ({timeout}s timeout). "
+            f"Try a smaller model or reduce input size."
         )
     except requests.exceptions.HTTPError as e:
         logger.error(f"Ollama HTTP ERROR: {response.status_code} {response.text}")
-        raise RuntimeError(f"Ollama API error {response.status_code}: {response.text}")
+        raise AIServiceError(
+            f"Local Ollama returned error {response.status_code}. "
+            f"Check if model '{model}' is pulled and available."
+        )
+    except requests.exceptions.ConnectionError as e:
+        logger.error(f"Ollama CONNECTION ERROR: {str(e)}")
+        raise AIModelUnavailableError(
+            f"Could not connect to local Ollama at {base_url}. "
+            f"Ensure Ollama is running and reachable."
+        )
     except requests.exceptions.RequestException as e:
         logger.error(f"Ollama REQUEST ERROR: {str(e)}")
-        raise RuntimeError(f"Failed to reach Ollama at {url}: {str(e)}")
+        raise AIModelUnavailableError(f"Failed to reach Ollama at {url}: {str(e)}")
 
 
 def call_ollama(prompt: str, model: str = None, force_local: bool = False) -> str:
@@ -79,3 +99,32 @@ def call_ollama(prompt: str, model: str = None, force_local: bool = False) -> st
         return cloud_call(prompt, model)
 
     return _call_ollama_local(prompt, model)
+
+
+def call_ollama_with_retry(prompt: str, model: str = None,
+                           force_local: bool = False,
+                           max_retries: int = 2) -> str:
+    """Call Ollama with automatic retry for transient connection failures.
+
+    Retries only on AIModelUnavailableError (Ollama not running, connection
+    refused). Does NOT retry timeouts or HTTP errors — those indicate
+    non-transient issues.
+    """
+    last_error = None
+    for attempt in range(max_retries + 1):
+        try:
+            return call_ollama(prompt, model=model, force_local=force_local)
+        except AIModelUnavailableError as e:
+            last_error = e
+            if attempt < max_retries:
+                delay = 2 ** attempt
+                logger.warning(
+                    "AI unavailable (attempt %d/%d), retrying in %ds: %s",
+                    attempt + 1, max_retries + 1, delay, str(e),
+                )
+                time.sleep(delay)
+        except (AITimeoutError, AICloudAPIError, AIServiceError):
+            raise
+
+    assert last_error is not None
+    raise last_error

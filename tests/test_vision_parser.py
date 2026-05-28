@@ -96,9 +96,9 @@ class TestContentRegistry:
 
 class TestCollectionName:
     def test_collection_name_length(self):
-        from src.services.vision_parser import _get_collection_name
+        from src.services.vector_store import get_collection_name
         h = "a" * 64
-        name = _get_collection_name(h)
+        name = get_collection_name(h)
         assert name.startswith("doc_")
         assert len(name) <= 63
         assert len(name) == 4 + 59

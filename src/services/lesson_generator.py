@@ -2,7 +2,11 @@
 Lesson generation service for the Study-and-Learn MVP.
 """
 import json
+import logging
 from src.services.ai_client import call_ollama
+from src.services.exceptions import AIServiceError, StudyAndLearnError
+
+logger = logging.getLogger(__name__)
 
 
 def build_rag_context_for_module(module_title: str, learning_goal: str, retriever) -> str:
@@ -10,8 +14,8 @@ def build_rag_context_for_module(module_title: str, learning_goal: str, retrieve
         if retriever:
             query = f"{learning_goal} {module_title}"
             return retriever(query) or ""
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("RAG retrieval failed for module '%s': %s", module_title, str(e))
     return ""
 
 
@@ -74,7 +78,11 @@ JSON FORMAT:
 
 Lesson:"""
 
-    response = call_ollama(prompt)
+    try:
+        response = call_ollama(prompt)
+    except AIServiceError as e:
+        logger.error("Lesson generation failed for module '%s': %s", module_title, str(e))
+        return _fallback_lesson(module_title)
 
     try:
         start_idx = response.find('{')

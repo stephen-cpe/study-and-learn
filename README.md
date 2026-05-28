@@ -68,7 +68,24 @@ This creates all tables, indexes, foreign keys, stamps the alembic version, and 
 | bob      | BOBpassword   | USER  | Yes                  |
 | alice    | ALICEpassword | USER  | Yes                  |
 
-### 5. Pull Ollama models
+### 5. Install Poppler (Windows 11)
+
+The OCR pipeline requires Poppler to render PDF pages for AI vision processing.
+
+1. Download the latest Poppler for Windows from: https://github.com/oschwartz10612/poppler-windows/releases
+2. Extract the archive (e.g., `poppler-26.02.0`) to `C:\Program Files\poppler-26.02.0\`
+3. Add the `bin` directory to your system `PATH`:
+   - Open **System Properties > Environment Variables**
+   - Under **System variables**, edit `Path` and add: `C:\Program Files\poppler-26.02.0\Library\bin`
+   - Alternatively, set `POPPLER_PATH=C:\Program Files\poppler-26.02.0\Library\bin` in your `.env` file
+4. Restart any open terminals for the change to take effect
+
+To verify Poppler is installed correctly:
+```bash
+pdftoppm -v
+```
+
+### 6. Pull Ollama models
 
 ```bash
 ollama pull qwen3:0.6b
@@ -80,7 +97,7 @@ The default models are placeholders. For better results, use larger models such 
 
 `glm-ocr` (0.9B) enables AI-powered OCR for PDFs and images. If you skip this step, the app falls back to traditional text-only extraction.
 
-### 6. Create .env file
+### 7. Create .env file
 
 Copy the provided template and edit it:
 
@@ -90,7 +107,7 @@ copy .env.example .env
 
 Open `.env` and update `SECRET_KEY` with a random string and verify `DATABASE_URL` matches your PostgreSQL credentials.
 
-### 7. Run the application
+### 8. Run the application
 
 ```bash
 python app.py
@@ -128,7 +145,7 @@ Set `AI_MOCK=true` in your `.env` file to use mock responses. This is useful for
 ## Links
 - [Public Task Board](https://stephen-cpe.github.io/task-board-v1/)
 - [Task Board Repository](https://github.com/stephen-cpe/task-board-v1/)
-- [Deployed App](#) *(coming soon — Sprint 7)*
+- [Deployed App](#) *(coming soon — Sprint 8)*
 
 ## License
 

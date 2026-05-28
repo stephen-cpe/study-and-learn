@@ -3,7 +3,7 @@
 
 ## Project Brief (Read First)
 - **App:** Study-and-Learn — a Flask web app where a learner uploads study documents and gets an AI-generated summary, relevance check, study path, interactive slide-based lessons, mixed-type quizzes, and per-module grading with gated progression.
-- **Stack:** Python 3.13, Flask, Flask-Session (cachelib), Bootstrap 5, PostgreSQL, pytest, LangChain, ChromaDB, Ollama (configurable chat + embedding models), GitHub Actions (CI)
+- **Stack:** Python 3.13, Flask, Flask-Session (cachelib), Bootstrap 5, PostgreSQL, pytest, LangChain, ChromaDB, Ollama (configurable chat + embedding models), pdf2image + Poppler (PDF rendering), Pillow (image handling), python-pptx (PPTX extraction), GLM-OCR (local OCR, 0.9B), Qwen3-VL:235b-cloud (cloud figure descriptions), GitHub Actions (CI)
 - **Structure:** See SRS.md for requirements. See TODO.md for sprint tasks. See DESIGN_AND_TESTING.md for ADRs and architecture. See docs/STATUS.md for current state.
 - **Repo root:** study-and-learn/
 - **Key rules:** No chat UI. Forms and result pages only. Custom CSS/JS slide deck (no reveal.js). Retro cyberpunk theme with Retrograde Bold and BoldPixels fonts. PostgreSQL-only database. Flask-Session (cachelib FileSystemCache) for transient form data; DB-backed lesson repository (PostgreSQL StudyPath + LessonProgress + extracted_texts) for lesson/progress persistence.
@@ -48,7 +48,8 @@ You follow Spec-Driven Development strictly.
    - Custom slide deck engine only — do not reintroduce reveal.js
    - Retro fonts (Retrograde Bold, BoldPixels) must be preserved in all templates where headings appear
    - Module gating: 80% pass threshold, sequential unlock enforced in routes
-   - Lesson generation requires `can_generate_lessons=True` or `is_admin=True`; new signups default to denied
+    - Lesson generation requires `can_generate_lessons=True` or `is_admin=True`; new signups default to denied
+    - Catch AI failures as typed exceptions (`AIServiceError` subclasses from `src/services/exceptions.py`), never as bare `RuntimeError` or `Exception`
 
 ## State Tracking
 After each task, update `docs/STATUS.md` using EXACTLY this format:

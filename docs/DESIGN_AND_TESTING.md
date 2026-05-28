@@ -1,9 +1,9 @@
 # Design and Testing Document
 # Study-and-Learn
 
-**Version:** 0.3  
+**Version:** 0.4  
 **Status:** Living document  
-**Last updated:** May 2026
+**Last updated:** May 24, 2026
 
 ---
 
@@ -14,10 +14,13 @@ Study-and-Learn is a Flask web application with a Bootstrap-and-retro-CSS fronte
 ```mermaid
 flowchart TD
     A["Unified Form: Goal + Files"] --> B["POST /process Route"]
-    B --> C["Document Parser: .txt, .md, .pdf"]
-    C --> D["Chunker: RecursiveCharacterTextSplitter"]
-    D --> E["Vector Store: ChromaDB + OllamaEmbeddings"]
-    E --> F["RAG Retriever: top-k=5 context"]
+    B --> C["Document Parser: .txt, .md, .pdf, .docx, .pptx"]
+    B --> C2["Vision Parser: .png, .jpg, .jpeg"]
+    C --> C3["OCR Pipeline: GLM-OCR local + Qwen3-VL cloud"]
+    C2 --> C3
+    C3 --> D["Chunker: RecursiveCharacterTextSplitter"]
+    D --> E["Vector Store: Content-Keyed ChromaDB (doc_{hash})"]
+    E --> F["RAG Retriever: Multi-Collection top-k=5 context"]
     F --> G["Summarizer"]
     F --> H["Relevance Checker"]
     F --> I["Curriculum Generator"]
@@ -44,16 +47,20 @@ Core workflow:
 
 1. User enters a learning goal and uploads study documents in a single unified form.
 2. Backend validates and stores uploads.
-3. Document parser extracts text.
-4. RAG pipeline chunks, embeds, stores, and retrieves relevant context.
-5. AI services generate summary, relevance check, and study path.
-6. Results page displays structured output with improved visual hierarchy.
-7. User clicks "Generate Interactive Lessons" to produce slide-based lessons.
-8. AI generates lesson slides + inline checkpoints + mixed-type quiz per module.
-9. Custom CSS/JS slide deck presents lessons with retro fonts and checkpoint blocking.
-10. Learner completes quiz, receives instant grading with per-question feedback.
-11. Failed modules can be retaken with fresh regenerated questions.
-12. Progression is gated (80% pass threshold required to unlock next module).
+3. Document parser extracts text from `.txt`, `.md`, `.pdf`, `.docx`, `.pptx`.
+4. Vision parser renders pages/images and runs AI-powered OCR (GLM-OCR local, Qwen3-VL cloud) for `.png`, `.jpg`, `.jpeg`, and scanned PDFs.
+5. File hashes are computed, ContentRegistry check skips duplicates globally.
+6. RAG pipeline chunks, embeds, stores, and retrieves relevant context from content-keyed ChromaDB collections.
+7. AI services generate summary, relevance check, and study path.
+8. Results page displays structured output with improved visual hierarchy.
+7. AI services generate summary, relevance check, and study path.
+8. Results page displays structured output with improved visual hierarchy.
+9. User clicks "Generate Interactive Lessons" to produce slide-based lessons.
+10. AI generates lesson slides + inline checkpoints + mixed-type quiz per module.
+11. Custom CSS/JS slide deck presents lessons with retro fonts and checkpoint blocking.
+12. Learner completes quiz, receives instant grading with per-question feedback.
+13. Failed modules can be retaken with fresh regenerated questions.
+14. Progression is gated (80% pass threshold required to unlock next module).
 
 ---
 
@@ -162,6 +169,18 @@ Core workflow:
 
 **Reason:** Sprint 5 introduced user accounts but left admin functionality incomplete. Admins need a centralized view to manage user access (toggle `can_generate_lessons`, reset passwords). The access model was refined to three tiers: unauthenticated users see the login form, privileged users (`can_generate_lessons=True` or `is_admin=True`) see the full learning form, and unprivileged users see an access-denied message. Custom error handlers (400/403/404/500) provide retro-themed error pages instead of raw Werkzeug debug output. Tradeoffs: ✅ Role-based access control, user management, polished error UX • ❌ Removed dead `login.html` template (index.html handles unauthenticated login inline).
 
+### ADR-017: AI-Powered OCR/Vision Integration with Content-Addressable Deduplication
+
+**Decision:** Integrate local GLM-OCR (0.9B, text/table/figure recognition) and cloud Qwen3-VL:235b (figure descriptions) as an AI-powered OCR pipeline, coupled with SHA-256 content-addressable deduplication via a `ContentRegistry` database model and content-keyed ChromaDB collections (`doc_{hash}`).
+
+**Reason:** Before Sprint 6, the app only supported text-layer extraction from `.txt`, `.md`, `.pdf`, and `.docx`. Scanned PDFs, embedded images, PowerPoint slides, and raw image files were either rejected or produced empty output. The OCR pipeline enables 8 file types, extracts text from visual content, and generates semantic figure descriptions. Content-addressable deduplication prevents redundant OCR and embedding when identical files are uploaded by different users or in different sessions — ChromaDB collections are named by file hash and shared globally rather than tied to user sessions. Tradeoffs: ✅ 8 file types, global dedup, multi-collection retrieval • ❌ Adds GLM-OCR dependency (~2.2 GB), Poppler system dependency, ~2s/page OCR latency
+
+### ADR-018: Typed Exception Hierarchy with User-Facing Error Messages
+
+**Decision:** Replace generic `RuntimeError` in AI clients with a typed exception hierarchy (`StudyAndLearnError` → `AIServiceError` → `AIModelUnavailableError` / `AICloudAPIError` / `AITimeoutError`), add exponential-backoff retry for transient connection failures, and catch AI errors at the service layer to return user-friendly messages instead of raw error strings.
+
+**Reason:** Before this change, Ollama failures (connection refused, HTTP 500, timeouts) produced raw `RuntimeError` strings shown directly to users: `"Failed to reach Ollama at http://localhost:11434"`. Users had no way to distinguish between a temporary glitch (retryable) and a configuration error (needs human fix). The new hierarchy maps HTTP status codes and exception types to user-actionable messages (`"AI service is currently unavailable. Please verify your AI backend is running and try again."`). Service-layer generators (`summarizer.py`, `relevance_checker.py`, `curriculum_generator.py`) catch `AIServiceError` and either raise `StudyAndLearnError` with a friendly message or gracefully fall back to default content. Lesson/quiz generators fall back to hardcoded content when AI is unavailable rather than crashing. Silent `except Exception: pass` blocks were converted to `logger.warning()` calls. Tradeoffs: ✅ User-visible error clarity, graceful degradation, retry resilience • ❌ 7-class hierarchy, additional `try/except` in each service layer
+
 ---
 
 ## 4. Software & Architectural Patterns
@@ -193,7 +212,10 @@ Core workflow:
     - Quiz generator: mock, empty inputs, retriever, inline checkpoint, question validation, type mix distribution, fallback quiz structure,
     - Slide validation (only known types accepted),
     - Question validation (all 4 question types: mcq, true_false, multi_select, fill_blank),
-    - Fallback lesson and quiz generation for error resilience.
+    - Fallback lesson and quiz generation for error resilience,
+    - Vision parser: OCR, file hashing, content registry, dedup, feature gates, concurrent handling (20 tests),
+    - Parser expansion: pptx extraction, image files, dedup verification (5 tests),
+    - RAG expansion: multi-collection retrieval, metadata propagation, scores (4 tests).
 
 ### Integration Tests
 
@@ -208,7 +230,7 @@ Integration tests cover routes and workflow behavior:
 - mocked generate-lessons flow: session data → lesson + quiz generation → redirect,
 - lesson deck route with pre-populated session lessons returns 200.
 
-Current test suite: **143 tests across 18 test modules covering core MVP, auth, models, dashboard, lesson repository, admin access, multi-path workflows, and access control — 0 failures**.
+Current test suite: **172 tests across 21 test modules covering core MVP, auth, models, dashboard, lesson repository, admin access, multi-path workflows, OCR/vision pipeline, multi-collection retrieval, and access control — 0 failures**.
 
 ### Smoke Tests
 

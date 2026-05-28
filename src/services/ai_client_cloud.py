@@ -21,6 +21,10 @@ import os
 import logging
 import requests
 
+from src.services.exceptions import (
+    AIServiceError, AIModelUnavailableError, AICloudAPIError, AITimeoutError,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -31,7 +35,7 @@ def call_ollama(prompt: str, model: str = None) -> str:
         return f"Mock response for prompt: {prompt[:50]}..."
 
     if model is None:
-        model = os.environ.get('OLLAMA_MODEL', 'nemotron-3-nano:30b-cloud')
+        model = os.environ.get('OLLAMA_MODEL', 'gemma3:27b-cloud')
 
     base_url = os.environ.get('OLLAMA_CLOUD_BASE_URL', 'https://ollama.com')
     url = f"{base_url}/v1/chat/completions"
@@ -57,12 +61,46 @@ def call_ollama(prompt: str, model: str = None) -> str:
         response_text = result.get('choices', [{}])[0].get('message', {}).get('content', '')
         logger.info(f"Ollama Cloud success: received {len(response_text)} chars")
         return response_text
-    except requests.exceptions.Timeout:
-        logger.error(f"Ollama Cloud TIMEOUT after {timeout}s for model '{model}'")
-        raise RuntimeError(f"Model '{model}' timed out after {timeout}s.")
+    except requests.exceptions.ConnectTimeout:
+        logger.error(f"Ollama Cloud CONNECT TIMEOUT for model '{model}'")
+        raise AIModelUnavailableError(
+            "Could not connect to Ollama Cloud. Check your internet connection."
+        )
+    except requests.exceptions.ReadTimeout:
+        logger.error(f"Ollama Cloud READ TIMEOUT after {timeout}s for model '{model}'")
+        raise AITimeoutError(
+            f"Cloud model '{model}' took too long to respond ({timeout}s timeout). "
+            f"Try again or use a smaller model."
+        )
     except requests.exceptions.HTTPError as e:
-        logger.error(f"Ollama Cloud HTTP ERROR: {response.status_code} {response.text}")
-        raise RuntimeError(f"Ollama Cloud API error {response.status_code}: {response.text}")
+        status = response.status_code
+        logger.error(f"Ollama Cloud HTTP ERROR: {status} {response.text}")
+        if status == 400:
+            raise AICloudAPIError(
+                f"Cloud API rejected the request for model '{model}'. "
+                f"The model may not be available or the request is malformed."
+            )
+        elif status in (401, 403):
+            raise AICloudAPIError(
+                "Cloud API authentication failed. Check your OLLAMA_CLOUD_API_KEY."
+            )
+        elif status == 404:
+            raise AICloudAPIError(
+                f"Cloud model '{model}' not found. "
+                f"Verify the model name includes the '-cloud' suffix."
+            )
+        elif status >= 500:
+            raise AICloudAPIError(
+                f"Cloud API server error ({status}). The service may be temporarily "
+                f"unavailable. Try again in a moment."
+            )
+        else:
+            raise AICloudAPIError(f"Cloud API error {status}: {response.text}")
+    except requests.exceptions.ConnectionError as e:
+        logger.error(f"Ollama Cloud CONNECTION ERROR: {str(e)}")
+        raise AIModelUnavailableError(
+            "Could not connect to Ollama Cloud. Check your internet connection."
+        )
     except requests.exceptions.RequestException as e:
         logger.error(f"Ollama Cloud REQUEST ERROR: {str(e)}")
-        raise RuntimeError(f"Failed to reach Ollama Cloud at {url}: {str(e)}")
+        raise AIModelUnavailableError(f"Failed to reach Ollama Cloud at {url}: {str(e)}")
