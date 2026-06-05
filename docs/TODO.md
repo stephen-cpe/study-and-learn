@@ -2,7 +2,7 @@
 # Study-and-Learn
 
 **Purpose:** This document organizes the capstone work into MVP tasks, user stories, sprints, stretch goals, and submission requirements.  
-**Last updated:** May 2026
+**Last updated:** June 2026
 
 ---
 
@@ -234,15 +234,15 @@ Build the smallest working version first, then iterate:
 
 ---
 
-### Sprint 7: Polish, Mascot Animation, TTS & PDF Export ⬜ FUTURE
+### Sprint 7: Polish, Mascot Animation, TTS & PDF Export 🔄 IN PROGRESS
 
 **Goal:** Add mascot animation frames, TTS narration, PDF export, session cleanup, and remaining Sprint 6 polish tasks.
 
 **User Stories:** US-036, US-037, US-038
 
 **Tasks:**
-- [ ] Add mascot basic animation frames (idle/waiting/done)
-- [ ] Display mascot state changes during loading operations
+- [x] Add mascot basic animation frames (idle/waiting/done)
+- [x] Display mascot state changes during loading operations
 - [ ] Integrate Web Speech API or TTS library for lesson narration
 - [ ] Add TTS toggle button on slide deck (disabled by default)
 - [ ] Generate PDF from completed lesson slides and quiz results
@@ -380,7 +380,7 @@ Build the smallest working version first, then iterate:
 - [x] Defect remediation and performance optimization (Sprint 6)
 - [x] Expanded test coverage (Sprint 6)
 - [x] OCR/Vision integration with content deduplication (Sprint 6)
-- [ ] Mascot animation frames (Sprint 7)
+- [x] Mascot animation frames (Sprint 7)
 - [ ] TTS narration (opt-in) (Sprint 7)
 - [ ] PDF export for completed lessons (Sprint 7)
 - [ ] Session cleanup (Sprint 7)

@@ -2,6 +2,7 @@
 Flask application factory for the Study-and-Learn MVP.
 """
 import os
+import logging
 from flask import Flask
 from cachelib import FileSystemCache
 
@@ -15,27 +16,29 @@ db = SQLAlchemy()  # noqa: F401
 migrate = Migrate()  # noqa: F401
 login_manager = LoginManager()
 
+logger = logging.getLogger(__name__)
+
 
 def create_app():
     """Create and configure the Flask application."""
     app = Flask(__name__)
 
-    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-for-testing-only')
-    app.config['UPLOAD_FOLDER'] = 'uploads'
+    # ── Centralized config ──────────────────────────────────────────────
+    from config import Config
+    app.config.from_object(Config)
+    logger.info(Config.summary())
 
-    # ── PostgreSQL-only database ──────────────────────────────────────────
-    database_url = os.environ.get('DATABASE_URL')
-    if not database_url:
+    # ── PostgreSQL-only database (strict validation) ────────────────────
+    if not app.config['SQLALCHEMY_DATABASE_URI']:
         raise RuntimeError(
             "DATABASE_URL environment variable is required. "
             "Example: postgresql+psycopg2://user:password@localhost:5432/study_and_learn"
         )
-    if 'postgresql' not in database_url:
+    if 'postgresql' not in app.config['SQLALCHEMY_DATABASE_URI']:
         raise RuntimeError(
-            f"DATABASE_URL must use PostgreSQL ('postgresql' prefix). Got: {database_url}"
+            f"DATABASE_URL must use PostgreSQL ('postgresql' prefix). "
+            f"Got: {app.config['SQLALCHEMY_DATABASE_URI']}"
         )
-    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
     # ── Server-side sessions (cachelib-backed) ────────────────────────────
     # TODO: migrate session storage to DB-backed in Sprint 5 Phase 2
@@ -44,11 +47,9 @@ def create_app():
     )
     os.makedirs(session_dir, exist_ok=True)
 
-    app.config['SESSION_TYPE'] = 'cachelib'
     app.config['SESSION_CACHELIB'] = FileSystemCache(
         cache_dir=session_dir, threshold=500, mode=0o700
     )
-    app.config['SESSION_PERMANENT'] = False
 
     from flask_session import Session
     Session(app)

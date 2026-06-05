@@ -1,0 +1,39 @@
+# Auto-detect text files and normalize line endings on commit.
+* text=auto
+
+# Force LF (Unix) line endings for code, config, and docs.
+# This prevents CRLF churn between Windows and Linux contributors
+# — important for cross-platform development (Windows 11 dev → Linux prod).
+*.py        text eol=lf
+*.pyi       text eol=lf
+*.js        text eol=lf
+*.css       text eol=lf
+*.html      text eol=lf
+*.md        text eol=lf
+*.txt       text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.json      text eol=lf
+*.toml      text eol=lf
+*.cfg       text eol=lf
+*.ini       text eol=lf
+*.sh        text eol=lf
+*.example   text eol=lf
+.env*       text eol=lf
+.gitignore  text eol=lf
+.gitattributes text eol=lf
+
+# Explicitly mark binaries so Git never tries to "fix" their line endings.
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.webp      binary
+*.ico       binary
+*.pdf       binary
+*.zip       binary
+*.woff      binary
+*.woff2     binary
+*.ttf       binary
+*.otf       binary
+*.eot       binary

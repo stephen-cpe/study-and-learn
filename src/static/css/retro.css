@@ -741,12 +741,24 @@ h2, .section-title {
     height: 120px;
     z-index: 1000;
     cursor: pointer;
-    transition: all 0.3s ease;
     filter: drop-shadow(0 10px 20px rgba(0, 180, 216, 0.4));
 }
 
-#robot-mascot:hover {
-    transform: scale(1.08) translateY(-8px);
+/* State-based glow tints so users can see when the mascot is
+   idle vs processing vs celebrating. The GIF itself is the only
+   motion — no CSS transforms are applied. */
+#robot-mascot.mascot-state-busy {
+    filter: drop-shadow(0 10px 22px rgba(0, 180, 216, 0.65))
+            drop-shadow(0 0 8px rgba(0, 180, 216, 0.45));
+}
+
+#robot-mascot.mascot-state-happy {
+    filter: drop-shadow(0 10px 22px rgba(126, 231, 135, 0.6))
+            drop-shadow(0 0 10px rgba(126, 231, 135, 0.4));
+}
+
+#robot-mascot.mascot-state-idle {
+    filter: drop-shadow(0 10px 20px rgba(0, 180, 216, 0.4));
 }
 
 #speech-bubble {

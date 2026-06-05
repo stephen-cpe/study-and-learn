@@ -1,6 +1,11 @@
-<div class="mascot-wrapper">
+<div class="mascot-wrapper" data-mascot-state="idle">
     <img id="robot-mascot"
-         src="{{ url_for('static', filename='images/mascot-robot.png') }}"
+         class="mascot-img mascot-state-idle"
+         src="{{ url_for('static', filename='images/mascot-idle.gif') }}"
+         data-idle-src="{{ url_for('static', filename='images/mascot-idle.gif') }}"
+         data-busy-src="{{ url_for('static', filename='images/mascot-busy.gif') }}"
+         data-happy-src="{{ url_for('static', filename='images/mascot-happy.gif') }}"
+         data-fallback-src="{{ url_for('static', filename='images/mascot-robot.png') }}"
          alt="Study Robot Mascot"
          onclick="window._mascotTalk &amp;&amp; window._mascotTalk()">
     <div id="speech-bubble">

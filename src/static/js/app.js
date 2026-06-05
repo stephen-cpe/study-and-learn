@@ -374,6 +374,7 @@
           if (data.stage === undefined || data.stage < 0) return;
           setBubblePersistent(data.mascot || 'Processing your materials...');
           showBubbleBar(data.pct);
+          setMascotState(data.mascot_state || 'busy');
         })
         .catch(function () {});
     }, 2000);
@@ -471,6 +472,7 @@
           _receivedValidProgress = true;
           setBubblePersistent(data.mascot || 'Working on your lesson...');
           showBubbleBar(data.pct);
+          setMascotState(data.mascot_state || 'busy');
           if (data.stage >= 4) {
             stopProgressPoll();
             window.location.href = _generateRedirectUrl;
@@ -482,11 +484,52 @@
 
   /* ── Mascot ──────────────────────────────────────────── */
 
+  var VALID_MASCOT_STATES = ['idle', 'busy', 'happy'];
+  var _currentMascotState = null;
+  var _mascotGifFailed = false;
+
+  function setMascotState(state) {
+    var mascot = document.getElementById('robot-mascot');
+    if (!mascot) return;
+
+    var normalized = (state || 'idle').toLowerCase();
+    if (VALID_MASCOT_STATES.indexOf(normalized) === -1) {
+      normalized = 'idle';
+    }
+
+    if (_currentMascotState === normalized) return;
+
+    var src = mascot.getAttribute('data-' + normalized + '-src');
+    if (src && mascot.src.indexOf(src) === -1) {
+      _currentMascotState = normalized;
+      mascot.classList.remove(
+        'mascot-state-idle', 'mascot-state-busy', 'mascot-state-happy'
+      );
+      mascot.classList.add('mascot-state-' + normalized);
+      var wrapper = mascot.parentElement;
+      if (wrapper) wrapper.setAttribute('data-mascot-state', normalized);
+      mascot.src = src;
+    }
+  }
+
   function initMascot() {
     var mascot = document.getElementById('robot-mascot');
     var bubble = document.getElementById('speech-bubble');
     var bubbleText = document.getElementById('bubble-text');
     if (!mascot || !bubble || !bubbleText) return;
+
+    if (!_mascotGifFailed) {
+      mascot.addEventListener('error', function onMascotErr() {
+        var fallback = mascot.getAttribute('data-fallback-src');
+        if (fallback && mascot.src.indexOf(fallback) === -1) {
+          _mascotGifFailed = true;
+          mascot.removeEventListener('error', onMascotErr);
+          mascot.src = fallback;
+        }
+      });
+    }
+
+    setMascotState('idle');
 
     var messages = [
       'Ready to learn something cool today?',

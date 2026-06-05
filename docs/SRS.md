@@ -6,7 +6,7 @@
 **Capstone track:** Software system / AI system  
 **Repository name:** `study-and-learn`  
 **Primary development approach:** Spec-Driven Development with AI tooling support  
-**Last updated:** May 24, 2026
+**Last updated:** June 5, 2026
 
 ---
 
@@ -300,7 +300,7 @@ study-and-learn/
 | FR-025 | The MVP shall avoid a chat interface. | Must |
 | FR-026 | The UI shall guide the user through goal input, upload, analysis, and results. | Must |
 | FR-027 | The UI should use a retro-inspired visual style with custom pixel fonts. | Should |
-| FR-028 | The UI may include a pixel companion or mascot with simple idle/waiting/done animations. | Could |
+| FR-028 | The UI may include a pixel companion or mascot with idle/waiting/done animations. | Implemented (idle/busy/happy animated GIFs with progress-driven state switching) |
 | FR-032 | The system shall combine learning goal entry and file upload into a single unified form submission. | Must |
 | FR-033 | The system should display processing progress feedback during long-running AI operations. | Should |
 
@@ -423,7 +423,7 @@ study-and-learn/
 | Story ID | User Story | Acceptance Criteria |
 |---|---|---|
 | US-018 | As a learner, I want the app to feel simple, guided, and retro-themed. | Unified form; retro fonts applied consistently; cyberpunk visual identity maintained |
-| US-019 | As a learner, I want a retro mascot that provides simple visual feedback during my learning journey. | Mascot image displayed with idle/waiting/done states; animations or frames for key moments |
+| US-019 | As a learner, I want a retro mascot that provides simple visual feedback during my learning journey. | Mascot image displayed with idle/busy/happy animated GIF states; state-driven glow tints; progress-aware state switching via polling |
 | US-020 | As a learner, I want clear progress feedback during long AI operations so I know the app is working. | Background processing with visible progress bar or stage indicator instead of full-screen overlay |
 | US-021 | As a learner, I want the quality of generated lessons and quizzes to be acceptable for high-school to college-level material. | Prompt engineering refined; model research conducted for optimal quality/speed tradeoff on target hardware |
 | US-022 | As a learner, I want a difficulty toggle so content matches my age and skill level. *(Deferred to post-capstone — high effort, low impact for MVP.)* | Easy (10–11), Moderate (12–13), Hard (14–15) difficulty options; prompt adjusted accordingly |
@@ -463,7 +463,7 @@ study-and-learn/
 
 ### 8.2 Should-Have MVP Polish
 
-- Retro mascot/companion with idle/waiting/done animation frames.
+- Retro mascot/companion with idle/busy/happy animation frames.
 - Loading progress indicators showing current stage during AI operations.
 - Non-blocking background progress indicator during document processing.
 - Upload status messages.
@@ -524,7 +524,7 @@ Ranked from easier to harder. Items above the line are implemented; items below 
 30. Global content-addressable deduplication — done (SHA-256 ContentRegistry, content-keyed ChromaDB collections, multi-collection retrieval, 172 tests)
 
 ### Sprint 7 (Planned)
-31. Mascot animation frames (idle/waiting/done)
+31. Mascot animation frames (idle/busy/happy) — done (3 animated GIFs, sprite sheets, state-based glow tints, progress-driven switching, fallback to static PNG, centralized config)
 32. Text-to-speech narration (opt-in)
 33. PDF export for completed lessons
 34. Session cleanup (remove extracted_texts after lessons generated)
@@ -610,11 +610,11 @@ Later additions:
 3. ~~How many file types should be truly supported in the first sprint?~~ → **txt, md, pdf** (MVP); docx deferred to post-capstone
 4. ~~Should OCR be postponed until after the main workflow works?~~ → **Implemented in Sprint 6** (GLM-OCR local + Qwen3-VL cloud, content-addressable dedup)
 5. ~~Should generated outputs be stored as JSON, Markdown, or database records?~~ → **JSON in Flask session (server-side via cachelib)**
-6. ~~Should the companion be purely visual or tied to progress?~~ → Visual feedback with click-to-talk implemented; animation frames deferred to Sprint 6
+6. ~~Should the companion be purely visual or tied to progress?~~ → Visual feedback with click-to-talk implemented; animated GIF states (idle/busy/happy) with progress-driven switching implemented
 7. ~~Which deployment platform is easiest for the final capstone demo?~~ → Render or Railway free tier TBD in Sprint 8
 8. ~~What is the optimal model for lesson/quiz generation quality vs speed on 6GB VRAM?~~ → qwen3:0.6b chosen as placeholder; upgrade guidance documented (Sprint 4 prompt tuning ongoing)
 9. ~~Should loading UI use full-screen overlay or background processing with stage indicator?~~ → Background processing with progress bar + mascot speech bubble (implemented Sprint 4)
-10. ~~How many mascot animation frames are needed for adequate visual feedback?~~ → TBD in Sprint 6
+10. ~~How many mascot animation frames are needed for adequate visual feedback?~~ → 3 animated GIFs (idle: 4 frames blink/antenna/chest, busy: 6 frames fast cycle, happy: 5 frames sparkle/glow); 3 sprite sheets; generated programmatically from base PNG
 
 ---
 
