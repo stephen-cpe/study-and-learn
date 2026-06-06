@@ -1,6 +1,7 @@
 import io
 import tempfile
 import pytest
+from unittest.mock import patch
 from cachelib import FileSystemCache
 from src import create_app
 
@@ -50,7 +51,9 @@ def test_process_valid(monkeypatch, client):
         'learning_goal': 'Learn testing',
         'files': [(io.BytesIO(b'Test content'), 'test.txt')]
     }
-    response = client.post('/process', data=data, content_type='multipart/form-data', follow_redirects=True)
+    with patch("src.services.vision_parser.is_content_registered", return_value=None), \
+         patch("src.services.vision_parser.register_content"):
+        response = client.post('/process', data=data, content_type='multipart/form-data', follow_redirects=True)
     assert response.status_code == 200
     assert b'Processed' in response.data and b'successfully' in response.data
 
