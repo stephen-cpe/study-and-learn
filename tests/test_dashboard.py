@@ -150,3 +150,27 @@ def test_cannot_cancel_other_users_path(client):
 
     path_refreshed = db.session.get(StudyPath, path.id)
     assert path_refreshed.status == 'active'
+
+
+def test_reset_preserves_paths_with_lessons(client):
+    path = _make_active_path(client)
+
+    rv = client.get('/reset', follow_redirects=True)
+    assert rv.status_code == 200
+
+    path_refreshed = db.session.get(StudyPath, path.id)
+    assert path_refreshed.status == 'active', (
+        "Paths with generated lessons should remain active after reset"
+    )
+
+
+def test_reset_cancels_paths_without_lessons(client):
+    path = _make_path_no_progress(client)
+
+    rv = client.get('/reset', follow_redirects=True)
+    assert rv.status_code == 200
+
+    path_refreshed = db.session.get(StudyPath, path.id)
+    assert path_refreshed.status == 'cancelled', (
+        "Paths with zero LessonProgress rows should be cancelled on reset"
+    )

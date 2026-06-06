@@ -147,3 +147,60 @@ def test_retrieve_from_multiple_collections(mock_client):
         result = retrieve_from_multiple_collections("query", ["c1", "c2"], top_k=5)
         assert "from_coll2" in result
         assert "from_coll1" in result
+
+
+@patch("src.services.rag_retriever.store_chunks")
+@patch("src.services.rag_retriever.retrieve_with_scores")
+@patch("src.services.rag_retriever.retrieve_from_multiple_collections")
+@patch("src.services.vector_store.get_chroma_client")
+def test_build_rag_context_from_hashes_corrupted_collection(
+    mock_client_factory, mock_retrieve_multi, mock_retrieve_scores, mock_store_chunks
+):
+    from src.services.rag_retriever import build_rag_context_from_hashes
+    from src.services.vector_store import get_collection_name
+
+    h = "a" * 64
+    coll_name = get_collection_name(h)
+
+    mock_client = MagicMock()
+    mock_client.get_collection.return_value = MagicMock()
+    mock_client.delete_collection.return_value = None
+    mock_client_factory.return_value = mock_client
+
+    mock_retrieve_scores.side_effect = Exception(
+        "Internal error: Error creating hnsw segment reader: Nothing found on disk"
+    )
+    mock_retrieve_multi.return_value = "context from rebuild"
+
+    with patch("src.models.ContentRegistry") as mock_cr, \
+         patch("src.services.rag_retriever.chunk_text") as mock_chunk:
+        mock_entry = MagicMock()
+        mock_entry.extracted_text = "rebuild text for corrupted collection"
+        mock_cr.query.filter_by.return_value.first.return_value = mock_entry
+        mock_chunk.return_value = ["rebuild chunk 1", "rebuild chunk 2"]
+
+        result = build_rag_context_from_hashes("test goal", [h])
+
+    assert result == "context from rebuild"
+    mock_client.delete_collection.assert_called_once_with(name=coll_name)
+    mock_store_chunks.assert_called_once()
+
+
+@patch("src.services.rag_retriever.retrieve_from_multiple_collections")
+@patch("src.services.vector_store.get_chroma_client")
+def test_build_rag_context_from_hashes_no_valid_collections(
+    mock_client_factory, mock_retrieve_multi
+):
+    from src.services.rag_retriever import build_rag_context_from_hashes
+
+    mock_client = MagicMock()
+    mock_client.get_collection.side_effect = Exception("not found")
+    mock_client_factory.return_value = mock_client
+
+    with patch("src.models.ContentRegistry") as mock_cr:
+        mock_cr.query.filter_by.return_value.first.return_value = None
+
+        result = build_rag_context_from_hashes("test goal", ["b" * 64])
+
+    assert result == ""
+    mock_retrieve_multi.assert_not_called()

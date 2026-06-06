@@ -209,7 +209,7 @@ Build the smallest working version first, then iterate:
 - [x] Implement DOCX embedded image extraction via python-docx inline shapes
 - [x] Implement PPTX text extraction via python-pptx
 - [x] Add `.docx`, `.pptx`, `.png`, `.jpg`, `.jpeg` to allowed extensions
-- [x] Build `src/services/vision_parser.py` — OCR pipeline with file hashing, content registry, page rendering, and Qwen3-VL cloud figure descriptions
+- [x] Build `src/services/vision_parser.py` — OCR pipeline with file hashing, content registry, page rendering, and Qwen3.5 cloud figure descriptions
 - [x] Add SHA-256 content-addressable deduplication via `ContentRegistry` DB model
 - [x] Transition ChromaDB from session-keyed (`study_{uuid}`) to content-keyed (`doc_{hash[:59]}`) collections shared across users
 - [x] Implement multi-collection retrieval with score-based merging (`retrieve_from_multiple_collections`)
@@ -328,10 +328,10 @@ Build the smallest working version first, then iterate:
 - [x] Results page with improved hierarchy
 - [x] Lesson listing page with progress bar
 - [x] Markdown rendering for AI outputs
-- [x] AI-powered OCR/vision (GLM-OCR local + Qwen3-VL cloud)
+- [x] AI-powered OCR/vision (GLM-OCR local + Qwen3.5 cloud)
 - [x] Content-addressable global deduplication
 - [x] Multi-collection ChromaDB retrieval
-- [x] 172 automated tests
+- [x] 190 automated tests
 - [x] GitHub Actions CI
 - [x] Static task board
 - [x] Design/testing document

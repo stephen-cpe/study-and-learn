@@ -77,7 +77,9 @@ def extract_text(file_path: str) -> str:
 def extract_text_with_vision(file_path: str, progress_callback=None) -> str:
     """Enhanced text extraction using OCR and vision models when beneficial.
     
-    For .txt and .md files, delegates to the basic extract_text().
+    For .txt and .md files, delegates to the basic extract_text() and
+    registers the content in ContentRegistry so the hash-based RAG
+    pipeline can find it.
     For .pdf, .docx, .pptx, and image files, uses the vision pipeline:
     computes file hash, checks ContentRegistry for cached results,
     and runs OCR/vision analysis only for new content.
@@ -90,13 +92,23 @@ def extract_text_with_vision(file_path: str, progress_callback=None) -> str:
         Enriched text corpus with OCR and figure descriptions merged in
     """
     from src.services.vision_parser import (
-        hash_file, is_content_registered, extract_text_with_vision as _vision_extract
+        hash_file, is_content_registered, register_content,
+        extract_text_with_vision as _vision_extract,
     )
 
     _, ext = os.path.splitext(file_path)
     ext = ext.lower()
 
     if ext in ('.txt', '.md'):
-        return extract_text(file_path)
+        text = extract_text(file_path)
+        if text and text.strip():
+            file_hash = hash_file(file_path)
+            if not is_content_registered(file_hash):
+                try:
+                    register_content(file_hash, text)
+                except Exception as e:
+                    logger.debug("ContentRegistry registration for %s skipped: %s",
+                                 file_path, str(e))
+        return text
 
     return _vision_extract(file_path, progress_callback=progress_callback)

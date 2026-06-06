@@ -8,7 +8,7 @@ import uuid
 from flask import (Blueprint, render_template, request, redirect,
                    url_for, flash, session, current_app, jsonify, abort)
 from src.utils import allowed_file
-from src.services.document_parser import extract_text, extract_text_with_vision
+from src.services.document_parser import extract_text_with_vision
 from src.services.summarizer import generate_summary
 from src.services.relevance_checker import check_relevance
 from src.services.curriculum_generator import generate_study_path
@@ -132,7 +132,7 @@ def process():
             ext = os.path.splitext(filename)[1].lower()
             if ext in ('.txt', '.md'):
                 try:
-                    text = extract_text(file_path)
+                    text = extract_text_with_vision(file_path)
                     extracted_texts.append(text)
                     filenames.append(filename)
                 except ValueError as e:
@@ -383,7 +383,11 @@ def reset():
         for path in StudyPath.query.filter_by(
             user_id=current_user.id, status='active'
         ).all():
-            path.status = 'cancelled'
+            lesson_count = LessonProgress.query.filter_by(
+                study_path_id=path.id
+            ).count()
+            if lesson_count == 0:
+                path.status = 'cancelled'
         db.session.commit()
     session.clear()
     flash('Session reset. You can start over.', 'info')

@@ -5,7 +5,7 @@ import logging
 import uuid
 from typing import List
 from src.services.chunker import chunk_text
-from src.services.vector_store import store_chunks, retrieve_context, retrieve_from_multiple_collections, get_collection_name
+from src.services.vector_store import store_chunks, retrieve_context, retrieve_with_scores, retrieve_from_multiple_collections, get_collection_name
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +50,9 @@ def build_rag_context_from_hashes(goal: str, file_hashes: List[str]) -> str:
     For each file hash, checks if a ChromaDB collection exists. If it does,
     queries it. If it doesn't but ContentRegistry has cached text, chunks
     and embeds it on-the-fly. Then queries all collections and merges results.
+    If a collection exists by name but its index is corrupted (e.g. HNSW
+    "Nothing found on disk"), deletes the broken collection and rebuilds from
+    ContentRegistry text.
     
     Args:
         goal: The learning goal (used as retrieval query)
@@ -92,8 +95,46 @@ def build_rag_context_from_hashes(goal: str, file_hashes: List[str]) -> str:
         logger.warning("No ChromaDB collections found for any file hash, falling back")
         return ""
 
+    from src.services.vector_store import get_chroma_client as _get_client
+    clean_client = _get_client()
+    valid_names = []
+    for coll_name in collection_names:
+        try:
+            retrieve_with_scores(goal, coll_name, top_k=1)
+            valid_names.append(coll_name)
+        except Exception as e:
+            logger.warning(
+                "Collection '%s' is corrupted (query failed), attempting rebuild: %s",
+                coll_name[:40], str(e)
+            )
+            try:
+                clean_client.delete_collection(name=coll_name)
+            except Exception:
+                pass
+            for h in file_hashes:
+                test_name = get_collection_name(h)
+                if test_name == coll_name:
+                    entry = ContentRegistry.query.filter_by(file_hash=h).first()
+                    if entry and entry.extracted_text:
+                        chunks = chunk_text(entry.extracted_text)
+                        if chunks:
+                            chunk_metadata = [{"source_hash": h, "content_type": "text"} for _ in chunks]
+                            try:
+                                store_chunks(chunks, coll_name, metadata=chunk_metadata)
+                                valid_names.append(coll_name)
+                            except Exception as rebuild_err:
+                                logger.warning(
+                                    "Failed to rebuild corrupted collection '%s': %s",
+                                    coll_name[:40], str(rebuild_err)
+                                )
+                    break
+
+    if not valid_names:
+        logger.warning("No ChromaDB collections found for any file hash, falling back")
+        return ""
+
     try:
-        context = retrieve_from_multiple_collections(goal, collection_names, top_k=5)
+        context = retrieve_from_multiple_collections(goal, valid_names, top_k=5)
         return context
     except Exception as e:
         logger.warning("Multi-collection retrieval failed: %s", str(e))

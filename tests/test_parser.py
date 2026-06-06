@@ -126,8 +126,50 @@ def test_extract_text_with_vision_txt_delegates(tmp_path):
     with open(txt_path, "w") as f:
         f.write("Hello world from vision txt test")
 
-    result = extract_text_with_vision(txt_path)
+    with patch("src.services.vision_parser.is_content_registered", return_value="doc_skip"), \
+         patch("src.services.vision_parser.register_content"):
+        result = extract_text_with_vision(txt_path)
     assert result == "Hello world from vision txt test"
+
+
+def test_extract_text_with_vision_md_registers_content(tmp_path):
+    from src.services.document_parser import extract_text_with_vision
+
+    md_path = os.path.join(tmp_path, "test.md")
+    with open(md_path, "w") as f:
+        f.write("# Hello Markdown\n\nSome content here.")
+
+    with patch("src.services.vision_parser.hash_file") as mock_hash, \
+         patch("src.services.vision_parser.is_content_registered") as mock_is_reg, \
+         patch("src.services.vision_parser.register_content") as mock_reg:
+        mock_hash.return_value = "a" * 64
+        mock_is_reg.return_value = None
+
+        result = extract_text_with_vision(md_path)
+
+        assert result == "# Hello Markdown\n\nSome content here."
+        mock_is_reg.assert_called_once_with("a" * 64)
+        mock_reg.assert_called_once_with("a" * 64, "# Hello Markdown\n\nSome content here.")
+
+
+def test_extract_text_with_vision_txt_skips_registration_if_already_registered(tmp_path):
+    from src.services.document_parser import extract_text_with_vision
+
+    txt_path = os.path.join(tmp_path, "test.txt")
+    with open(txt_path, "w") as f:
+        f.write("Already registered text")
+
+    with patch("src.services.vision_parser.hash_file") as mock_hash, \
+         patch("src.services.vision_parser.is_content_registered") as mock_is_reg, \
+         patch("src.services.vision_parser.register_content") as mock_reg:
+        mock_hash.return_value = "b" * 64
+        mock_is_reg.return_value = "doc_existing_coll"
+
+        result = extract_text_with_vision(txt_path)
+
+        assert result == "Already registered text"
+        mock_is_reg.assert_called_once_with("b" * 64)
+        mock_reg.assert_not_called()
 
 
 def test_extract_text_with_vision_unknown_ext(tmp_path):

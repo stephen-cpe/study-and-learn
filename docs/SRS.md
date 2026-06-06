@@ -439,7 +439,7 @@ study-and-learn/
 - Unified learning goal + document upload form (single submission).
 - File type validation.
 - Text extraction for `.txt`, `.md`, `.pdf`, `.docx`, `.pptx`, `.png`, `.jpg`, `.jpeg`.
-- AI-powered OCR for scanned PDFs and images (GLM-OCR local + Qwen3-VL cloud).
+- AI-powered OCR for scanned PDFs and images (GLM-OCR local + Qwen3.5 cloud).
 - Retrieval-Augmented Generation (RAG) pipeline (ChromaDB persistent vector store).
 - Multi-file upload (≤5).
 - AI summary generation through Ollama.
@@ -456,7 +456,7 @@ study-and-learn/
 - Server-side session storage (Flask-Session + cachelib).
 - Custom CSS/JS slide-deck engine (retro-themed).
 - Content-addressable global deduplication (SHA-256 + ContentRegistry).
-- pytest test suite (172 tests).
+- pytest test suite (190 tests).
 - GitHub Actions test workflow.
 - Static public task board.
 - Design and testing document.
@@ -520,7 +520,7 @@ Ranked from easier to harder. Items above the line are implemented; items below 
 26. Password reset (self-service + admin-initiated) — done (/reset-password, /admin/reset-password)
 27. Multi-path study support — done (independent StudyPath per learning goal, up to 3 concurrent)
 28. Session leakage fix (user A's data appearing for user B) — done (session.pop on login)
-29. AI-powered OCR/vision integration — done (GLM-OCR local for text/table/figure recognition, Qwen3-VL cloud for figure descriptions, pdf2image page rendering, DOCX/PPTX image extraction, image file support)
+29. AI-powered OCR/vision integration — done (GLM-OCR local for text/table/figure recognition, Qwen3.5 cloud for figure descriptions, pdf2image page rendering, DOCX/PPTX image extraction, image file support)
 30. Global content-addressable deduplication — done (SHA-256 ContentRegistry, content-keyed ChromaDB collections, multi-collection retrieval, 172 tests)
 
 ### Sprint 7 (Planned)
@@ -608,7 +608,7 @@ Later additions:
 1. ~~Should the first prototype use pgvector or ChromaDB?~~ → **ChromaDB** (chosen, implemented)
 2. ~~Which Ollama model gives acceptable local results on the target hardware?~~ → **qwen3:0.6b (chat) + qwen3-embedding:0.6b (embeddings)** (placeholder; upgrade path: `qwen3:1.7b`, `gemma3:4b`, or Ollama Cloud)
 3. ~~How many file types should be truly supported in the first sprint?~~ → **txt, md, pdf** (MVP); docx deferred to post-capstone
-4. ~~Should OCR be postponed until after the main workflow works?~~ → **Implemented in Sprint 6** (GLM-OCR local + Qwen3-VL cloud, content-addressable dedup)
+4. ~~Should OCR be postponed until after the main workflow works?~~ → **Implemented in Sprint 6** (GLM-OCR local + Qwen3.5 cloud, content-addressable dedup)
 5. ~~Should generated outputs be stored as JSON, Markdown, or database records?~~ → **JSON in Flask session (server-side via cachelib)**
 6. ~~Should the companion be purely visual or tied to progress?~~ → Visual feedback with click-to-talk implemented; animated GIF states (idle/busy/happy) with progress-driven switching implemented
 7. ~~Which deployment platform is easiest for the final capstone demo?~~ → Render or Railway free tier TBD in Sprint 8

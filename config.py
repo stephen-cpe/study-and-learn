@@ -58,7 +58,7 @@ class Config:
     OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
     OLLAMA_OCR_MODEL = os.environ.get("OLLAMA_OCR_MODEL", "glm-ocr")
     OLLAMA_VISION_MODEL = os.environ.get(
-        "OLLAMA_VISION_MODEL", "qwen3-vl:235b-cloud"
+        "OLLAMA_VISION_MODEL", "qwen3.5:397b-cloud"
     )
     OLLAMA_EMBEDDING_MODEL = os.environ.get(
         "OLLAMA_EMBEDDING_MODEL", "qwen3-embedding:0.6b"

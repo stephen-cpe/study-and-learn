@@ -7,9 +7,93 @@ from PIL import Image
 from src.models import ContentRegistry
 from src import db
 from src.services.ai_client import call_ollama
+from src.services.exceptions import AIModelUnavailableError
 from src.services.vector_store import get_collection_name
 
 logger = logging.getLogger(__name__)
+
+
+# Vision model default. Migrated from the deprecated qwen3-vl:235b-cloud
+# to qwen3.5:397b-cloud (same vendor, Text+Image input, 256K context, Medium
+# cloud cost tier). If the model is unreachable on Ollama Cloud, callers
+# should expect a soft failure (empty string) + a WARNING log from
+# :func:`probe_vision_model_availability` instead of a hard error.
+_DEFAULT_VISION_MODEL = "qwen3.5:397b-cloud"
+_DEPRECATED_VISION_MODEL = "qwen3-vl:235b-cloud"
+
+# Tracks whether the warning has been logged once per process to avoid
+# log spam when the vision model is called repeatedly.
+_vision_availability_warned = ""
+
+
+def probe_vision_model_availability(model: Optional[str] = None) -> bool:
+    """Best-effort startup probe for the configured vision model.
+
+    Logs a WARNING and returns ``False`` if the model appears unavailable
+    on the active Ollama backend. Returns ``True`` otherwise. Never raises.
+
+    Skipped entirely when ``AI_MOCK=true`` (CI/tests). The probe is lazy and
+    idempotent — a WARN is logged at most once per process per model name
+    to avoid log spam on repeated calls.
+
+    This is a soft check: it does not block app startup. Real vision
+    requests will still attempt the call and degrade gracefully via the
+    existing try/except wrappers in :func:`ocr_page` and
+    :func:`describe_figure`.
+    """
+    global _vision_availability_warned
+
+    if os.environ.get("AI_MOCK", "").lower() == "true":
+        return True
+
+    if model is None:
+        model = os.environ.get("OLLAMA_VISION_MODEL", _DEFAULT_VISION_MODEL)
+
+    # Detect the previously-deprecated default so we can give a useful hint.
+    is_deprecated = model == _DEPRECATED_VISION_MODEL
+
+    probe_key = f"{model}:{is_deprecated}"
+    if _vision_availability_warned.startswith(f"{probe_key}:"):
+        return not _vision_availability_warned.endswith(":unavailable")
+    _vision_availability_warned = f"{probe_key}:probing"
+
+    try:
+        # Minimal prompt — we only care that the model is reachable and
+        # accepts an image-bearing request without returning a "model not
+        # found" style error.
+        call_ollama(
+            "Image: probe\n\nRespond with the single word: ok",
+            model=model,
+        )
+        _vision_availability_warned = f"{probe_key}:available"
+        return True
+    except AIModelUnavailableError as e:
+        hint = (
+            f"The configured vision model '{model}' is not reachable on "
+            f"the active Ollama backend. Figure descriptions will degrade "
+            f"to empty strings. If you are running locally, ensure the "
+            f"model is pulled (`ollama pull {model}`). If you are using "
+            f"Ollama Cloud, confirm `AI_BACKEND=cloud` is set and your "
+            f"API key is valid."
+        )
+        if is_deprecated:
+            hint += (
+                f" NOTE: '{model}' is the deprecated default — "
+                f"update OLLAMA_VISION_MODEL to "
+                f"'{_DEFAULT_VISION_MODEL}' (Qwen3.5:397b-cloud)."
+            )
+        logger.warning("%s Underlying error: %s", hint, str(e))
+        _vision_availability_warned = f"{probe_key}:unavailable"
+        return False
+    except Exception as e:
+        # Non-fatal: the probe is best-effort. Real calls will surface
+        # the real error and fall back to empty string.
+        logger.debug(
+            "Vision model probe returned non-fatal error for '%s': %s",
+            model, str(e),
+        )
+        _vision_availability_warned = f"{probe_key}:available"
+        return True
 
 
 def hash_file(file_path: str) -> str:
@@ -271,13 +355,18 @@ def describe_figure(image_path: str) -> str:
     _resize_image_if_needed(image_path)
     abs_path = os.path.abspath(image_path)
 
+    model = os.environ.get("OLLAMA_VISION_MODEL", _DEFAULT_VISION_MODEL)
+
+    # Best-effort availability check. Logs a WARNING once per process if
+    # the configured model is unreachable on Ollama Cloud. Never raises.
+    probe_vision_model_availability(model)
+
     prompt = (
         f"Image: {abs_path}\n\n"
         "Describe what this figure explains in 2-3 sentences, focusing on the key concepts "
         "and how they relate to each other. Include any labels, axis titles, or annotations "
         "visible in the figure."
     )
-    model = os.environ.get("OLLAMA_VISION_MODEL", "qwen3-vl:235b-cloud")
 
     try:
         result = call_ollama(prompt, model=model)
@@ -311,6 +400,15 @@ def extract_text_with_vision(file_path: str, progress_callback=None) -> str:
 
     if ext in ('.txt', '.md'):
         result = basic_text if parts else ""
+        register_content(file_hash, result)
+        return result
+
+    ocr_enabled = os.environ.get("OCR_FULL", "").lower() == "true"
+
+    if not ocr_enabled and ext in ('.pdf', '.docx', '.pptx'):
+        result = "\n\n".join(parts) if parts else ""
+        if not result or not result.strip():
+            result = ""
         register_content(file_hash, result)
         return result
 

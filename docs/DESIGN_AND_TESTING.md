@@ -3,7 +3,7 @@
 
 **Version:** 0.4  
 **Status:** Living document  
-**Last updated:** May 24, 2026
+**Last updated:** June 6, 2026
 
 ---
 
@@ -16,7 +16,7 @@ flowchart TD
     A["Unified Form: Goal + Files"] --> B["POST /process Route"]
     B --> C["Document Parser: .txt, .md, .pdf, .docx, .pptx"]
     B --> C2["Vision Parser: .png, .jpg, .jpeg"]
-    C --> C3["OCR Pipeline: GLM-OCR local + Qwen3-VL cloud"]
+    C --> C3["OCR Pipeline: GLM-OCR local + Qwen3.5 cloud"]
     C2 --> C3
     C3 --> D["Chunker: RecursiveCharacterTextSplitter"]
     D --> E["Vector Store: Content-Keyed ChromaDB (doc_{hash})"]
@@ -48,7 +48,7 @@ Core workflow:
 1. User enters a learning goal and uploads study documents in a single unified form.
 2. Backend validates and stores uploads.
 3. Document parser extracts text from `.txt`, `.md`, `.pdf`, `.docx`, `.pptx`.
-4. Vision parser renders pages/images and runs AI-powered OCR (GLM-OCR local, Qwen3-VL cloud) for `.png`, `.jpg`, `.jpeg`, and scanned PDFs.
+4. Vision parser renders pages/images and runs AI-powered OCR (GLM-OCR local, Qwen3.5 cloud) for `.png`, `.jpg`, `.jpeg`, and scanned PDFs.
 5. File hashes are computed, ContentRegistry check skips duplicates globally.
 6. RAG pipeline chunks, embeds, stores, and retrieves relevant context from content-keyed ChromaDB collections.
 7. AI services generate summary, relevance check, and study path.
@@ -171,7 +171,7 @@ Core workflow:
 
 ### ADR-017: AI-Powered OCR/Vision Integration with Content-Addressable Deduplication
 
-**Decision:** Integrate local GLM-OCR (0.9B, text/table/figure recognition) and cloud Qwen3-VL:235b (figure descriptions) as an AI-powered OCR pipeline, coupled with SHA-256 content-addressable deduplication via a `ContentRegistry` database model and content-keyed ChromaDB collections (`doc_{hash}`).
+**Decision:** Integrate local GLM-OCR (0.9B, text/table/figure recognition) and cloud Qwen3.5:397b (figure descriptions) as an AI-powered OCR pipeline, coupled with SHA-256 content-addressable deduplication via a `ContentRegistry` database model and content-keyed ChromaDB collections (`doc_{hash}`).
 
 **Reason:** Before Sprint 6, the app only supported text-layer extraction from `.txt`, `.md`, `.pdf`, and `.docx`. Scanned PDFs, embedded images, PowerPoint slides, and raw image files were either rejected or produced empty output. The OCR pipeline enables 8 file types, extracts text from visual content, and generates semantic figure descriptions. Content-addressable deduplication prevents redundant OCR and embedding when identical files are uploaded by different users or in different sessions — ChromaDB collections are named by file hash and shared globally rather than tied to user sessions. Tradeoffs: ✅ 8 file types, global dedup, multi-collection retrieval • ❌ Adds GLM-OCR dependency (~2.2 GB), Poppler system dependency, ~2s/page OCR latency
 
@@ -230,7 +230,7 @@ Integration tests cover routes and workflow behavior:
 - mocked generate-lessons flow: session data → lesson + quiz generation → redirect,
 - lesson deck route with pre-populated session lessons returns 200.
 
-Current test suite: **172 tests across 21 test modules covering core MVP, auth, models, dashboard, lesson repository, admin access, multi-path workflows, OCR/vision pipeline, multi-collection retrieval, and access control — 0 failures**.
+Current test suite: **190 tests across 22 test modules covering core MVP, auth, models, dashboard, lesson repository, admin access, multi-path workflows, OCR/vision pipeline, multi-collection retrieval, access control, ChromaDB corruption recovery, and reset path preservation — 0 failures**.
 
 ### Smoke Tests
 
