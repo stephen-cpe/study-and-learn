@@ -1,9 +1,9 @@
 # Design and Testing Document
 # Study-and-Learn
 
-**Version:** 0.4  
+**Version:** 0.5  
 **Status:** Living document  
-**Last updated:** June 6, 2026
+**Last updated:** June 8, 2026
 
 ---
 
@@ -230,7 +230,7 @@ Integration tests cover routes and workflow behavior:
 - mocked generate-lessons flow: session data → lesson + quiz generation → redirect,
 - lesson deck route with pre-populated session lessons returns 200.
 
-Current test suite: **190 tests across 22 test modules covering core MVP, auth, models, dashboard, lesson repository, admin access, multi-path workflows, OCR/vision pipeline, multi-collection retrieval, access control, ChromaDB corruption recovery, and reset path preservation — 0 failures**.
+Current test suite: **191 tests across 23 test modules covering core MVP, auth, models, dashboard, lesson repository, admin access, multi-path workflows, OCR/vision pipeline, multi-collection retrieval, access control, ChromaDB corruption recovery, reset path preservation, and retake quiz regeneration — 0 failures**.
 
 ### Smoke Tests
 

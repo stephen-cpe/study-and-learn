@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ lesson.module_title }} — Study-and-Learn</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logo.png') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/study-and-learn.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/deck-base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/deck-components.css') }}">
 </head>
 <body>
     <div class="deck-container" data-module-index="{{ module_index }}" data-path-id="{{ path_id or '' }}">
@@ -154,7 +155,9 @@
         <div class="deck-progress-bar"></div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/study-and-learn.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/mascot.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/progress.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/deck-engine.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/deck-page.js') }}"></script>
 </body>
 </html>

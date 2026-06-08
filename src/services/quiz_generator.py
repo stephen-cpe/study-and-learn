@@ -1,16 +1,37 @@
 """
 Quiz generation service for the Study-and-Learn MVP.
+
+Generates mixed-type quizzes (mcq, true_false, multi_select, fill_blank)
+and inline comprehension checkpoints grounded in RAG context. Applies
+pedagogical safeguards: plausible distractors, diversified true/false
+answers, shuffled option ordering, and single-word-only fill-in-the-blank.
 """
 import json
-import random
 import logging
+import random
+from typing import Any, Callable, Dict, List, Optional
+
 from src.services.ai_client import call_ollama
 from src.services.exceptions import AIServiceError
 
 logger = logging.getLogger(__name__)
 
 
-def _shuffle_options(options, correct_indices, single_index=False):
+def _shuffle_options(
+    options: List[str],
+    correct_indices: Any,
+    single_index: bool = False,
+) -> Any:
+    """Randomly shuffle MCQ/multi-select options while tracking correct positions.
+
+    Args:
+        options: The original ordered list of answer options.
+        correct_indices: Index (mcq) or list of indices (multi_select).
+        single_index: If True, return a single new index; otherwise a sorted list.
+
+    Returns:
+        Tuple of (shuffled_options, new_correct_index_or_indices).
+    """
     if not options:
         return options, correct_indices
     indexed = list(enumerate(options))
@@ -23,7 +44,17 @@ def _shuffle_options(options, correct_indices, single_index=False):
     return shuffled, new_indices
 
 
-def _shuffle_questions(questions):
+def _shuffle_questions(
+    questions: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Randomize option ordering within each question.
+
+    Args:
+        questions: List of question dicts from AI output.
+
+    Returns:
+        The same questions with shuffled options and updated answer indices.
+    """
     for q in questions:
         qtype = q.get('type', '')
         if qtype == 'mcq':
@@ -39,7 +70,20 @@ def _shuffle_questions(questions):
     return questions
 
 
-def _diversify_true_false(questions):
+def _diversify_true_false(
+    questions: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Ensure true/false questions have a mix of True and False answers.
+
+    If all T/F questions share the same answer, inverts every other one
+    to prevent learners from guessing the pattern.
+
+    Args:
+        questions: List of question dicts.
+
+    Returns:
+        The questions with diversified true/false answers.
+    """
     tf_indices = [(i, q) for i, q in enumerate(questions) if q.get('type') == 'true_false']
     if len(tf_indices) < 2:
         return questions
@@ -52,14 +96,31 @@ def _diversify_true_false(questions):
     return questions
 
 
-def _invert_statement(text):
+def _invert_statement(text: str) -> str:
+    """Invert a true/false statement for answer diversification.
+
+    Args:
+        text: The original true/false prompt statement.
+
+    Returns:
+        A negated version of the statement.
+    """
     t = text.strip()
     if t.lower().startswith('not '):
         return t[4:].strip()
     return 'It is NOT the case that ' + t[0].lower() + t[1:]
 
 
-def _shuffle_checkpoint(cp):
+def _shuffle_checkpoint(cp: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Shuffle the options in an inline checkpoint question.
+
+    Args:
+        cp: A checkpoint question dict, or None.
+
+    Returns:
+        The checkpoint with shuffled options and updated answer_index,
+        or unchanged if not a valid dict.
+    """
     if not isinstance(cp, dict):
         return cp
     options = cp.get('options', [])
@@ -69,7 +130,25 @@ def _shuffle_checkpoint(cp):
     return cp
 
 
-def generate_quiz(module_title: str, slides: list, retriever, n_questions: int = 5) -> dict:
+def generate_quiz(
+    module_title: str,
+    slides: List[Dict[str, Any]],
+    retriever: Optional[Callable[[str], str]],
+    n_questions: int = 5,
+) -> Dict[str, Any]:
+    """Generate a mixed-type quiz for a module grounded in RAG context.
+
+    Args:
+        module_title: The module title.
+        slides: The lesson slides to base quiz questions on.
+        retriever: A callable that returns RAG context for a query string,
+            or None if unavailable.
+        n_questions: Number of questions to generate (default 5).
+
+    Returns:
+        A dict with key ``questions`` containing a list of validated,
+        shuffled, and diversified question dicts.
+    """
     if not module_title or not module_title.strip():
         return _fallback_quiz(n_questions)
 
@@ -202,7 +281,24 @@ Quiz:"""
     return _fallback_quiz(n_questions)
 
 
-def generate_inline_checkpoint(module_title: str, slides_subset: list, retriever) -> dict:
+def generate_inline_checkpoint(
+    module_title: str,
+    slides_subset: List[Dict[str, Any]],
+    retriever: Optional[Callable[[str], str]],
+) -> Dict[str, Any]:
+    """Generate a single inline comprehension checkpoint (MCQ).
+
+    Tests immediate recall of a key concept from a segment of slides.
+
+    Args:
+        module_title: The module title.
+        slides_subset: A subset of slides to base the checkpoint on.
+        retriever: A callable that returns RAG context, or None.
+
+    Returns:
+        A shuffled checkpoint question dict with keys: id, type, prompt,
+        options, answer_index, explanation.
+    """
     slide_summary = _summarize_slides(slides_subset)
     rag_context = ""
     if retriever:
@@ -263,7 +359,12 @@ Question:"""
     return _fallback_checkpoint()
 
 
-def _fallback_checkpoint() -> dict:
+def _fallback_checkpoint() -> Dict[str, Any]:
+    """Return a generic placeholder checkpoint when AI generation fails.
+
+    Returns:
+        A shuffled checkpoint dict with a generic comprehension question.
+    """
     fallback = {
         'id': 'checkpoint',
         'type': 'mcq',
@@ -275,8 +376,16 @@ def _fallback_checkpoint() -> dict:
     return _shuffle_checkpoint(fallback)
 
 
-def _summarize_slides(slides: list) -> str:
-    parts = []
+def _summarize_slides(slides: List[Dict[str, Any]]) -> str:
+    """Build a text summary from slide content for quiz prompt construction.
+
+    Args:
+        slides: List of slide dicts from the lesson generator.
+
+    Returns:
+        A space-joined string summarizing all slide content.
+    """
+    parts: List[str] = []
     for slide in slides:
         stype = slide.get('type', '')
         if stype == 'title':
@@ -293,15 +402,39 @@ def _summarize_slides(slides: list) -> str:
     return ' '.join(parts)
 
 
-def _build_type_mix(n: int, types: list) -> dict:
-    counts = {t: 0 for t in types}
+def _build_type_mix(n: int, types: List[str]) -> Dict[str, int]:
+    """Distribute `n` questions across available question types.
+
+    Args:
+        n: Number of questions to generate.
+        types: Available question type strings.
+
+    Returns:
+        A dict mapping each type to its allocated question count.
+    """
+    counts: Dict[str, int] = {t: 0 for t in types}
     for i in range(n):
         counts[types[i % len(types)]] += 1
     return counts
 
 
-def _validate_questions(questions: list, expected_count: int) -> list:
-    valid = []
+def _validate_questions(
+    questions: List[Dict[str, Any]],
+    expected_count: int,
+) -> List[Dict[str, Any]]:
+    """Validate and normalize AI-generated quiz questions.
+
+    Filters malformed questions and normalizes structure. Stops early
+    once enough valid questions are collected.
+
+    Args:
+        questions: Raw question list from AI JSON output.
+        expected_count: Minimum number of valid questions needed.
+
+    Returns:
+        A list of validated question dicts (up to expected_count items).
+    """
+    valid: List[Dict[str, Any]] = []
     for q in questions:
         if not isinstance(q, dict):
             continue

@@ -1,15 +1,37 @@
 """
 Lesson generation service for the Study-and-Learn MVP.
+
+Generates RAG-grounded interactive slide-based lessons with four slide types:
+title, content, example, and summary. Falls back to a generic placeholder
+lesson when AI generation fails or returns unparseable output.
 """
 import json
 import logging
+from typing import Any, Callable, Dict, List, Optional
+
 from src.services.ai_client import call_ollama
-from src.services.exceptions import AIServiceError, StudyAndLearnError
+from src.services.exceptions import AIServiceError
 
 logger = logging.getLogger(__name__)
 
 
-def build_rag_context_for_module(module_title: str, learning_goal: str, retriever) -> str:
+def build_rag_context_for_module(
+    module_title: str,
+    learning_goal: str,
+    retriever: Optional[Callable[[str], str]],
+) -> str:
+    """Query the retriever for context relevant to a module.
+
+    Args:
+        module_title: The module title to build a query around.
+        learning_goal: The learner's stated goal.
+        retriever: A callable that accepts a query string and returns
+            retrieved context, or None.
+
+    Returns:
+        Retrieved context string, or an empty string if retrieval fails
+        or no retriever is provided.
+    """
     try:
         if retriever:
             query = f"{learning_goal} {module_title}"
@@ -19,7 +41,27 @@ def build_rag_context_for_module(module_title: str, learning_goal: str, retrieve
     return ""
 
 
-def generate_lesson(module_title: str, learning_goal: str, retriever) -> dict:
+def generate_lesson(
+    module_title: str,
+    learning_goal: str,
+    retriever: Optional[Callable[[str], str]],
+) -> Dict[str, Any]:
+    """Generate an interactive slide-based lesson for a single module.
+
+    Builds a prompt grounded in RAG context (when available), calls the AI
+    backend, and parses the JSON response. Falls back to a generic placeholder
+    lesson if generation fails, the response is unparseable, or inputs are empty.
+
+    Args:
+        module_title: The title of the module to generate a lesson for.
+        learning_goal: The learner's stated goal.
+        retriever: A callable that accepts a query string and returns
+            retrieved RAG context, or None if unavailable.
+
+    Returns:
+        A dict with keys ``module_title`` (str) and ``slides``
+        (list of slide dicts with types: title, content, example, summary).
+    """
     if not learning_goal or not learning_goal.strip():
         return _fallback_lesson(module_title)
     if not module_title or not module_title.strip():
@@ -103,7 +145,15 @@ Lesson:"""
     return _fallback_lesson(module_title)
 
 
-def _validate_slides(slides: list) -> list:
+def _validate_slides(slides: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Filter slides to only include those with valid types.
+
+    Args:
+        slides: A list of slide dicts from AI output.
+
+    Returns:
+        Slides that have a valid ``type`` field (title/content/example/summary).
+    """
     valid_types = {'title', 'content', 'example', 'summary'}
     validated = []
     for slide in slides:
@@ -112,7 +162,15 @@ def _validate_slides(slides: list) -> list:
     return validated
 
 
-def _fallback_lesson(module_title: str) -> dict:
+def _fallback_lesson(module_title: str) -> Dict[str, Any]:
+    """Return a generic placeholder lesson when AI generation fails.
+
+    Args:
+        module_title: The module title to use in the fallback slides.
+
+    Returns:
+        A dict with ``module_title`` and a minimal set of placeholder slides.
+    """
     return {
         'module_title': module_title,
         'slides': [

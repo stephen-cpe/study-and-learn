@@ -227,3 +227,56 @@ def test_process_ajax_no_files(client):
     assert response.status_code == 400
     json_data = response.get_json()
     assert 'error' in json_data
+
+
+@patch('src.services.lesson_generator.call_ollama')
+@patch('src.services.quiz_generator.call_ollama')
+def test_retake_regenerates_quiz_and_resets_state(mock_quiz_ollama, mock_lesson_ollama, client):
+    """Verify retake regenerates checkpoint/quiz questions and clears progress state."""
+    mock_lesson_ollama.return_value = (
+        '{"module_title": "Intro", '
+        '"slides": [{"type": "title", "title": "Hello", "subtitle": "World"}]}'
+    )
+    # First call to quiz_generator returns question set A
+    quiz_response_a = (
+        '{"questions": ['
+        '{"id": "q_a", "type": "true_false", "prompt": "Set A?", '
+        '"answer": true, "explanation": "Original quiz"}]}'
+    )
+    # Second call (during retake) returns question set B
+    quiz_response_b = (
+        '{"questions": ['
+        '{"id": "q_b", "type": "mcq", "prompt": "Set B?", '
+        '"options": ["X","Y","Z","W"], "answer_index": 0, '
+        '"explanation": "Regenerated quiz"}]}'
+    )
+    mock_quiz_ollama.side_effect = [quiz_response_a, quiz_response_b]
+
+    with client.session_transaction() as sess:
+        sess['learning_goal'] = 'Learn testing'
+        sess['study_path'] = {
+            'modules': [{'title': 'Module 1', 'estimated_effort': '1h'}]
+        }
+        sess['extracted_texts'] = ['Test text']
+
+    # Generate lessons (uses quiz_response_a)
+    gen_resp = client.post('/generate-lessons', follow_redirects=True)
+    assert gen_resp.status_code == 200
+
+    # Verify initial quiz is Set A
+    deck_resp = client.get('/lessons/0')
+    assert deck_resp.status_code == 200
+    assert b'Set A?' in deck_resp.data
+
+    # Retake the lesson (should regenerate quiz using quiz_response_b)
+    retake_resp = client.post('/lessons/0/retake')
+    assert retake_resp.status_code == 200
+    retake_data = retake_resp.get_json()
+    assert retake_data is not None
+    assert retake_data.get('success') is True
+
+    # Verify quiz is now Set B (freshly regenerated)
+    deck_resp_after = client.get('/lessons/0')
+    assert deck_resp_after.status_code == 200
+    assert b'Set B?' in deck_resp_after.data
+    assert b'Set A?' not in deck_resp_after.data

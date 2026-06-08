@@ -3,9 +3,10 @@ SQLAlchemy models for Study-and-Learn — PostgreSQL-only.
 """
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, Text, Boolean, Integer, DateTime
-from werkzeug.security import generate_password_hash, check_password_hash
+
 from flask_login import UserMixin
+from sqlalchemy import Boolean, DateTime, Integer, String, Text
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from src import db
 

@@ -1,8 +1,9 @@
 # TODO / Product Backlog
 # Study-and-Learn
+### *Turn Any Documents into Interactive, Personalized Learning Experiences*
 
 **Purpose:** This document organizes the capstone work into MVP tasks, user stories, sprints, stretch goals, and submission requirements.  
-**Last updated:** June 2026
+**Last updated:** June 7, 2026
 
 ---
 
@@ -11,6 +12,8 @@
 Build the smallest working version first, then iterate:
 
 > Goal + upload → parse → chunk → embed → retrieve → summary → relevance → study path → **generate lessons** → **interactive slide deck** → **quiz + grade** → **retake** → results.
+
+**Core insight:** The AI is not the source of truth — the uploaded documents are. The system transforms proprietary, unseen, or dense documents into scaffolded, gamified learning pathways. RAG grounds every generated lesson and quiz in the user's own materials, enabling knowledge domains that no public AI was trained on.
 
 ---
 
@@ -236,23 +239,27 @@ Build the smallest working version first, then iterate:
 
 ### Sprint 7: Polish, Mascot Animation, TTS & PDF Export 🔄 IN PROGRESS
 
-**Goal:** Add mascot animation frames, TTS narration, PDF export, session cleanup, and remaining Sprint 6 polish tasks.
+**Goal:** Add mascot animation frames, TTS narration, PDF export, session cleanup, source citations, difficulty selector, and sample demo document set.
 
-**User Stories:** US-036, US-037, US-038
+**User Stories:** US-036, US-037, US-038, US-046
 
 **Tasks:**
 - [x] Add mascot basic animation frames (idle/waiting/done)
 - [x] Display mascot state changes during loading operations
+- [ ] Create proprietary demo document set (non-public, niche knowledge)
+- [ ] Update landing page copy to reflect Document-to-Learning Transformer framing
 - [ ] Integrate Web Speech API or TTS library for lesson narration
 - [ ] Add TTS toggle button on slide deck (disabled by default)
 - [ ] Generate PDF from completed lesson slides and quiz results
 - [ ] Add PDF export button on completed lesson page
 - [ ] Remove `extracted_texts` from session after lessons generated
+- [ ] Add difficulty/age-level selector on upload form (Easy/Moderate/Hard)
+- [ ] Inject difficulty level into lesson and quiz generation prompts
+- [ ] Link generated lesson content back to source PDF/document
+- [ ] Add citations showing which document a slide references
 - [ ] Design badge/trophy system for completed modules
 - [ ] Track abandoned lessons separately from completions
 - [ ] Display achievement badges on dashboard
-- [ ] Link generated lesson content back to source PDF/document
-- [ ] Add citations showing which document a slide references
 - [ ] Test cloud ChromaDB (optional parallel track)
 - [ ] Test cloud AI model providers (optional parallel track)
 - [ ] Conduct general application refinement: UX polish, defect remediation, and performance optimization
@@ -260,33 +267,36 @@ Build the smallest working version first, then iterate:
 
 **Sprint 7 Definition of Done:**
 - Mascot animation frames working (idle/waiting/done states)
+- Sample demo documents created and tested end-to-end
 - TTS functional (opt-in)
 - PDF export working for completed lessons
 - Session bloat fixed (extracted_texts cleaned up)
+- Difficulty selector working with age-appropriate output differences
+- Source document citations visible on slides
 - Badges displayed for completed lessons
-- Source document references visible in lessons
 - Cloud deployment dependencies identified and tested
 - General refinement tasks completed
 - Test suite expanded and fully passing
 
 ---
 
-### Sprint 8: Final Deployment & Demo ⬜ FUTURE
+### Sprint 8: Final Deployment & Capstone Demo 🟡 CURRENT FOCUS
 
-**Goal:** Deploy to free-tier host (Render or Railway), finalize documentation, prepare demo script, record 15-min presentation, and submit capstone.
+**Goal:** Deploy to free-tier host (Render or Railway), finalize documentation, record demo, and submit capstone.
 
-**User Stories:** US-040, US-041, US-042, US-043
+**User Stories:** US-042, US-043, US-044, US-045
 
 **Tasks:**
 - [ ] Deploy web app to Render or Railway free tier
 - [ ] Configure production environment variables
 - [ ] Verify all routes and features work in production
-- [ ] Finalize README with complete setup and deployment instructions
+- [ ] Update `docs/SRS.md` §1.2 (Product Vision) and §1.4 (Intended Users) to reflect proprietary knowledge reframe
+- [ ] Update `README.md` with new positioning and deployment link
 - [ ] Complete `DESIGN_AND_TESTING.md` with all ADRs and test results
 - [ ] Ensure `AI_AGENT_PROTOCOL.md` is current
 - [ ] Update task board to reflect final sprint status
-- [ ] Write demo script covering full workflow (goal → upload → results → lessons → quiz → grade)
-- [ ] Record 15-minute walkthrough of the app
+- [ ] Write demo script covering full workflow (goal → upload → results → lessons → quiz → grade → retake)
+- [ ] Record walkthrough of the app
 - [ ] Add demo link to README
 - [ ] Triage and fix any remaining production bugs
 - [ ] Run full CI pipeline one final time
@@ -300,7 +310,7 @@ Build the smallest working version first, then iterate:
 - Task board link works
 - Repository is documented and accessible
 - Design/testing document is complete
-- Final demo recorded and submission-ready
+- Demo recorded and submission-ready
 - Capstone submitted
 
 ---
@@ -331,7 +341,7 @@ Build the smallest working version first, then iterate:
 - [x] AI-powered OCR/vision (GLM-OCR local + Qwen3.5 cloud)
 - [x] Content-addressable global deduplication
 - [x] Multi-collection ChromaDB retrieval
-- [x] 190 automated tests
+- [x] 191 automated tests
 - [x] GitHub Actions CI
 - [x] Static task board
 - [x] Design/testing document
@@ -381,15 +391,16 @@ Build the smallest working version first, then iterate:
 - [x] Expanded test coverage (Sprint 6)
 - [x] OCR/Vision integration with content deduplication (Sprint 6)
 - [x] Mascot animation frames (Sprint 7)
+- [ ] Proprietary demo document set (Sprint 7)
+- [ ] Difficulty/age-level selector (Easy/Moderate/Hard) (Sprint 7)
 - [ ] TTS narration (opt-in) (Sprint 7)
 - [ ] PDF export for completed lessons (Sprint 7)
 - [ ] Session cleanup (Sprint 7)
-- [ ] Badges/trophies for completed lessons (Sprint 7)
-- [ ] Source document referencing in lessons (Sprint 7)
-- [ ] Deployment, demo, and capstone submission (Sprint 8)
+- [ ] Source document citations in lessons (Sprint 7)
+- [ ] Badges/trophies for completed lessons (Sprint 7) (stretch)
+- [ ] Deployment, demo recording, and capstone submission (Sprint 8)
 
 ### Post-Capstone
-- [ ] Difficulty level selector (Easy/Moderate/Hard)
 - [ ] Extended file type support (.html, .odt)
 - [ ] YouTube/video transcript integration
 - [ ] External learning resource search
@@ -449,7 +460,7 @@ Build the smallest working version first, then iterate:
 - [x] OCR/vision parser tests (Sprint 6 — 20 tests)
 - [x] Parser expansion tests (Sprint 6 — 5 tests for pptx, image, dedup)
 - [x] RAG service expansion tests (Sprint 6 — 4 tests for multi-collection, metadata)
-- [ ] Retake route test (quiz regeneration, state reset)
+- [x] Retake route test (quiz regeneration, state reset)
 
 ### Manual Demo Tests
 - [ ] Demo document uploads successfully

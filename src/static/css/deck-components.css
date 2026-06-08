@@ -1,0 +1,255 @@
+/* ── Checkpoint slides ── */
+.checkpoint-slide .slide-content-inner {
+    text-align: center;
+}
+
+.checkpoint-slide h3 {
+    color: var(--deck-warning);
+    font-family: "BoldPixels", sans-serif;
+    font-weight: 400;
+    margin-bottom: 0.4em;
+    font-size: 0.9em;
+}
+
+.checkpoint-slide .question-prompt {
+    font-size: 0.75em;
+    color: var(--deck-text);
+    margin-bottom: 0.5em;
+}
+
+.checkpoint-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3em;
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.checkpoint-option {
+    background: rgba(30,58,95,0.8);
+    border: 1px solid rgba(0,180,216,0.35);
+    border-radius: 4px;
+    padding: 0.35em 0.6em;
+    color: var(--deck-text);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    font-size: 0.65em;
+}
+
+.checkpoint-option:hover {
+    border-color: var(--deck-accent);
+    background: rgba(0,180,216,0.15);
+}
+
+.checkpoint-option.selected {
+    border-color: var(--deck-accent);
+    background: rgba(0,180,216,0.25);
+}
+
+.checkpoint-feedback {
+    margin-top: 0.4em;
+    padding: 0.35em;
+    border-radius: 4px;
+    font-size: 0.6em;
+    display: none;
+}
+
+.checkpoint-feedback.correct {
+    background: rgba(126,231,135,0.15);
+    border: 1px solid var(--deck-success);
+    color: var(--deck-success);
+}
+
+.checkpoint-feedback.incorrect {
+    background: rgba(255,107,107,0.15);
+    border: 1px solid var(--deck-danger);
+    color: var(--deck-danger);
+}
+
+/* ── Quiz slides ── */
+.quiz-slide .slide-content-inner {
+    text-align: center;
+    padding: 0.5em 1em 2rem;
+}
+
+.quiz-slide h3 {
+    color: var(--deck-accent-light);
+    font-family: "BoldPixels", sans-serif;
+    font-weight: 400;
+    margin-bottom: 0.3em;
+    font-size: 0.95em;
+}
+
+.quiz-slide .quiz-instructions {
+    color: var(--deck-text);
+    margin-bottom: 0.6em;
+    font-size: 0.65em;
+}
+
+.quiz-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35em;
+    max-width: 620px;
+    margin: 0 auto;
+}
+
+.quiz-question {
+    background: rgba(30,58,95,0.6);
+    border: 1px solid rgba(0,180,216,0.2);
+    border-radius: 5px;
+    padding: 0.35em 0.55em;
+    text-align: left;
+}
+
+.quiz-question .q-prompt {
+    color: var(--deck-text);
+    font-weight: 600;
+    margin-bottom: 0.25em;
+    font-size: 0.65em;
+}
+
+.quiz-question .q-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12em;
+}
+
+.quiz-question .q-option {
+    display: flex;
+    align-items: center;
+    gap: 0.3em;
+    color: var(--deck-text);
+    cursor: pointer;
+    font-size: 0.58em;
+}
+
+.quiz-question .q-option input {
+    accent-color: var(--deck-accent);
+    margin: 0;
+    transform: scale(0.8);
+}
+
+.quiz-question .q-input {
+    background: rgba(5,11,20,0.8);
+    border: 1px solid var(--deck-accent);
+    color: var(--deck-text);
+    border-radius: 4px;
+    padding: 0.25em 0.4em;
+    width: 100%;
+    font-size: 0.6em;
+}
+
+.btn-submit-quiz {
+    background: var(--deck-accent);
+    color: var(--deck-bg);
+    border: none;
+    border-radius: 4px;
+    padding: 0.35em 1em;
+    font-weight: 800;
+    font-size: 0.65em;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: "BoldPixels", sans-serif;
+}
+
+.btn-submit-quiz:hover {
+    background: var(--deck-accent-light);
+    box-shadow: 0 0 12px rgba(0,180,216,0.4);
+}
+
+/* ── Results slide ── */
+.results-slide .slide-content-inner {
+    text-align: center;
+}
+
+.results-slide h2 {
+    font-family: "Retrograde Bold", sans-serif;
+}
+
+.results-slide .score-circle {
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0.3em auto;
+    font-size: 36px;
+    font-weight: 900;
+    font-family: "BoldPixels", sans-serif;
+    overflow: hidden;
+}
+
+.results-slide .score-circle.passed {
+    border: 3px solid var(--deck-success);
+    color: var(--deck-success);
+}
+
+.results-slide .score-circle.failed {
+    border: 3px solid var(--deck-danger);
+    color: var(--deck-danger);
+}
+
+.results-slide .verdict {
+    font-size: 0.8em;
+    font-weight: 700;
+    margin-bottom: 0.5em;
+}
+
+.results-slide .verdict.passed {
+    color: var(--deck-success);
+}
+
+.results-slide .verdict.failed {
+    color: var(--deck-danger);
+}
+
+.results-detail {
+    text-align: left;
+    max-width: 500px;
+    margin: 1rem auto;
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 0.45em;
+}
+
+.results-detail p {
+    font-size: 1em;
+    line-height: 1.5;
+}
+
+.results-actions {
+    display: flex;
+    gap: 0.4em;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+}
+
+.btn-retake {
+    background: var(--deck-warning);
+    color: var(--deck-bg);
+    border: none;
+    border-radius: 4px;
+    padding: 0.35em 0.8em;
+    font-weight: 800;
+    font-size: 0.6em;
+    cursor: pointer;
+    font-family: "BoldPixels", sans-serif;
+}
+
+.btn-modules {
+    background: transparent;
+    color: var(--deck-accent-light);
+    border: 1px solid var(--deck-accent);
+    border-radius: 4px;
+    padding: 0.35em 0.8em;
+    font-weight: 800;
+    font-size: 0.6em;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    font-family: "BoldPixels", sans-serif;
+}

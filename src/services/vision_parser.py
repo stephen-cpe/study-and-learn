@@ -1,11 +1,12 @@
 import hashlib
-import os
 import logging
+import os
 from typing import List, Optional, Tuple
+
 from PIL import Image
 
-from src.models import ContentRegistry
 from src import db
+from src.models import ContentRegistry
 from src.services.ai_client import call_ollama
 from src.services.exceptions import AIModelUnavailableError
 from src.services.vector_store import get_collection_name

@@ -12,13 +12,17 @@ IMPORTANT: ``AI_MOCK`` and ``AI_BACKEND`` are checked at *call time*, not at
 import time, so tests can safely use ``monkeypatch.setenv`` before invoking
 ``call_ollama``.
 """
+import logging
 import os
 import time
-import logging
+
 import requests
 
 from src.services.exceptions import (
-    AIServiceError, AIModelUnavailableError, AICloudAPIError, AITimeoutError,
+    AICloudAPIError,
+    AIModelUnavailableError,
+    AIServiceError,
+    AITimeoutError,
 )
 
 logger = logging.getLogger(__name__)

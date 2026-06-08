@@ -6,6 +6,7 @@ Swap the implementation below in Sprint 5 Phase 2 when moving to a
 persistent database store (e.g. PostgreSQL-backed LessonRepository).
 """
 from typing import Any, Dict, List
+
 import flask
 
 

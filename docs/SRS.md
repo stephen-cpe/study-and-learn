@@ -196,7 +196,7 @@ Candidate deployment platforms:
 study-and-learn/
 ├── src/
 │   ├── __init__.py
-│   ├── routes.py
+│   ├── routes/
 │   ├── models.py
 │   ├── services/
 │   │   ├── document_parser.py
@@ -456,7 +456,7 @@ study-and-learn/
 - Server-side session storage (Flask-Session + cachelib).
 - Custom CSS/JS slide-deck engine (retro-themed).
 - Content-addressable global deduplication (SHA-256 + ContentRegistry).
-- pytest test suite (190 tests).
+- pytest test suite (191 tests).
 - GitHub Actions test workflow.
 - Static public task board.
 - Design and testing document.
@@ -502,7 +502,7 @@ Ranked from easier to harder. Items above the line are implemented; items below 
 9. Simple quiz generation — done (4 question types: mcq, true_false, multi_select, fill_blank)
 10. Slide-style lesson pages — done (custom CSS/JS deck engine with inline checkpoints)
 11. Cloud model toggle — done (ai_client_cloud.py with import-override pattern)
-12. JS refactored into external app.js — done
+12. JS refactored into domain modules (mascot, progress, upload, deck-engine, deck-page, results) — done
 13. Gated module progression with pass/fail — done (80% threshold)
 14. Retake with regenerated questions — done
 15. Server-side session storage — done (Flask-Session + cachelib FileSystemCache)
@@ -521,7 +521,7 @@ Ranked from easier to harder. Items above the line are implemented; items below 
 27. Multi-path study support — done (independent StudyPath per learning goal, up to 3 concurrent)
 28. Session leakage fix (user A's data appearing for user B) — done (session.pop on login)
 29. AI-powered OCR/vision integration — done (GLM-OCR local for text/table/figure recognition, Qwen3.5 cloud for figure descriptions, pdf2image page rendering, DOCX/PPTX image extraction, image file support)
-30. Global content-addressable deduplication — done (SHA-256 ContentRegistry, content-keyed ChromaDB collections, multi-collection retrieval, 172 tests)
+30. Global content-addressable deduplication — done (SHA-256 ContentRegistry, content-keyed ChromaDB collections, multi-collection retrieval)
 
 ### Sprint 7 (Planned)
 31. Mascot animation frames (idle/busy/happy) — done (3 animated GIFs, sprite sheets, state-based glow tints, progress-driven switching, fallback to static PNG, centralized config)

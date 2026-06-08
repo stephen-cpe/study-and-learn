@@ -7,9 +7,10 @@ Replaces the session-backed session_repo.py (Sprint 5 Phase 2.2).
 import json
 from typing import Any, Dict, List, Optional
 
-from src import db
-from src.models import StudyPath, LessonProgress
 from flask_login import current_user
+
+from src import db
+from src.models import LessonProgress, StudyPath
 
 
 def get_lessons(user=None, path_id: str = None) -> List[Dict[str, Any]]:
