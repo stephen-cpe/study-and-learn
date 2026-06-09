@@ -178,10 +178,53 @@
       });
   }
 
+  function initSourceToggles() {
+    var overlay = document.getElementById('sources-overlay');
+    var openBtn = document.getElementById('sources-btn');
+    var closeBtn = document.getElementById('sources-close');
+
+    if (!overlay || !openBtn) return;
+
+    openBtn.addEventListener('click', function () {
+      overlay.style.display = 'flex';
+    });
+
+    function closeOverlay() {
+      overlay.style.display = 'none';
+    }
+
+    closeBtn.addEventListener('click', closeOverlay);
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) closeOverlay();
+    });
+
+    overlay.querySelectorAll('.source-toggle-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var entry = btn.closest('.source-entry');
+        var preview = entry.querySelector('.source-preview');
+        var full = preview.querySelector('.source-full');
+        var ellipsis = preview.querySelector('.source-ellipsis');
+        var isExpanded = preview.dataset.expanded === 'true';
+        if (isExpanded) {
+          full.style.display = 'none';
+          if (ellipsis) ellipsis.style.display = '';
+          preview.dataset.expanded = 'false';
+          btn.textContent = 'Show more';
+        } else {
+          full.style.display = '';
+          if (ellipsis) ellipsis.style.display = 'none';
+          preview.dataset.expanded = 'true';
+          btn.textContent = 'Show less';
+        }
+      });
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     if (document.querySelector('.deck-container')) {
       window.formatSlideText();
       window.initDeckPage();
+      initSourceToggles();
     }
   });
 })();

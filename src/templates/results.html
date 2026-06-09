@@ -37,6 +37,12 @@
                 <span class="relevance-dot"></span>
                 <h3>{{ relevance_result.relevance_label|capitalize }} Match</h3>
             </div>
+            {% if rel_label == 'partial' %}
+            <div class="partial-warning-banner">
+                <span class="partial-warning-icon">&#9888;</span>
+                <span>Your materials partially match your goal. Some topics may not be covered. Consider supplementing with additional materials.</span>
+            </div>
+            {% endif %}
             <div class="relevance-details">
                 <div class="relevance-section">
                     <h4>Explanation</h4>
@@ -52,11 +58,18 @@
         </div>
     </div>
 
+    {% if rel_label != 'weak' %}
     <div class="card results-card-path">
         <div class="card-header">
             <h2 class="mb-0">Recommended Study Path</h2>
         </div>
         <div class="card-body">
+            {% if rel_label == 'partial' %}
+            <div class="partial-warning-banner">
+                <span class="partial-warning-icon">&#9888;</span>
+                <span>Your materials partially match your goal. Some topics may not be covered. Consider supplementing with additional materials.</span>
+            </div>
+            {% endif %}
             {% if study_path.modules %}
             <div class="module-timeline">
             {% for module in study_path.modules %}
@@ -83,6 +96,36 @@
             </div>
         </div>
     </div>
+    {% endif %}
+
+    {% if rel_label == 'weak' %}
+    <div class="card results-card-weak">
+        <div class="card-header">
+            <h2 class="mb-0">Materials Not Aligned</h2>
+        </div>
+        <div class="card-body">
+            <div class="weak-feedback-content">
+                <p class="weak-feedback-main">Your uploaded materials are not well-aligned with your learning goal. A study path and interactive lessons cannot be generated from these materials.</p>
+                {% if relevance_result.explanation %}
+                <div class="weak-feedback-section">
+                    <h4>Why this doesn't match:</h4>
+                    <p>{{ relevance_result.explanation }}</p>
+                </div>
+                {% endif %}
+                {% if relevance_result.missing_material and relevance_result.missing_material|lower != 'none' %}
+                <div class="weak-feedback-section">
+                    <h4>What to look for:</h4>
+                    <p>{{ relevance_result.missing_material }}</p>
+                </div>
+                {% endif %}
+                <div class="weak-feedback-actions mt-3">
+                    <a href="{{ url_for('main.index') }}" class="btn btn-primary">Upload Different Materials</a>
+                    <a href="{{ url_for('main.reset') }}" class="btn btn-outline-primary">Start Over</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <div class="action-buttons mb-4">

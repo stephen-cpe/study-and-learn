@@ -90,6 +90,86 @@ def test_dashboard_renders_active_paths(client):
     assert b'Cancel / Abandon' in rv.data
 
 
+def test_dashboard_completed_tab(client):
+    path = _make_active_path(client)
+    path.status = 'completed'
+    db.session.commit()
+
+    rv = client.get('/dashboard?tab=completed')
+    assert rv.status_code == 200
+    assert b'Completed' in rv.data
+    assert b'Intro to ML' in rv.data
+    assert b'Delete' in rv.data
+
+
+def test_dashboard_cancelled_tab(client):
+    path = _make_active_path(client)
+    path.status = 'cancelled'
+    db.session.commit()
+
+    rv = client.get('/dashboard?tab=cancelled')
+    assert rv.status_code == 200
+    assert b'Cancelled' in rv.data
+    assert b'Intro to ML' in rv.data
+    assert b'Delete' in rv.data
+
+
+def test_mark_complete_sets_status(client):
+    path = _make_active_path(client)
+
+    rv = client.post(f'/study-path/{path.id}/complete', follow_redirects=True)
+    assert rv.status_code == 200
+    assert b'marked as complete' in rv.data.lower()
+
+    refreshed = db.session.get(StudyPath, path.id)
+    assert refreshed.status == 'completed'
+
+
+def test_mark_complete_blocked_if_not_all_passed(client):
+    user = User.query.filter_by(username='dashuser').first()
+    path = StudyPath(
+        user_id=user.id, title='Partial',
+        learning_goal='Goal', status='active',
+    )
+    db.session.add(path)
+    db.session.commit()
+    db.session.add_all([
+        LessonProgress(study_path_id=path.id, module_index=0, score=90, passed=True, completed=True),
+        LessonProgress(study_path_id=path.id, module_index=1, score=70, passed=False, completed=True),
+    ])
+    db.session.commit()
+
+    rv = client.post(f'/study-path/{path.id}/complete', follow_redirects=True)
+    assert rv.status_code == 200
+    assert b'must be passed' in rv.data.lower()
+
+    refreshed = db.session.get(StudyPath, path.id)
+    assert refreshed.status == 'active'
+
+
+def test_delete_path_removes_record(client):
+    path = _make_active_path(client)
+    path.status = 'completed'
+    db.session.commit()
+
+    rv = client.post(f'/study-path/{path.id}/delete', follow_redirects=True)
+    assert rv.status_code == 200
+    assert b'permanently deleted' in rv.data.lower()
+
+    assert db.session.get(StudyPath, path.id) is None
+    assert LessonProgress.query.filter_by(study_path_id=path.id).count() == 0
+
+
+def test_delete_blocked_for_active_path(client):
+    path = _make_active_path(client)
+
+    rv = client.post(f'/study-path/{path.id}/delete', follow_redirects=True)
+    assert rv.status_code == 200
+    assert b'Only completed or cancelled' in rv.data
+
+    assert db.session.get(StudyPath, path.id) is not None
+
+
 def test_cancel_path_updates_status(client):
     path = _make_active_path(client)
 

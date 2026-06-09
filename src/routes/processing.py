@@ -207,7 +207,10 @@ def process():
         if is_ajax:
             progress_tracker.update_progress(task_id, 7)
 
-        study_path = generate_study_path(goal, rag_context, summary)
+        if relevance_result.get('relevance_label') != 'weak':
+            study_path = generate_study_path(goal, rag_context, summary)
+        else:
+            study_path = {}
 
         session['learning_goal'] = goal
         session['summary'] = summary
@@ -228,7 +231,8 @@ def process():
             path_title = study_path.get('title', goal[:50])
             create_study_path(current_user, path_title, goal,
                               extracted_texts=extracted_texts,
-                              file_hashes=file_hashes)
+                              file_hashes=file_hashes,
+                              file_names=filenames)
 
         if is_ajax:
             progress_tracker.update_progress(task_id, 8)

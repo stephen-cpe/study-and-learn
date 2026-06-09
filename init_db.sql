@@ -36,6 +36,7 @@ CREATE TABLE study_paths (
     content_data    TEXT         NULL,
     extracted_texts TEXT         NULL,
     file_hashes     TEXT         NULL,
+    file_names      TEXT         NULL,
     created_at      TIMESTAMP    NULL,
     updated_at      TIMESTAMP    NULL,
     CONSTRAINT pk_study_paths PRIMARY KEY (id),

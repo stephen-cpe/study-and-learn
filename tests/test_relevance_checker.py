@@ -68,3 +68,34 @@ def test_check_relevance_prompt_construction(monkeypatch):
     assert 'relevance' in prompt.lower()
     # Should mention the expected output format (JSON)
     assert 'json' in prompt.lower() or 'label' in prompt.lower()
+
+
+def test_check_relevance_empty_goal_returns_weak():
+    """Test that empty learning goal returns weak match without calling AI."""
+    result = check_relevance('', 'Some document text', 'Summary text')
+    assert result['relevance_label'] == 'weak'
+    assert 'No learning goal provided' in result['explanation']
+    assert 'Please provide a learning goal' in result['missing_material']
+
+
+def test_check_relevance_empty_text_returns_weak():
+    """Test that empty extracted text returns weak match without calling AI."""
+    result = check_relevance('Learn Python', '', 'Summary text')
+    assert result['relevance_label'] == 'weak'
+    assert 'No document text provided' in result['explanation']
+    assert 'Please upload study materials' in result['missing_material']
+
+
+def test_check_relevance_invalid_label_coerced_to_weak(monkeypatch):
+    """Test that an unrecognised label from the AI is coerced to weak."""
+    import src.services.relevance_checker as rc
+
+    def mock_call(prompt, model='llama3'):
+        return ('{"relevance_label": "unknown", '
+                '"explanation": "Not a valid label", '
+                '"missing_material": "None"}')
+
+    monkeypatch.setattr(rc, 'call_ollama', mock_call)
+    result = check_relevance('Learn Python', 'Some text', 'A summary')
+    assert result['relevance_label'] == 'weak'
+    assert result['explanation'] == 'Not a valid label'

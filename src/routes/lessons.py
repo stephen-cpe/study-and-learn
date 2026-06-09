@@ -14,7 +14,7 @@ from src.repositories.lesson_repo import (
     save_lessons,
 )
 from src.routes import PASS_THRESHOLD, bp
-from src.routes._helpers import _build_retriever, _resolve_goal, _resolve_hashes, _resolve_texts
+from src.routes._helpers import _build_retriever, _resolve_goal, _resolve_hashes, _resolve_texts, _resolve_filenames
 from src.services import progress_tracker
 from src.services.grader import _get_correct_answer, _grade_single_question
 from src.services.lesson_orchestrator import build_module_artifacts
@@ -56,7 +56,8 @@ def generate_lessons():
 
     extracted_texts = _resolve_texts()
     file_hashes_data = _resolve_hashes()
-    retriever = _build_retriever(learning_goal, extracted_texts, file_hashes_data)
+    file_names_data = _resolve_filenames()
+    retriever = _build_retriever(learning_goal, extracted_texts, file_hashes_data, file_names_data)
 
     progress_tracker.update_progress(task_id, 1)
 
@@ -72,6 +73,7 @@ def generate_lessons():
             'lesson': artifacts['lesson'],
             'quiz': artifacts['quiz'],
             'checkpoints': artifacts['checkpoints'],
+            'sources': artifacts.get('sources', []),
             'completed': False,
             'score': None,
             'passed': False
@@ -84,6 +86,7 @@ def generate_lessons():
                  learning_goal=learning_goal,
                  extracted_texts=extracted_texts,
                  file_hashes_val=file_hashes_data,
+                 file_names_val=file_names_data,
                  path_id=path_id_val)
 
     flash(f'Generated {len(modules)} lessons successfully!', 'success')
@@ -235,7 +238,8 @@ def retake_lesson(module_index):
     goal = _resolve_goal()
     texts = _resolve_texts()
     hashes_data = _resolve_hashes()
-    retriever = _build_retriever(goal, texts, hashes_data)
+    names_data = _resolve_filenames()
+    retriever = _build_retriever(goal, texts, hashes_data, names_data)
 
     artifacts = build_module_artifacts(
         {'title': module_title},

@@ -140,6 +140,8 @@
                     </div>
                 </div>
             </section>
+
+            {% set sources = lesson.sources if lesson.sources else [] %}
         </div>
 
         <div class="deck-controls">
@@ -151,6 +153,10 @@
             </button>
         </div>
 
+        {% if sources %}
+        <button class="deck-sources" id="sources-btn">View Sources</button>
+        {% endif %}
+
         <div class="deck-progress">Module {{ module_index + 1 }} of {{ total_modules }}</div>
         <div class="deck-progress-bar"></div>
     </div>
@@ -159,5 +165,31 @@
     <script src="{{ url_for('static', filename='js/progress.js') }}"></script>
     <script src="{{ url_for('static', filename='js/deck-engine.js') }}"></script>
     <script src="{{ url_for('static', filename='js/deck-page.js') }}"></script>
+
+    {% if sources %}
+    <div class="sources-overlay" id="sources-overlay" style="display: none;">
+        <div class="sources-modal">
+            <div class="sources-modal-header">
+                <h2>Source Materials</h2>
+                <button class="sources-close-btn" id="sources-close">&times;</button>
+            </div>
+            <div class="sources-modal-body">
+                {% for src in sources %}
+                <div class="source-entry">
+                    <div class="source-entry-header">
+                        <span class="source-filename">{{ src.filename }}</span>
+                    </div>
+                    <div class="source-preview" data-expanded="false">
+                        {{ src.text[:200] }}{% if src.text|length > 200 %}<span class="source-ellipsis">...</span><span class="source-full" style="display: none;">{{ src.text[200:] }}</span>{% endif %}
+                    </div>
+                    {% if src.text|length > 200 %}
+                    <button class="source-toggle-btn">Show more</button>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </body>
 </html>

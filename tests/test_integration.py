@@ -69,6 +69,79 @@ def test_full_workflow(mock_curriculum, mock_relevance, mock_summarizer, mock_ra
     assert b'Start Over' in response.data
 
 
+@patch('src.services.rag_retriever.build_rag_context')
+@patch('src.services.summarizer.call_ollama')
+@patch('src.services.relevance_checker.call_ollama')
+@patch('src.services.curriculum_generator.call_ollama')
+def test_weak_match_gates_study_path(mock_curriculum, mock_relevance, mock_summarizer, mock_rag, client):
+    """Weak match: no study path, no lesson button, shows weak feedback card."""
+    mock_rag.return_value = "RAG context for testing."
+    mock_summarizer.return_value = "Main topics: ML, algorithms. Difficulty: intermediate."
+    mock_relevance.return_value = (
+        '{"relevance_label": "weak", '
+        '"explanation": "Documents cover statistics, not ML", '
+        '"missing_material": "Look for materials covering supervised learning"}'
+    )
+
+    data = {
+        'learning_goal': 'Learn ML',
+        'files': [(io.BytesIO(b'Statistical methods'), 'test.txt')]
+    }
+    response = client.post('/process', data=data,
+                           content_type='multipart/form-data',
+                           follow_redirects=True)
+
+    assert response.status_code == 200
+    # Weak feedback card title
+    assert b'Materials Not Aligned' in response.data
+    # Weak match explanation (from AI)
+    assert b'Documents cover statistics, not ML' in response.data
+    # Missing material suggestion
+    assert b'supervised learning' in response.data
+    # Study path card MUST NOT be present
+    assert b'Recommended Study Path' not in response.data
+    # Lesson button MUST NOT be present
+    assert b'Generate Interactive Lessons' not in response.data
+    # Curriculum generator should NOT have been called
+    mock_curriculum.assert_not_called()
+
+
+@patch('src.services.rag_retriever.build_rag_context')
+@patch('src.services.summarizer.call_ollama')
+@patch('src.services.relevance_checker.call_ollama')
+@patch('src.services.curriculum_generator.call_ollama')
+def test_partial_match_shows_warning_banners(mock_curriculum, mock_relevance, mock_summarizer, mock_rag, client):
+    """Partial match: warning banners on both relevance and study path cards."""
+    mock_rag.return_value = "RAG context for testing."
+    mock_summarizer.return_value = "Main topics: ML basics. Difficulty: beginner."
+    mock_relevance.return_value = (
+        '{"relevance_label": "partial", '
+        '"explanation": "Materials cover ML basics but lack depth", '
+        '"missing_material": "Advanced ML textbooks"}'
+    )
+    mock_curriculum.return_value = (
+        '{"modules": [{"title": "Intro to ML", "estimated_effort": "2 hours"}]}'
+    )
+
+    data = {
+        'learning_goal': 'Learn ML',
+        'files': [(io.BytesIO(b'ML basics'), 'test.txt')]
+    }
+    response = client.post('/process', data=data,
+                           content_type='multipart/form-data',
+                           follow_redirects=True)
+
+    assert response.status_code == 200
+    # Study path is still generated
+    assert b'Recommended Study Path' in response.data
+    assert b'Intro to ML' in response.data
+    # Partial warning banner text appears
+    assert b'partially match' in response.data
+    assert b'Some topics may not be covered' in response.data
+    # Curriculum generator WAS called
+    mock_curriculum.assert_called_once()
+
+
 @patch('src.services.lesson_generator.call_ollama')
 @patch('src.services.quiz_generator.call_ollama')
 def test_generate_lessons_flow(mock_quiz_ollama, mock_lesson_ollama, client):

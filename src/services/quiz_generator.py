@@ -133,7 +133,7 @@ def _shuffle_checkpoint(cp: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]
 def generate_quiz(
     module_title: str,
     slides: List[Dict[str, Any]],
-    retriever: Optional[Callable[[str], str]],
+    retriever: Optional[Callable[[str], Dict[str, Any]]],
     n_questions: int = 5,
 ) -> Dict[str, Any]:
     """Generate a mixed-type quiz for a module grounded in RAG context.
@@ -159,8 +159,10 @@ def generate_quiz(
         try:
             query = f"{module_title}"
             result = retriever(query)
-            if result:
-                rag_context = result
+            if isinstance(result, dict):
+                rag_context = result.get("context_text", str(result))
+            elif result:
+                rag_context = str(result)
         except Exception as e:
             logger.warning("RAG retrieval failed for quiz '%s': %s", module_title, str(e))
 
@@ -284,7 +286,7 @@ Quiz:"""
 def generate_inline_checkpoint(
     module_title: str,
     slides_subset: List[Dict[str, Any]],
-    retriever: Optional[Callable[[str], str]],
+    retriever: Optional[Callable[[str], Dict[str, Any]]],
 ) -> Dict[str, Any]:
     """Generate a single inline comprehension checkpoint (MCQ).
 
@@ -304,8 +306,10 @@ def generate_inline_checkpoint(
     if retriever:
         try:
             result = retriever(f"{module_title}")
-            if result:
-                rag_context = result
+            if isinstance(result, dict):
+                rag_context = result.get("context_text", "")
+            elif result:
+                rag_context = str(result)
         except Exception as e:
             logger.warning("RAG retrieval failed for checkpoint '%s': %s", module_title, str(e))
 

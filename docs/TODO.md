@@ -3,7 +3,7 @@
 ### *Turn Any Documents into Interactive, Personalized Learning Experiences*
 
 **Purpose:** This document organizes the capstone work into MVP tasks, user stories, sprints, stretch goals, and submission requirements.  
-**Last updated:** June 7, 2026
+**Last updated:** June 9, 2026
 
 ---
 
@@ -250,15 +250,17 @@ Build the smallest working version first, then iterate:
 - [ ] Update landing page copy to reflect Document-to-Learning Transformer framing
 - [ ] Integrate Web Speech API or TTS library for lesson narration
 - [ ] Add TTS toggle button on slide deck (disabled by default)
-- [ ] Generate PDF from completed lesson slides and quiz results
-- [ ] Add PDF export button on completed lesson page
+- [x] Generate PDF from completed lesson slides and quiz results
+- [x] Add PDF export button on completed lesson page (per-lesson granularity)
 - [ ] Remove `extracted_texts` from session after lessons generated
 - [ ] Add difficulty/age-level selector on upload form (Easy/Moderate/Hard)
 - [ ] Inject difficulty level into lesson and quiz generation prompts
-- [ ] Link generated lesson content back to source PDF/document
-- [ ] Add citations showing which document a slide references
+- [x] Link generated lesson content back to source PDF/document
+- [x] Add citations showing which document a slide references (modal overlay)
 - [ ] Design badge/trophy system for completed modules
-- [ ] Track abandoned lessons separately from completions
+- [x] Track abandoned lessons separately from completions (Dashboard tabs: Active/Completed/Cancelled)
+- [x] Add Mark Complete lifecycle action (user-triggered when 100% passed)
+- [x] Add Delete action for completed/cancelled paths (irreversible warning)
 - [ ] Display achievement badges on dashboard
 - [ ] Test cloud ChromaDB (optional parallel track)
 - [ ] Test cloud AI model providers (optional parallel track)
@@ -341,7 +343,7 @@ Build the smallest working version first, then iterate:
 - [x] AI-powered OCR/vision (GLM-OCR local + Qwen3.5 cloud)
 - [x] Content-addressable global deduplication
 - [x] Multi-collection ChromaDB retrieval
-- [x] 191 automated tests
+- [x] 202 automated tests
 - [x] GitHub Actions CI
 - [x] Static task board
 - [x] Design/testing document

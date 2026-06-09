@@ -1,9 +1,9 @@
 # Design and Testing Document
 # Study-and-Learn
 
-**Version:** 0.5  
-**Status:** Living document  
-**Last updated:** June 8, 2026
+**Version:** 0.6
+**Status:** Living document
+**Last updated:** June 9, 2026
 
 ---
 
@@ -20,21 +20,25 @@ flowchart TD
     C2 --> C3
     C3 --> D["Chunker: RecursiveCharacterTextSplitter"]
     D --> E["Vector Store: Content-Keyed ChromaDB (doc_{hash})"]
-    E --> F["RAG Retriever: Multi-Collection top-k=5 context"]
+    E --> F["RAG Retriever: Multi-Collection top-k=5 context + sources metadata"]
     F --> G["Summarizer"]
     F --> H["Relevance Checker"]
     F --> I["Curriculum Generator"]
     G --> J["results.html: Summary, Relevance, Study Path"]
-    H --> J
-    I --> J
-    J --> K{"Generate Interactive Lessons?"}
-    K --> L["Lesson Generator: slides JSON"]
-    K --> M["Quiz Generator: questions + checkpoints"]
-    L --> N["lessons.html: Module Grid with Gating"]
-    M --> N
-    N --> O["lesson_deck.html: Custom Slide Deck"]
-    O --> P["Inline Checkpoints: block advance"]
-    O --> Q["Final Quiz: 4 question types"]
+    H -->|weak| J
+    H -->|partial/strong| J
+    I -->|if not weak| J
+    J --> K{"Weak match?"}
+    K -->|Yes| K2["Weak feedback card: no study path, no lessons"]
+    K -->|No| L{"Generate Interactive Lessons?"}
+    L --> M["Lesson Generator: slides JSON + sources"]
+    L --> N["Quiz Generator: questions + checkpoints"]
+    M --> O["lessons.html: Module Grid with Gating + Export PDF buttons"]
+    N --> O
+    O --> P["lesson_deck.html: Custom Slide Deck + Sources modal"]
+    P --> Q["Inline Checkpoints: block advance"]
+    P --> R["Final Quiz: 4 question types"]
+    Q --> R
     Q --> R["POST /grade: AJAX, instant feedback"]
     R --> S["Results Slide: score, pass/fail"]
     S --> T{"Score >= 80%?"}
@@ -51,16 +55,18 @@ Core workflow:
 4. Vision parser renders pages/images and runs AI-powered OCR (GLM-OCR local, Qwen3.5 cloud) for `.png`, `.jpg`, `.jpeg`, and scanned PDFs.
 5. File hashes are computed, ContentRegistry check skips duplicates globally.
 6. RAG pipeline chunks, embeds, stores, and retrieves relevant context from content-keyed ChromaDB collections.
-7. AI services generate summary, relevance check, and study path.
-8. Results page displays structured output with improved visual hierarchy.
-7. AI services generate summary, relevance check, and study path.
-8. Results page displays structured output with improved visual hierarchy.
-9. User clicks "Generate Interactive Lessons" to produce slide-based lessons.
-10. AI generates lesson slides + inline checkpoints + mixed-type quiz per module.
-11. Custom CSS/JS slide deck presents lessons with retro fonts and checkpoint blocking.
-12. Learner completes quiz, receives instant grading with per-question feedback.
-13. Failed modules can be retaken with fresh regenerated questions.
-14. Progression is gated (80% pass threshold required to unlock next module).
+7. AI services generate summary and relevance check.
+8. If weak match → display alternative feedback card (study path + lesson generation gated). Otherwise → full pipeline.
+9. AI generates study path (if not gated).
+10. Results page displays structured output: summary, relevance (with partial warning banners or weak feedback card), and study path (if applicable).
+11. User clicks "Generate Interactive Lessons" to produce slide-based lessons (if not gated by weak relevance).
+12. AI generates lesson slides + inline checkpoints + mixed-type quiz per module.
+13. Source citation metadata (chunk provenance) is preserved through retrieval and stored alongside lesson artifacts.
+14. Custom CSS/JS slide deck presents lessons with retro fonts, checkpoint blocking, and a "View Sources" button in the controls bar (opens modal overlay with document excerpts).
+15. Learner completes quiz, receives instant grading with per-question feedback.
+16. Failed modules can be retaken with fresh regenerated questions.
+17. Progression is gated (80% pass threshold required to unlock next module).
+18. Passed lessons can be exported to PDF via a per-lesson export button (slides, checkpoints, quiz answers, source materials).
 
 ---
 
@@ -181,6 +187,30 @@ Core workflow:
 
 **Reason:** Before this change, Ollama failures (connection refused, HTTP 500, timeouts) produced raw `RuntimeError` strings shown directly to users: `"Failed to reach Ollama at http://localhost:11434"`. Users had no way to distinguish between a temporary glitch (retryable) and a configuration error (needs human fix). The new hierarchy maps HTTP status codes and exception types to user-actionable messages (`"AI service is currently unavailable. Please verify your AI backend is running and try again."`). Service-layer generators (`summarizer.py`, `relevance_checker.py`, `curriculum_generator.py`) catch `AIServiceError` and either raise `StudyAndLearnError` with a friendly message or gracefully fall back to default content. Lesson/quiz generators fall back to hardcoded content when AI is unavailable rather than crashing. Silent `except Exception: pass` blocks were converted to `logger.warning()` calls. Tradeoffs: ✅ User-visible error clarity, graceful degradation, retry resilience • ❌ 7-class hierarchy, additional `try/except` in each service layer
 
+### ADR-019: Relevance Gating — Weak Match Blocks Downstream Generation
+
+**Decision:** When the relevance checker returns a `weak` match, skip `generate_study_path()` entirely (set `study_path = {}`), display an alternative weak-match feedback card on the results page, and do not render the "Recommended Study Path" card or "Generate Interactive Lessons" button. Partial matches display warning banners on both the relevance card and study path card but allow full access.
+
+**Reason:** Generating a study path and lessons from irrelevant content wastes AI tokens and produces misleading output. The SRS requirement FR-023 ("should identify when uploaded materials are insufficient") is now fulfilled by this gating. The `missing_material` field from the AI serves as the primary content for the weak feedback card, giving learners specific, actionable suggestions for what materials to find. Tradeoffs: ✅ FR-023 fulfilled, token savings, clear UX signal • ❌ AI judgment is opaque (no algorithmic scoring backup), user cannot override
+
+### ADR-020: Source Citation System — Retriever Metadata Preservation
+
+**Decision:** Preserve chunk-level provenance metadata (chunk ID, source hash, filename, full chunk text) from ChromaDB retrieval through the entire pipeline: `retrieve_from_multiple_collections_with_sources()` → `build_rag_context_for_module()` → `generate_lesson()` → `build_module_artifacts()` → `save_lessons()`. Store sources in the lesson JSON alongside slides/quiz/checkpoints. Render them via a "View Sources" button in the slide deck controls bar that opens a modal overlay (not a slide, so it never blocks navigation). A parallel `file_names` JSON column on `StudyPath` provides human-readable filenames for citation display.
+
+**Reason:** The critical provenance break was at `vector_store.py:181` where `retrieve_from_multiple_collections()` discarded all metadata (joining only document text). The function `retrieve_with_scores()` already queried ChromaDB with `include=["documents", "distances", "metadatas"]` — the data was available but thrown away. Adding a parallel `retrieve_from_multiple_collections_with_sources()` that returns `{"context_text": str, "sources": [...]}` required updating the retriever callable signature from `Callable[[str], str]` to `Callable[[str], Dict[str, Any]]` across 6 service files. The `isinstance(result, dict)` fallback in quiz/checkpoint generators maintains backward compatibility with string-only mock retrievers in tests. Tradeoffs: ✅ Deterministic provenance (no LLM hallucination risk), one-click source access, existing `retrieve_with_scores()` infra already in place • ❌ ~6 service file signature changes, `file_names` DB column added, retriever type change ripples to all callers
+
+### ADR-021: Dashboard Tabs + StudyPath Status Lifecycle
+
+**Decision:** Replace the single-status dashboard (`status='active'` only) with three tab pills (Active/Completed/Cancelled) driven by a `?tab=` query parameter. Add a `status='completed'` lifecycle state (user-triggered via "Mark Complete" button, only available when all modules have `passed=True`). Add a `POST /study-path/<id>/delete` route (permanent deletion, only available for completed or cancelled paths with a stern irreversibility warning). The navbar gains a "My Lessons" link for direct access.
+
+**Reason:** Previously, a fully-passed path remained "active" forever with 100% progress — no way to archive it. Cancelled paths simply disappeared from the dashboard — users could not review abandoned work. The three-tab design gives users a clear view of their learning history without adding new navigation pages. The "Mark Complete" action is manual (not automatic) to give users a sense of accomplishment and control. Deletion is restricted to completed/cancelled statuses only — active paths cannot be deleted to prevent accidental data loss. Tradeoffs: ✅ Learning history preserved, clutter control via delete, no new pages/routes (just tabs) • ❌ `status='completed'` is a new VARCHAR value (no schema change needed), delete is irreversible
+
+### ADR-022: Per-Lesson PDF Export via fpdf2
+
+**Decision:** Implement per-lesson PDF export (`GET /lessons/<i>/export?path_id=...`) using the fpdf2 library (pure Python, no system dependencies) rather than WeasyPrint (requires GTK system libraries, unavailable on Windows). Each PDF contains: lesson slides, inline checkpoints with correct answers, quiz questions with answers and explanations, and source materials with filenames and chunk text. Export is available for any passed lesson (score ≥ 80%) regardless of the parent StudyPath status (active, completed, or cancelled). All AI-generated/user-provided text passes through a `_clean()` sanitizer (Unicode NFKD normalization + explicit character mapping for en-dash, em-dash, smart quotes, bullets, ellipsis, non-breaking space) to ensure Latin-1 compatibility with fpdf2's built-in Helvetica font.
+
+**Reason:** WeasyPrint was attempted first but failed at import time due to missing GTK/pango system libraries on Windows (`libgobject-2.0-0` not found). fpdf2 is already in the project's virtual environment (was a transitive dependency of markdown_pdf) and requires only the Python standard library. Per-lesson granularity (not per-path) allows learners to export individual completed modules even if they abandon the overall study path — analogous to keeping a textbook from a course you didn't finish. Tradeoffs: ✅ Pure Python, no system deps, per-lesson granularity, Latin-1 sanitization • ❌ Limited to built-in Helvetica font (no Unicode), text wrapping is manual, no header/footer page numbering, output is single-page-per-lesson (not multi-page)
+
 ---
 
 ## 4. Software & Architectural Patterns
@@ -230,7 +260,7 @@ Integration tests cover routes and workflow behavior:
 - mocked generate-lessons flow: session data → lesson + quiz generation → redirect,
 - lesson deck route with pre-populated session lessons returns 200.
 
-Current test suite: **191 tests across 23 test modules covering core MVP, auth, models, dashboard, lesson repository, admin access, multi-path workflows, OCR/vision pipeline, multi-collection retrieval, access control, ChromaDB corruption recovery, reset path preservation, and retake quiz regeneration — 0 failures**.
+Current test suite: **202 tests across 23 test modules covering core MVP, auth, models, dashboard, lesson repository, admin access, multi-path workflows, OCR/vision pipeline, multi-collection retrieval, access control, ChromaDB corruption recovery, reset path preservation, relevance gating (weak/partial matching), source citation metadata propagation, dashboard lifecycle (complete/delete), and retake quiz regeneration — 0 failures**.
 
 ### Smoke Tests
 

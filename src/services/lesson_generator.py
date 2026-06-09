@@ -18,33 +18,32 @@ logger = logging.getLogger(__name__)
 def build_rag_context_for_module(
     module_title: str,
     learning_goal: str,
-    retriever: Optional[Callable[[str], str]],
-) -> str:
+    retriever: Optional[Callable[[str], Dict[str, Any]]],
+) -> Dict[str, Any]:
     """Query the retriever for context relevant to a module.
 
     Args:
         module_title: The module title to build a query around.
         learning_goal: The learner's stated goal.
-        retriever: A callable that accepts a query string and returns
-            retrieved context, or None.
+        retriever: A callable that accepts a query string and returns a dict
+            with ``context_text`` (str) and ``sources`` (list), or None.
 
     Returns:
-        Retrieved context string, or an empty string if retrieval fails
-        or no retriever is provided.
+        Dict with ``context_text`` (str) and ``sources`` (list).
     """
     try:
         if retriever:
             query = f"{learning_goal} {module_title}"
-            return retriever(query) or ""
+            return retriever(query) or {"context_text": "", "sources": []}
     except Exception as e:
         logger.warning("RAG retrieval failed for module '%s': %s", module_title, str(e))
-    return ""
+    return {"context_text": "", "sources": []}
 
 
 def generate_lesson(
     module_title: str,
     learning_goal: str,
-    retriever: Optional[Callable[[str], str]],
+    retriever: Optional[Callable[[str], Dict[str, Any]]],
 ) -> Dict[str, Any]:
     """Generate an interactive slide-based lesson for a single module.
 
@@ -55,19 +54,21 @@ def generate_lesson(
     Args:
         module_title: The title of the module to generate a lesson for.
         learning_goal: The learner's stated goal.
-        retriever: A callable that accepts a query string and returns
-            retrieved RAG context, or None if unavailable.
+        retriever: A callable that accepts a query string and returns a dict
+            with ``context_text`` and ``sources``, or None if unavailable.
 
     Returns:
-        A dict with keys ``module_title`` (str) and ``slides``
-        (list of slide dicts with types: title, content, example, summary).
+        A dict with keys ``module_title`` (str), ``slides`` (list), and
+        ``sources`` (list of source provenance dicts).
     """
     if not learning_goal or not learning_goal.strip():
         return _fallback_lesson(module_title)
     if not module_title or not module_title.strip():
         return _fallback_lesson("Untitled Module")
 
-    rag_context = build_rag_context_for_module(module_title, learning_goal, retriever)
+    rag_result = build_rag_context_for_module(module_title, learning_goal, retriever)
+    rag_context = rag_result.get("context_text", "") if isinstance(rag_result, dict) else str(rag_result)
+    sources = rag_result.get("sources", []) if isinstance(rag_result, dict) else []
 
     context_instruction = ""
     if rag_context and rag_context.strip():
@@ -137,7 +138,8 @@ Lesson:"""
                 if validated_slides:
                     return {
                         'module_title': result.get('module_title', module_title),
-                        'slides': validated_slides
+                        'slides': validated_slides,
+                        'sources': sources,
                     }
     except (json.JSONDecodeError, ValueError, KeyError, TypeError):
         pass
@@ -187,5 +189,6 @@ def _fallback_lesson(module_title: str) -> Dict[str, Any]:
                 'Ensure understanding before moving to the quiz.',
                 'Retake the lesson if needed to master the material.'
             ]}
-        ]
+        ],
+        'sources': [],
     }

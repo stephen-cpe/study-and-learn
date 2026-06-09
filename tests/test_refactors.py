@@ -40,8 +40,8 @@ def client(monkeypatch):
 # lesson_orchestrator
 # ──────────────────────────────────────────────────────────────
 
-def dummy_retriever(query: str) -> str:
-    return "dummy context"
+def dummy_retriever(query: str):
+    return {"context_text": "dummy context", "sources": []}
 
 
 def test_build_module_artifacts_returns_expected_keys(monkeypatch):
@@ -69,14 +69,19 @@ def test_build_module_artifacts_reuses_existing_slides():
 def test_make_retriever_returns_context_when_texts_present(mock_build_rag):
     mock_build_rag.return_value = "text one text two"
     retriever = make_retriever("goal", ["text one", "text two"])
-    ctx = retriever("query")
-    assert "text one" in ctx
-    assert "text two" in ctx
+    result = retriever("query")
+    assert isinstance(result, dict)
+    assert "text one" in result["context_text"]
+    assert "text two" in result["context_text"]
+    assert isinstance(result["sources"], list)
 
 
 def test_make_retriever_returns_empty_when_no_texts():
     retriever = make_retriever("goal", [])
-    assert retriever("q") == ""
+    result = retriever("q")
+    assert isinstance(result, dict)
+    assert result["context_text"] == ""
+    assert result["sources"] == []
 
 
 # ──────────────────────────────────────────────────────────────

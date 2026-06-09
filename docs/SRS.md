@@ -6,7 +6,7 @@
 **Capstone track:** Software system / AI system  
 **Repository name:** `study-and-learn`  
 **Primary development approach:** Spec-Driven Development with AI tooling support  
-**Last updated:** June 5, 2026
+**Last updated:** June 9, 2026
 
 ---
 
@@ -281,6 +281,8 @@ study-and-learn/
 | FR-016 | The system shall return a relevance label: strong match, partial match, or weak match. | Must |
 | FR-017 | The system shall provide a brief explanation for the relevance result. | Must |
 | FR-018 | The system should suggest what kind of missing material would improve the match. | Should |
+| FR-018a | The system shall gate study path generation and lesson generation when a weak match is detected, displaying alternative feedback with material suggestions. | Must |
+| FR-018b | The system shall display warning banners on the relevance card and study path card when a partial match is detected. | Must |
 
 ### 5.6 Study Path Generation
 
@@ -290,7 +292,7 @@ study-and-learn/
 | FR-020 | The study path shall contain modules or lessons in a recommended sequence. | Must |
 | FR-021 | The study path shall include estimated effort per module or lesson. | Must |
 | FR-022 | The generated plan should target approximately 6–8 hours of study per week. | Should |
-| FR-023 | The system should identify when uploaded materials are insufficient for a complete study path. | Should |
+| FR-023 | The system should identify when uploaded materials are insufficient for a complete study path. | Should — Implemented (weak match gates study path + lesson generation, displays alternative feedback card) |
 
 ### 5.7 User Interface
 
@@ -317,6 +319,8 @@ study-and-learn/
 | FR-040 | The system shall enforce an 80% pass threshold for module completion with a pass/fail verdict. | Must |
 | FR-041 | The system could support a difficulty level selector (Easy/Moderate/Hard) mapped to age-appropriate content complexity. | Could |
 | FR-042 | The system shall present lessons via a custom CSS/JS slide-deck engine styled with retro fonts and cyberpunk visuals. | Must |
+| FR-043 | The system shall allow the learner to view source document text excerpts that informed the generated lesson content via a modal overlay in the slide deck. | Must |
+| FR-044 | The system shall allow the learner to export a passed lesson (≥80% score) to PDF containing all slides, checkpoints with answers, quiz questions with answers and explanations, and source materials. | Must |
 
 ### 5.9 Admin / Editing Features
 
@@ -456,7 +460,7 @@ study-and-learn/
 - Server-side session storage (Flask-Session + cachelib).
 - Custom CSS/JS slide-deck engine (retro-themed).
 - Content-addressable global deduplication (SHA-256 + ContentRegistry).
-- pytest test suite (191 tests).
+- pytest test suite (202 tests).
 - GitHub Actions test workflow.
 - Static public task board.
 - Design and testing document.
@@ -475,7 +479,7 @@ study-and-learn/
 
 - YouTube integration.
 - AI-generated TTS narration.
-- Export to PDF, PPTX, or SCORM.
+- Export to PPTX or SCORM.
 - Short-answer (free-text) AI grading.
 - Adaptive difficulty based on learner performance.
 - Spaced repetition and review scheduling.
@@ -522,6 +526,10 @@ Ranked from easier to harder. Items above the line are implemented; items below 
 28. Session leakage fix (user A's data appearing for user B) — done (session.pop on login)
 29. AI-powered OCR/vision integration — done (GLM-OCR local for text/table/figure recognition, Qwen3.5 cloud for figure descriptions, pdf2image page rendering, DOCX/PPTX image extraction, image file support)
 30. Global content-addressable deduplication — done (SHA-256 ContentRegistry, content-keyed ChromaDB collections, multi-collection retrieval)
+31. Relevance gating for weak matches — done (weak match blocks study path + lesson generation, partial match shows warning banners)
+32. Source document citations in lessons — done (ChromaDB metadata preserved through retrieval pipeline, "View Sources" modal in slide deck)
+33. Dashboard with Active/Completed/Cancelled tabs — done (tab pills, Mark Complete, Delete with irreversibility warning, My Lessons navbar link)
+34. Per-lesson PDF export — done (fpdf2, passed lessons only, includes slides/checkpoints/quiz/sources)
 
 ### Sprint 7 (Planned)
 31. Mascot animation frames (idle/busy/happy) — done (3 animated GIFs, sprite sheets, state-based glow tints, progress-driven switching, fallback to static PNG, centralized config)

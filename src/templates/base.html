@@ -21,6 +21,7 @@
             {% if current_user.is_authenticated %}
             <div class="d-flex align-items-center gap-3">
                 <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-primary btn-sm nav-dashboard-btn">Dashboard</a>
+                <a href="{{ url_for('main.lessons') }}" class="btn btn-outline-primary btn-sm nav-dashboard-btn">My Lessons</a>
                 <div class="dropdown">
                     <a href="#" class="user-avatar-toggle d-flex align-items-center" data-bs-toggle="dropdown" aria-expanded="false">
                         <img src="{{ url_for('static', filename='images/avatar.png') }}" alt="User Avatar" class="user-avatar">

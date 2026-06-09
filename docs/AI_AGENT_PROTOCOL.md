@@ -2,11 +2,11 @@
 ## Study-and-Learn Capstone Project
 
 ## Project Brief (Read First)
-- **App:** Study-and-Learn — a Flask web app where a learner uploads study documents and gets an AI-generated summary, relevance check, study path, interactive slide-based lessons, mixed-type quizzes, and per-module grading with gated progression.
-- **Stack:** Python 3.13, Flask, Flask-Session (cachelib), Bootstrap 5, PostgreSQL, pytest, LangChain, ChromaDB, Ollama (configurable chat + embedding models), pdf2image + Poppler (PDF rendering), Pillow (image handling), python-pptx (PPTX extraction), GLM-OCR (local OCR, 0.9B), Qwen3.5:397b-cloud (cloud figure descriptions, migrated from deprecated Qwen3-VL:235b-cloud), GitHub Actions (CI)
+- **App:** Study-and-Learn — a Flask web app where a learner uploads study documents and gets an AI-generated summary, relevance check (with weak-match gating: blocks study path + lesson generation), study path, interactive slide-based lessons, mixed-type quizzes, per-module grading with gated progression, source citation system (ChromaDB metadata → deck modal), per-lesson PDF export (fpdf2), and dashboard with Active/Completed/Cancelled tabs (Mark Complete, Delete).
+- **Stack:** Python 3.13, Flask, Flask-Session (cachelib), Bootstrap 5, PostgreSQL, pytest, LangChain, ChromaDB, Ollama (configurable chat + embedding models), fpdf2 (PDF export), pdf2image + Poppler (PDF rendering), Pillow (image handling), python-pptx (PPTX extraction), GLM-OCR (local OCR, 0.9B), Qwen3.5:397b-cloud (cloud figure descriptions, migrated from deprecated Qwen3-VL:235b-cloud), GitHub Actions (CI)
 - **Structure:** See SRS.md for requirements. See TODO.md for sprint tasks. See DESIGN_AND_TESTING.md for ADRs and architecture. See docs/STATUS.md for current state.
 - **Repo root:** study-and-learn/
-- **Key rules:** No chat UI. Forms and result pages only. Custom CSS/JS slide deck (no reveal.js). Retro cyberpunk theme with Retrograde Bold and BoldPixels fonts. PostgreSQL-only database. Flask-Session (cachelib FileSystemCache) for transient form data; DB-backed lesson repository (PostgreSQL StudyPath + LessonProgress + extracted_texts) for lesson/progress persistence.
+- **Key rules:** No chat UI. Forms and result pages only. Custom CSS/JS slide deck (no reveal.js). Retro cyberpunk theme with Retrograde Bold and BoldPixels fonts. PostgreSQL-only database. Flask-Session (cachelib FileSystemCache) for transient form data; DB-backed lesson repository (PostgreSQL StudyPath + LessonProgress + extracted_texts + file_names) for lesson/progress persistence. Dashboard tabs (Active/Completed/Cancelled) with lifecycle: active → (complete | cancel) → delete. Source citations via retriever metadata propagation → modal overlay in slide deck. Per-lesson PDF export via GET /lessons/<i>/export available for any passed lesson regardless of parent path status.
 
 ## Role
 You are a senior full-stack Python/Flask developer and test-driven engineer.
@@ -48,8 +48,15 @@ You follow Spec-Driven Development strictly.
    - Custom slide deck engine only — do not reintroduce reveal.js
    - Retro fonts (Retrograde Bold, BoldPixels) must be preserved in all templates where headings appear
    - Module gating: 80% pass threshold, sequential unlock enforced in routes
-    - Lesson generation requires `can_generate_lessons=True` or `is_admin=True`; new signups default to denied
-    - Catch AI failures as typed exceptions (`AIServiceError` subclasses from `src/services/exceptions.py`), never as bare `RuntimeError` or `Exception`
+   - Lesson generation requires `can_generate_lessons=True` or `is_admin=True`; new signups default to denied
+   - Catch AI failures as typed exceptions (`AIServiceError` subclasses from `src/services/exceptions.py`), never as bare `RuntimeError` or `Exception`
+   - When `StudyPath.file_hashes` is populated, always populate `StudyPath.file_names` alongside it (parallel JSON array)
+   - Relevance gating: weak match skips `generate_study_path()` entirely (saves tokens); partial match shows warning banners but allows full access
+   - Source citations flow: chunk metadata preserved through retrieval → stored in lesson artifacts → rendered via modal overlay in deck (not a slide)
+   - Delete route (`POST /study-path/<id>/delete`) must only allow completed or cancelled status; active paths cannot be deleted
+   - Per-lesson PDF export (`GET /lessons/<i>/export`) available for any passed lesson regardless of parent StudyPath status
+   - All AI/user text in PDF export must pass through `_clean()` (Unicode NFKD normalization + explicit char mapping) for Latin-1 compatibility
+   - StudyPath status lifecycle: active → `complete_study_path()` when all modules passed → `cancel_study_path()` anytime → `delete_study_path()` only on completed/cancelled
 
 ## State Tracking
 After each task, update `docs/STATUS.md` using EXACTLY this format:

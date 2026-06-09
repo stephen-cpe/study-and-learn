@@ -112,9 +112,28 @@ def get_study_path_data(user=None) -> Optional[Dict[str, Any]]:
     return None
 
 
+def get_file_names(user=None, path_id: str = None) -> List[str]:
+    """Return a list of original filenames for the user's active study path."""
+    if user is None:
+        user = current_user
+    if not user or not user.is_authenticated:
+        return []
+    query = StudyPath.query.filter_by(user_id=user.id, status='active')
+    if path_id:
+        query = query.filter(StudyPath.id == path_id)
+    path = query.first()
+    if not path or not path.file_names:
+        return []
+    try:
+        return json.loads(path.file_names)
+    except (json.JSONDecodeError, TypeError):
+        return []
+
+
 def create_study_path(user, title: str, learning_goal: str,
                       extracted_texts: List[str] = None,
-                      file_hashes: List[str] = None) -> StudyPath:
+                      file_hashes: List[str] = None,
+                      file_names: List[str] = None) -> StudyPath:
     path = StudyPath(
         user_id=user.id,
         title=title,
@@ -125,6 +144,8 @@ def create_study_path(user, title: str, learning_goal: str,
         path.extracted_texts = json.dumps(extracted_texts)
     if file_hashes is not None:
         path.file_hashes = json.dumps(file_hashes)
+    if file_names is not None:
+        path.file_names = json.dumps(file_names)
     db.session.add(path)
     db.session.commit()
     return path
@@ -134,6 +155,7 @@ def save_lessons(lessons: List[Dict[str, Any]], user=None,
                  title: str = None, learning_goal: str = None,
                  extracted_texts: List[str] = None,
                  file_hashes_val: List[str] = None,
+                 file_names_val: List[str] = None,
                  path_id: str = None) -> None:
     if user is None:
         user = current_user
@@ -159,6 +181,8 @@ def save_lessons(lessons: List[Dict[str, Any]], user=None,
         db.session.add(path)
         if file_hashes_val is not None:
             path.file_hashes = json.dumps(file_hashes_val)
+        if file_names_val is not None:
+            path.file_names = json.dumps(file_names_val)
     else:
         if title:
             path.title = title
@@ -170,6 +194,8 @@ def save_lessons(lessons: List[Dict[str, Any]], user=None,
         path.extracted_texts = json.dumps(extracted_texts)
     if file_hashes_val is not None:
         path.file_hashes = json.dumps(file_hashes_val)
+    if file_names_val is not None:
+        path.file_names = json.dumps(file_names_val)
     path.updated_at = db.func.now()
 
     existing_rows = {

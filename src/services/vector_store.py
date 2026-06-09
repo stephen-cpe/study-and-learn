@@ -179,3 +179,53 @@ def retrieve_from_multiple_collections(
     top_results = all_results[:top_k]
     
     return "\n\n".join(r['document'] for r in top_results)
+
+
+def retrieve_from_multiple_collections_with_sources(
+    query: str,
+    collection_names: List[str],
+    top_k: int = 5
+) -> Dict[str, Any]:
+    """Query multiple collections and return context text + source metadata.
+
+    Unlike ``retrieve_from_multiple_collections``, this function preserves
+    chunk-level provenance (chunk ID, source hash, similarity score, and
+    full chunk text) alongside the joined context string.
+
+    Args:
+        query: The search query.
+        collection_names: ChromaDB collection names to query.
+        top_k: Total number of top results across all collections.
+
+    Returns:
+        Dict with ``context_text`` (str) and ``sources`` (list of dicts
+        each containing chunk_id, source_hash, score, and text).
+    """
+    all_results = []
+
+    for coll_name in collection_names:
+        try:
+            results = retrieve_with_scores(query, coll_name, top_k=3)
+            all_results.extend(results)
+        except Exception as e:
+            logger.warning("Failed to query collection '%s': %s", coll_name, str(e))
+            continue
+
+    if not all_results:
+        return {"context_text": "", "sources": []}
+
+    all_results.sort(key=lambda r: r.get('score', 0.0), reverse=True)
+    top_results = all_results[:top_k]
+
+    sources = []
+    for r in top_results:
+        metadata = r.get('metadata', {}) if isinstance(r.get('metadata'), dict) else {}
+        sources.append({
+            'chunk_id': metadata.get('chunk_id', ''),
+            'source_hash': metadata.get('source_hash', ''),
+            'score': r.get('score', 0.0),
+            'text': r.get('document', ''),
+        })
+
+    context_text = "\n\n".join(r['document'] for r in top_results)
+    return {"context_text": context_text, "sources": sources}
