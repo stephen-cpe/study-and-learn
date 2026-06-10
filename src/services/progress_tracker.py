@@ -11,23 +11,23 @@ os.makedirs(_cache_dir, exist_ok=True)
 _cache = FileSystemCache(cache_dir=_cache_dir, threshold=500, default_timeout=900)
 
 GENERATE_STAGES = [
-    {"stage": 0, "label": "Parsing documents", "pct": 0, "mascot": "Reading through your uploaded materials and extracting text...", "mascot_state": "busy"},
-    {"stage": 1, "label": "Chunking & embedding", "pct": 25, "mascot": "Splitting content into manageable sections and building knowledge maps...", "mascot_state": "busy"},
-    {"stage": 2, "label": "Retrieving context", "pct": 50, "mascot": "Scanning for important concepts and connecting the dots...", "mascot_state": "busy"},
-    {"stage": 3, "label": "Generating lessons", "pct": 75, "mascot": "Crafting your interactive lesson with slides and quizzes...", "mascot_state": "busy"},
-    {"stage": 4, "label": "Finalizing", "pct": 100, "mascot": "Polishing everything up and getting your study path ready...", "mascot_state": "happy"},
+    {"stage": 0, "label": "Parsing documents", "pct": 0, "mascot": "Parsing docs...", "mascot_state": "busy"},
+    {"stage": 1, "label": "Chunking & embedding", "pct": 25, "mascot": "Chunking + indexing...", "mascot_state": "busy"},
+    {"stage": 2, "label": "Retrieving context", "pct": 50, "mascot": "Scanning concepts...", "mascot_state": "busy"},
+    {"stage": 3, "label": "Generating lessons", "pct": 75, "mascot": "Building lesson...", "mascot_state": "busy"},
+    {"stage": 4, "label": "Finalizing", "pct": 100, "mascot": "Polishing...", "mascot_state": "happy"},
 ]
 
 PROCESS_STAGES = [
-    {"stage": 0, "label": "Uploading files",          "pct": 0,   "mascot": "Receiving your study materials...", "mascot_state": "busy"},
-    {"stage": 1, "label": "Parsing documents",         "pct": 10,  "mascot": "Reading through your uploaded materials and extracting text...", "mascot_state": "busy"},
-    {"stage": 2, "label": "OCR scanning pages",        "pct": 25,  "mascot": "Scanning each page for text, tables, and figures using AI vision...", "mascot_state": "busy"},
-    {"stage": 3, "label": "Analyzing figures",         "pct": 40,  "mascot": "Understanding diagrams and charts with AI vision...", "mascot_state": "busy"},
-    {"stage": 4, "label": "Building knowledge index",  "pct": 55,  "mascot": "Chunking and indexing your content for smart retrieval...", "mascot_state": "busy"},
-    {"stage": 5, "label": "Generating summary",        "pct": 70,  "mascot": "Summarizing what your materials cover...", "mascot_state": "busy"},
-    {"stage": 6, "label": "Checking relevance",        "pct": 80,  "mascot": "Checking how well your materials match your learning goal...", "mascot_state": "busy"},
-    {"stage": 7, "label": "Creating study path",       "pct": 90,  "mascot": "Building your personalized study path...", "mascot_state": "busy"},
-    {"stage": 8, "label": "Complete",                  "pct": 100, "mascot": "All done! Your results are ready.", "mascot_state": "happy"},
+    {"stage": 0, "label": "Uploading files",          "pct": 0,   "mascot": "Receiving files...", "mascot_state": "busy"},
+    {"stage": 1, "label": "Parsing documents",         "pct": 10,  "mascot": "Parsing docs...", "mascot_state": "busy"},
+    {"stage": 2, "label": "OCR scanning pages",        "pct": 25,  "mascot": "OCR scan...", "mascot_state": "busy"},
+    {"stage": 3, "label": "Analyzing figures",         "pct": 40,  "mascot": "Analyzing figs...", "mascot_state": "busy"},
+    {"stage": 4, "label": "Building knowledge index",  "pct": 55,  "mascot": "Building index...", "mascot_state": "busy"},
+    {"stage": 5, "label": "Generating summary",        "pct": 70,  "mascot": "Summarizing...", "mascot_state": "busy"},
+    {"stage": 6, "label": "Checking relevance",        "pct": 80,  "mascot": "Relevance check...", "mascot_state": "busy"},
+    {"stage": 7, "label": "Creating study path",       "pct": 90,  "mascot": "Building path...", "mascot_state": "busy"},
+    {"stage": 8, "label": "Complete",                  "pct": 100, "mascot": "All done!", "mascot_state": "happy"},
 ]
 
 STAGES = GENERATE_STAGES

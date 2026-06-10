@@ -24,8 +24,12 @@
     var bubble = document.getElementById('speech-bubble');
     var bubbleText = document.getElementById('bubble-text');
     if (bubble && bubbleText) {
-      bubbleText.textContent = text;
       bubble.classList.add('active');
+      if (typeof window._bubbleTypewrite === 'function') {
+        window._bubbleTypewrite(text || 'Working...');
+      } else {
+        bubbleText.textContent = text || 'Working...';
+      }
     }
   };
 
@@ -83,7 +87,7 @@
     _receivedValidProgress = false;
 
     var taskId = window.generateTaskId();
-    window.setBubblePersistent('Reading through your uploaded materials and extracting text...');
+    window.setBubblePersistent('Parsing docs...');
     window.showBubbleBar(0);
 
     fetch(url, {

@@ -246,6 +246,8 @@ Build the smallest working version first, then iterate:
 **Tasks:**
 - [x] Add mascot basic animation frames (idle/waiting/done)
 - [x] Display mascot state changes during loading operations
+- [x] Expand mascot animations to 14/16/14 distinct frames per status with transparent background (idle 14@250ms, busy 16@140ms, happy 14@220ms; gear-orbit + chest-chase for busy, rising particles + bounce for happy) + 26 pytest tests
+- [x] Add mascot error/failure state (mascot-error.gif, 14f @ 220ms, X-eyes + drooping bob + dimmed chest + red '!' banner + slow red/orange warning particles, base artwork preserved) + 11 pytest tests + template/JS/CSS wiring
 - [ ] Create proprietary demo document set (non-public, niche knowledge)
 - [ ] Update landing page copy to reflect Document-to-Learning Transformer framing
 - [ ] Integrate Web Speech API or TTS library for lesson narration

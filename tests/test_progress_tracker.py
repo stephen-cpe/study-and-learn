@@ -32,11 +32,20 @@ def test_generate_stages_have_labels():
 
 
 def test_generate_stages_have_mascot_messages():
-    assert 'Reading through your uploaded materials' in GENERATE_STAGES[0]['mascot']
-    assert 'Splitting content into manageable sections' in GENERATE_STAGES[1]['mascot']
-    assert 'Scanning for important concepts' in GENERATE_STAGES[2]['mascot']
-    assert 'Crafting your interactive lesson' in GENERATE_STAGES[3]['mascot']
-    assert 'Polishing everything up' in GENERATE_STAGES[4]['mascot']
+    # New CRT-friendly short messages (must be punchy; see retro.css #speech-bubble).
+    assert GENERATE_STAGES[0]['mascot'] == 'Parsing docs...'
+    assert GENERATE_STAGES[1]['mascot'] == 'Chunking + indexing...'
+    assert GENERATE_STAGES[2]['mascot'] == 'Scanning concepts...'
+    assert GENERATE_STAGES[3]['mascot'] == 'Building lesson...'
+    assert GENERATE_STAGES[4]['mascot'] == 'Polishing...'
+
+
+def test_mascot_messages_fit_crt_line():
+    """All mascot lines must be short enough to look right inside the
+    4:3 CRT speech bubble (one short line, no wrapping)."""
+    for s in GENERATE_STAGES + PROCESS_STAGES:
+        line = s['mascot']
+        assert len(line) <= 28, f'Mascot line too long for CRT bubble: {line!r}'
 
 
 def test_process_stages_enumeration():
@@ -68,8 +77,9 @@ def test_process_stages_labels():
 
 
 def test_process_stages_mascot_messages():
-    assert 'Receiving your study materials' in PROCESS_STAGES[0]['mascot']
+    assert PROCESS_STAGES[0]['mascot'] == 'Receiving files...'
     assert PROCESS_STAGES[8]['pct'] == 100
+    assert PROCESS_STAGES[8]['mascot'] == 'All done!'
 
 
 def test_stages_alias():
@@ -103,7 +113,7 @@ def test_update_progress():
     assert progress['stage'] == 2
     assert progress['pct'] == 50
     assert progress['label'] == 'Retrieving context'
-    assert 'Scanning for important concepts' in progress['mascot']
+    assert progress['mascot'] == 'Scanning concepts...'
 
 
 def test_update_progress_process_stages():
@@ -113,7 +123,7 @@ def test_update_progress_process_stages():
     assert progress['stage'] == 5
     assert progress['pct'] == 70
     assert progress['label'] == 'Generating summary'
-    assert 'Summarizing what your materials cover' in progress['mascot']
+    assert progress['mascot'] == 'Summarizing...'
 
 
 def test_update_progress_bounds():

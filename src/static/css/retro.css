@@ -27,6 +27,11 @@
   src: url("../fonts/boldpixels/boldspixels.ttf") format("truetype");
 }
 
+@font-face {
+  font-family: "PressStart2P";
+  src: url("../fonts/pressstart2p/PressStart2P-Regular.ttf") format("truetype");
+}
+
 * {
   box-sizing: border-box;
 }
@@ -817,8 +822,8 @@ h2, .section-title {
 }
 
 /* State-based glow tints so users can see when the mascot is
-   idle vs processing vs celebrating. The GIF itself is the only
-   motion — no CSS transforms are applied. */
+   idle vs processing vs celebrating vs in an error state. The GIF
+   itself is the only motion — no CSS transforms are applied. */
 #robot-mascot.mascot-state-busy {
     filter: drop-shadow(0 10px 22px rgba(0, 180, 216, 0.65))
             drop-shadow(0 0 8px rgba(0, 180, 216, 0.45));
@@ -829,27 +834,88 @@ h2, .section-title {
             drop-shadow(0 0 10px rgba(126, 231, 135, 0.4));
 }
 
+#robot-mascot.mascot-state-error {
+    filter: drop-shadow(0 10px 22px rgba(255, 70, 80, 0.65))
+            drop-shadow(0 0 10px rgba(255, 130, 60, 0.45));
+}
+
 #robot-mascot.mascot-state-idle {
     filter: drop-shadow(0 10px 20px rgba(0, 180, 216, 0.4));
 }
 
 #speech-bubble {
+    --crt-bg: #000000;
+    --crt-fg: #33ff66;
+    --crt-fg-dim: rgba(51, 255, 102, 0.55);
+    --crt-glow: rgba(51, 255, 102, 0.45);
+    --crt-bezel: #1a1a1a;
+    --crt-bezel-edge: #2a2a2a;
+    --crt-bezel-padding: 14px;
+    --crt-screen-inset: 10px;
+    --crt-text-line: 14.4px;   /* 9px * 1.6 line-height */
+    --crt-text-max-lines: 4;
+
     position: fixed;
-    bottom: 170px;
+    bottom: 175px;
     right: 80px;
-    background: #0a1628;
-    border: 2px solid #00b4d8;
-    border-radius: 12px;
-    padding: 10px 14px;
-    width: 240px;
-    color: #caf0f8;
-    font-size: 0.85rem;
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+    width: 200px;
+    aspect-ratio: 4 / 3;
+    background: var(--crt-bezel);
+    border: 3px solid var(--crt-bezel-edge);
+    border-radius: 14px;
+    padding: var(--crt-bezel-padding);
+    color: var(--crt-fg);
+    font-family: "PressStart2P", "Courier New", monospace;
+    font-size: 9px;
+    line-height: 1.6;
+    letter-spacing: 0.4px;
+    box-shadow:
+        0 10px 26px rgba(0, 0, 0, 0.7),
+        0 0 20px var(--crt-glow),
+        inset 0 0 18px rgba(0, 0, 0, 0.85);
     opacity: 0;
     visibility: hidden;
-    transition: all 0.3s ease;
+    transition: opacity 0.25s ease, visibility 0.25s ease, transform 0.25s ease;
     pointer-events: none;
     z-index: 1001;
+    overflow: hidden;
+}
+
+/* Inner "screen" surface that holds the text and scanlines. */
+#speech-bubble::before {
+    content: "";
+    position: absolute;
+    inset: var(--crt-screen-inset);
+    border-radius: 8px;
+    background: var(--crt-bg);
+    box-shadow:
+        inset 0 0 14px rgba(51, 255, 102, 0.18),
+        inset 0 0 4px rgba(0, 0, 0, 0.9);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* CRT scanlines + subtle screen vignette overlay. */
+#speech-bubble::after {
+    content: "";
+    position: absolute;
+    top: var(--crt-screen-inset);
+    left: var(--crt-screen-inset);
+    right: var(--crt-screen-inset);
+    bottom: var(--crt-screen-inset);
+    border-radius: 8px;
+    background:
+        repeating-linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0.0) 0px,
+            rgba(0, 0, 0, 0.0) 2px,
+            rgba(0, 0, 0, 0.35) 3px,
+            rgba(0, 0, 0, 0.35) 4px
+        ),
+        radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.6) 100%);
+    pointer-events: none;
+    z-index: 2;
+    mix-blend-mode: multiply;
 }
 
 #speech-bubble.active {
@@ -857,37 +923,84 @@ h2, .section-title {
     visibility: visible;
 }
 
-#speech-bubble::after {
-    content: '';
+/* Pointer/tail of the bubble (still a bezel arrow). */
+#speech-bubble .bubble-tail {
     position: absolute;
     bottom: -10px;
-    right: 30px;
+    right: 24px;
+    width: 0;
+    height: 0;
     border: 6px solid transparent;
-    border-top-color: #00b4d8;
+    border-top-color: var(--crt-bezel-edge);
+    z-index: 0;
 }
 
-/* ===== IN-BUBBLE PROGRESS BAR ===== */
+/* Vertical flex layout so the progress bar stays pinned to the bottom
+   of the CRT screen and the typewriter text fills the 4-line cap above it. */
+#speech-bubble {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+#bubble-text {
+    position: relative;
+    z-index: 1;
+    flex: 1 1 auto;
+    display: block;
+    min-height: 0;
+    max-height: calc(var(--crt-text-line) * var(--crt-text-max-lines));
+    overflow: hidden;
+    margin: 0;
+    padding: 8px 10px 6px 10px;
+    color: var(--crt-fg);
+    text-shadow:
+        0 0 4px var(--crt-glow),
+        0 0 10px var(--crt-glow);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+#bubble-text .bubble-caret {
+    display: inline-block;
+    width: 0.55em;
+    height: 1em;
+    background: var(--crt-fg);
+    margin-left: 1px;
+    vertical-align: text-bottom;
+    box-shadow: 0 0 6px var(--crt-glow);
+    animation: bubble-caret-blink 0.7s steps(2, start) infinite;
+}
+
+@keyframes bubble-caret-blink {
+    to { visibility: hidden; }
+}
+
+/* ===== IN-BUBBLE PROGRESS BAR (CRT themed, pinned to bottom) ===== */
 .bubble-progress {
-    margin-top: 8px;
+    position: relative;
+    z-index: 1;
+    flex: 0 0 auto;
+    margin: 0 10px 8px 10px;
     padding-top: 6px;
-    border-top: 1px solid rgba(0, 180, 216, 0.2);
+    border-top: 1px solid var(--crt-fg-dim);
 }
 
 .bubble-progress-track {
     height: 5px;
-    background: rgba(5, 11, 20, 0.7);
+    background: rgba(51, 255, 102, 0.12);
     border-radius: 999px;
     overflow: hidden;
-    border: 1px solid rgba(0, 180, 216, 0.15);
+    border: 1px solid var(--crt-fg-dim);
 }
 
 .bubble-progress-fill {
     height: 100%;
     width: 0%;
-    background: linear-gradient(90deg, var(--az-cyan), #0096c7);
+    background: linear-gradient(90deg, var(--crt-fg), #b6ffb9);
     border-radius: 999px;
     transition: width 0.5s ease;
-    box-shadow: 0 0 6px var(--az-glow);
+    box-shadow: 0 0 6px var(--crt-glow);
 }
 
 @media (max-width: 768px) {
@@ -898,15 +1011,18 @@ h2, .section-title {
         right: 16px;
     }
     #speech-bubble {
-        width: 180px;
-        font-size: 0.75rem;
-        bottom: 110px;
-        right: 50px;
-        padding: 8px 10px;
+        width: 170px;
+        bottom: 120px;
+        right: 44px;
+        padding: 10px;
+        font-size: 8px;
+        --crt-screen-inset: 8px;
+    }
+    #bubble-text {
+        padding: 6px 8px 4px 8px;
     }
     .bubble-progress {
-        margin-top: 5px;
-        padding-top: 4px;
+        margin: 0 8px 6px 8px;
     }
     .bubble-progress-track {
         height: 4px;

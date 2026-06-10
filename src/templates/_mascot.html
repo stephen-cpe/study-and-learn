@@ -5,13 +5,15 @@
          data-idle-src="{{ url_for('static', filename='images/mascot-idle.gif') }}"
          data-busy-src="{{ url_for('static', filename='images/mascot-busy.gif') }}"
          data-happy-src="{{ url_for('static', filename='images/mascot-happy.gif') }}"
+         data-error-src="{{ url_for('static', filename='images/mascot-error.gif') }}"
          data-fallback-src="{{ url_for('static', filename='images/mascot-robot.png') }}"
          alt="Study Robot Mascot"
          onclick="window._mascotTalk &amp;&amp; window._mascotTalk()">
     <div id="speech-bubble">
-        <span id="bubble-text">I'm here to help you learn. What are we studying today?</span>
+        <span id="bubble-text">Booting neural link...</span>
         <div id="bubble-progress" class="bubble-progress" style="display:none;">
             <div class="bubble-progress-track"><div class="bubble-progress-fill" id="bubble-progress-fill"></div></div>
         </div>
+        <div class="bubble-tail" aria-hidden="true"></div>
     </div>
 </div>
