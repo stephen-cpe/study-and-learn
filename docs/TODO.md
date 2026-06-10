@@ -241,7 +241,7 @@ Build the smallest working version first, then iterate:
 
 **Goal:** Add mascot animation frames, TTS narration, PDF export, session cleanup, source citations, difficulty selector, and sample demo document set.
 
-**User Stories:** US-036, US-037, US-038, US-046
+**User Stories:** US-036, US-037, US-038
 
 **Tasks:**
 - [x] Add mascot basic animation frames (idle/waiting/done)
@@ -294,8 +294,6 @@ Build the smallest working version first, then iterate:
 - [ ] Deploy web app to Render or Railway free tier
 - [ ] Configure production environment variables
 - [ ] Verify all routes and features work in production
-- [ ] Update `docs/SRS.md` §1.2 (Product Vision) and §1.4 (Intended Users) to reflect proprietary knowledge reframe
-- [ ] Update `README.md` with new positioning and deployment link
 - [ ] Complete `DESIGN_AND_TESTING.md` with all ADRs and test results
 - [ ] Ensure `AI_AGENT_PROTOCOL.md` is current
 - [ ] Update task board to reflect final sprint status
@@ -398,7 +396,6 @@ Build the smallest working version first, then iterate:
 - [ ] Proprietary demo document set (Sprint 7)
 - [ ] Difficulty/age-level selector (Easy/Moderate/Hard) (Sprint 7)
 - [ ] TTS narration (opt-in) (Sprint 7)
-- [ ] PDF export for completed lessons (Sprint 7)
 - [ ] Session cleanup (Sprint 7)
 - [ ] Source document citations in lessons (Sprint 7)
 - [ ] Badges/trophies for completed lessons (Sprint 7) (stretch)
