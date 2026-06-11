@@ -18,6 +18,10 @@ CREATE TABLE users (
     is_admin               BOOLEAN      NOT NULL DEFAULT FALSE,
     can_generate_lessons   BOOLEAN      NOT NULL DEFAULT FALSE,
     active_lessons         INTEGER      NOT NULL DEFAULT 0,
+    avatar                 VARCHAR(32)  NOT NULL DEFAULT 'avatar-0.png',
+    tts_enabled            BOOLEAN      NOT NULL DEFAULT FALSE,
+    tts_speaker            VARCHAR(16)  NOT NULL DEFAULT 'Ava',
+    lesson_difficulty      VARCHAR(8)   NOT NULL DEFAULT 'Normal',
     created_at             TIMESTAMP    NULL,
     updated_at             TIMESTAMP    NULL,
     CONSTRAINT pk_users PRIMARY KEY (id)

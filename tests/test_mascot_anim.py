@@ -24,6 +24,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
 IMG_DIR = ROOT / 'src' / 'static' / 'images'
+MASCOTS_DIR = IMG_DIR / 'mascots'
 
 GIF_STATES = {
     'mascot-idle.gif':   {'min_frames': 10, 'duration': 250, 'tolerance': 0},
@@ -32,7 +33,16 @@ GIF_STATES = {
     'mascot-error.gif':  {'min_frames': 10, 'duration': 220, 'tolerance': 0},
 }
 
-SOURCE_PNG = IMG_DIR / 'mascot-robot.png'
+# Each state's assets (gif + sprite + frames) live in their own subdirectory
+# under src/static/images/mascots/ — see ADR-TBD in DESIGN_AND_TESTING.md.
+GIF_STATE_DIRS = {
+    'mascot-idle.gif':   MASCOTS_DIR / 'idle',
+    'mascot-busy.gif':   MASCOTS_DIR / 'busy',
+    'mascot-happy.gif':  MASCOTS_DIR / 'happy',
+    'mascot-error.gif':  MASCOTS_DIR / 'error',
+}
+
+SOURCE_PNG = MASCOTS_DIR / 'mascot-robot.png'
 
 
 # --------------------------------------------------------------------------- #
@@ -77,7 +87,7 @@ def test_source_mascot_png_exists():
 
 @pytest.mark.parametrize('name', list(GIF_STATES))
 def test_gif_exists(name):
-    path = IMG_DIR / name
+    path = GIF_STATE_DIRS[name] / name
     assert path.is_file(), f'Missing mascot GIF: {path}'
 
 
@@ -88,7 +98,7 @@ def test_gif_exists(name):
 def test_gif_meets_minimum_frame_count(name, spec):
     """The user requested >= 10 frames per status.  We actually ship 14/16/14
     but enforce the 10-frame minimum here so future regressions are caught."""
-    im = Image.open(IMG_DIR / name)
+    im = Image.open(GIF_STATE_DIRS[name] / name)
     assert im.n_frames >= spec['min_frames'], (
         f'{name} has only {im.n_frames} frames (need >= {spec["min_frames"]})'
     )
@@ -99,14 +109,14 @@ def test_gif_dimensions_match_source(name):
     """The mascot GIFs are rendered at 759x759 to match mascot-robot.png.
     This matters because the slide deck CSS sizes the <img> at 120x120
     and a 1.0:1.0 aspect ratio is required for it to look right."""
-    im = Image.open(IMG_DIR / name)
+    im = Image.open(GIF_STATE_DIRS[name] / name)
     assert im.size == (759, 759), f'{name} is {im.size}, expected (759, 759)'
 
 
 @pytest.mark.parametrize('name,spec', list(GIF_STATES.items()))
 def test_gif_per_frame_duration_uniform(name, spec):
     """A non-uniform per-frame duration looks janky in browsers."""
-    im = Image.open(IMG_DIR / name)
+    im = Image.open(GIF_STATE_DIRS[name] / name)
     durations = [im.info.get('duration')]
     for i in range(1, im.n_frames):
         im.seek(i)
@@ -125,7 +135,7 @@ def test_gif_transparency_preserved_first_and_last_frame(name):
     """The original .gif files had a transparent background.  The new ones
     must keep that – the cyberpunk UI shows the GIF over the page
     background, so any opaque rectangle would be visible."""
-    im = Image.open(IMG_DIR / name)
+    im = Image.open(GIF_STATE_DIRS[name] / name)
     im.seek(0)
     first_ratio = _transparent_ratio(im)
     im.seek(im.n_frames - 1)
@@ -146,7 +156,7 @@ def test_gif_transparency_preserved_first_and_last_frame(name):
 def test_gif_transparency_present_on_every_frame(name):
     """Spot-check transparency on the middle frame too – some frames
     could have a stray opaque pixel that breaks the transparent look."""
-    im = Image.open(IMG_DIR / name)
+    im = Image.open(GIF_STATE_DIRS[name] / name)
     im.seek(im.n_frames // 2)
     mid_ratio = _transparent_ratio(im)
     assert mid_ratio > 0.50, (
@@ -162,7 +172,7 @@ def test_gif_all_frames_pixel_unique(name):
     """If two frames are pixel-identical Pillow's GIF optimizer will
     merge them and the loop will have fewer frames than the generator
     intended.  The user wants the full 14/16/14 cycle visible."""
-    im = Image.open(IMG_DIR / name)
+    im = Image.open(GIF_STATE_DIRS[name] / name)
     assert _all_frames_pixel_unique(im), (
         f'{name} has duplicate frames (GIF optimizer merged them)'
     )
@@ -175,7 +185,7 @@ def test_states_are_visually_distinct_from_each_other():
     """idle, busy, happy, and error must look obviously different.
     Compare multiple frames across the loop – not just frame 0 – because
     animations only convey state over time."""
-    gifs = {name: Image.open(IMG_DIR / name) for name in GIF_STATES}
+    gifs = {name: Image.open(GIF_STATE_DIRS[name] / name) for name in GIF_STATES}
     # Use the largest common frame index (happy/error only have 14)
     indices = [0, 5, 10, 13]
     for i in indices:
@@ -305,6 +315,23 @@ def test_mascot_template_wires_error_state():
     assert 'data-error-src' in template, (
         '_mascot.html does not declare a data-error-src attribute on the <img>'
     )
+
+
+def test_mascot_template_uses_new_state_subdirectory_layout():
+    """After the images/ reorganization (Sprint 7), each mascot state's
+    GIF must live under mascots/{state}/, not directly in images/."""
+    template = (ROOT / 'src' / 'templates' / '_mascot.html').read_text()
+    expected_substrings = [
+        'images/mascots/idle/mascot-idle.gif',
+        'images/mascots/busy/mascot-busy.gif',
+        'images/mascots/happy/mascot-happy.gif',
+        'images/mascots/error/mascot-error.gif',
+        'images/mascots/mascot-robot.png',
+    ]
+    for needle in expected_substrings:
+        assert needle in template, (
+            f'_mascot.html is missing the new path: {needle}'
+        )
 
 
 def test_mascot_js_supports_error_state():

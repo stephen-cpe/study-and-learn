@@ -26,6 +26,10 @@ class User(db.Model, UserMixin):
     is_admin = db.Column(Boolean, default=False, nullable=False)
     can_generate_lessons = db.Column(Boolean, default=False, nullable=False)
     active_lessons = db.Column(Integer, default=0, nullable=False)
+    avatar = db.Column(String(32), nullable=False, default='avatar-0.png')
+    tts_enabled = db.Column(Boolean, nullable=False, default=False)
+    tts_speaker = db.Column(String(16), nullable=False, default='Ava')
+    lesson_difficulty = db.Column(String(8), nullable=False, default='Normal')
     created_at = db.Column(DateTime, default=_utcnow)
     updated_at = db.Column(DateTime, default=_utcnow, onupdate=_utcnow)
 

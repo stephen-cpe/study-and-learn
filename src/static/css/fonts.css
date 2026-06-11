@@ -1,0 +1,19 @@
+/* ── Shared @font-face declarations ──────────────────────────────────
+   Imported by retro.css (all pages) and deck-base.css (slide deck).
+   Single source of truth — no duplication. ────────────────────────── */
+
+@font-face {
+  font-family: "Retrograde Bold";
+  src: url("../fonts/Retrograde/Retrograde-Bold.otf") format("opentype");
+  font-weight: bold;
+}
+
+@font-face {
+  font-family: "BoldPixels";
+  src: url("../fonts/boldpixels/boldspixels.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "PressStart2P";
+  src: url("../fonts/pressstart2p/PressStart2P-Regular.ttf") format("truetype");
+}

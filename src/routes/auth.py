@@ -7,6 +7,13 @@ from flask_login import current_user, login_required, login_user, logout_user
 from src import db
 from src.models import User
 from src.routes import bp
+from src.services.settings_service import (
+    ALLOWED_AVATARS,
+    DEFAULT_DIFFICULTY,
+    DIFFICULTY_LEVELS,
+    TTS_SPEAKERS,
+    apply_settings,
+)
 
 
 @bp.route('/signup', methods=['GET', 'POST'])
@@ -84,3 +91,29 @@ def reset_password():
         return redirect(url_for('main.index'))
 
     return render_template('reset_password.html')
+
+
+@bp.route('/settings', methods=['GET', 'POST'])
+@login_required
+def settings():
+    """User preferences — avatar, TTS, lesson difficulty (placeholders)."""
+    if request.method == 'POST':
+        _, message = apply_settings(
+            current_user,
+            avatar=request.form.get('avatar'),
+            tts_enabled=request.form.get('tts_enabled'),
+            tts_speaker=request.form.get('tts_speaker'),
+            lesson_difficulty=request.form.get('lesson_difficulty'),
+        )
+        db.session.commit()
+        flash(message, 'success')
+        return redirect(url_for('main.settings'))
+
+    return render_template(
+        'settings.html',
+        avatars=ALLOWED_AVATARS,
+        speakers=TTS_SPEAKERS,
+        difficulty_index=DIFFICULTY_LEVELS.index(current_user.lesson_difficulty)
+        if current_user.lesson_difficulty in DIFFICULTY_LEVELS
+        else DIFFICULTY_LEVELS.index(DEFAULT_DIFFICULTY),
+    )

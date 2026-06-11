@@ -8,6 +8,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+FONTS_CSS = ROOT / 'src' / 'static' / 'css' / 'fonts.css'
 RETRO_CSS = ROOT / 'src' / 'static' / 'css' / 'retro.css'
 MASCOT_JS = ROOT / 'src' / 'static' / 'js' / 'mascot.js'
 PROGRESS_JS = ROOT / 'src' / 'static' / 'js' / 'progress.js'
@@ -27,7 +28,7 @@ def test_pressstart2p_font_is_vendored():
 
 
 def test_pressstart2p_font_face_declared():
-    css = _read(RETRO_CSS)
+    css = _read(FONTS_CSS)
     assert '@font-face' in css
     assert 'PressStart2P' in css
     assert 'pressstart2p/PressStart2P-Regular.ttf' in css, (

@@ -1,4 +1,8 @@
 /* Study-and-Learn Retro Theme */
+
+/* Font faces — single source of truth in fonts.css */
+@import url("fonts.css");
+
 :root {
   --az-dark: #0a1628;
   --az-darker: #050b14;
@@ -13,23 +17,6 @@
   --az-success: #7ee787;
   --az-warning: #ffd166;
   --az-danger: #ff6b6b;
-}
-
-/* Font faces */
-@font-face {
-  font-family: "Retrograde Bold";
-  src: url("../fonts/Retrograde/Retrograde-Bold.otf") format("opentype");
-  font-weight: bold;
-}
-
-@font-face {
-  font-family: "BoldPixels";
-  src: url("../fonts/boldpixels/boldspixels.ttf") format("truetype");
-}
-
-@font-face {
-  font-family: "PressStart2P";
-  src: url("../fonts/pressstart2p/PressStart2P-Regular.ttf") format("truetype");
 }
 
 * {
@@ -152,6 +139,8 @@ h2, .section-title {
 .form-label {
   color: var(--az-cyan-light);
   font-weight: 700;
+  font-family: "Retrograde Bold", sans-serif;
+  font-size: 1.1rem;
   margin-top: 0.5rem;
 }
 
@@ -234,12 +223,20 @@ h2, .section-title {
   border-radius: 999px;
   padding: 0.4rem 0.7rem;
   font-weight: 700;
+  font-family: "PressStart2P", "Courier New", monospace;
+  font-size: 0.65em;
 }
 
 .filename-badge {
   background: var(--az-cyan);
   color: var(--az-dark);
   font-weight: 800;
+  font-family: "PressStart2P", "Courier New", monospace;
+  font-size: 0.6em;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .file-list {
@@ -410,7 +407,8 @@ h2, .section-title {
   margin-top: 1rem;
   font-size: 1.2rem;
   color: var(--az-cyan-light);
-  font-family: "BoldPixels", sans-serif;
+  font-family: "PressStart2P", "Courier New", monospace;
+  font-size: 0.7em;
 }
 
 .spinner-border {
@@ -529,6 +527,7 @@ h2, .section-title {
     flex-direction: column;
     gap: 0.65rem;
     align-items: flex-start;
+    width: 100%;
 }
 .goal-badge {
     background: rgba(0, 180, 216, 0.1);
@@ -536,7 +535,7 @@ h2, .section-title {
     border: 1px solid var(--az-border);
     font-weight: 600;
     font-size: 0.85em;
-    max-width: 400px;
+    max-width: 100%;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -632,7 +631,8 @@ h2, .section-title {
     align-items: center;
     justify-content: center;
     z-index: 2;
-    font-family: "BoldPixels", sans-serif;
+    font-family: "PressStart2P", "Courier New", monospace;
+    font-size: 0.55em;
 }
 .module-item-enhanced {
     flex: 1;
@@ -749,7 +749,8 @@ h2, .section-title {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: "BoldPixels", sans-serif;
+    font-family: "PressStart2P", "Courier New", monospace;
+    font-size: 0.55em;
 }
 .lesson-locked .lesson-module-number {
     background: var(--az-muted);
@@ -1320,8 +1321,8 @@ h2, .section-title {
     border: 1px solid var(--az-border);
     border-radius: 999px;
     color: var(--az-muted);
-    font-family: "BoldPixels", sans-serif;
-    font-size: 0.8em;
+    font-family: "PressStart2P", "Courier New", monospace;
+    font-size: 0.55em;
     padding: 0.4rem 1.2rem;
     text-decoration: none;
     transition: all 0.2s;

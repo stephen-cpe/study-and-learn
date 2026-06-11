@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Settings — Study-and-Learn{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="container settings-container">
+    <h1 class="retro-title">⚙ Settings</h1>
+    <p class="retro-subtitle">Tune your Study-and-Learn experience</p>
+
+    <form method="POST" action="{{ url_for('main.settings') }}" id="settings-form">
+        <input type="hidden" name="avatar" id="avatar-input" value="{{ current_user.avatar }}">
+
+        <!-- ── Profile Picture ──────────────────────────────────────── -->
+        <section class="settings-card">
+            <h2 class="settings-heading">Change Profile Picture</h2>
+            <div class="profile-row">
+                <button type="button" id="open-avatar-modal" class="avatar-button" aria-label="Change profile picture">
+                <img src="{{ url_for('static', filename='images/avatars/' ~ current_user.avatar) }}"
+                     alt="Current avatar"
+                     class="profile-avatar"
+                     id="current-avatar-img">
+                </button>
+                <span class="profile-hint">Click your avatar to choose a new one</span>
+            </div>
+        </section>
+
+        <!-- ── Text to Speech ──────────────────────────────────────── -->
+        <section class="settings-card">
+            <h2 class="settings-heading">Text to Speech</h2>
+            <div class="settings-row">
+                <label class="switch">
+                    <input type="checkbox" name="tts_enabled" id="tts-toggle"
+                           {% if current_user.tts_enabled %}checked{% endif %}>
+                    <span class="slider round"></span>
+                </label>
+                <span class="settings-label">Enable narration</span>
+            </div>
+            <div class="settings-row tts-speaker-row {% if not current_user.tts_enabled %}is-disabled{% endif %}">
+                <label for="tts_speaker" class="settings-label">Speaker</label>
+                <select name="tts_speaker" id="tts_speaker" class="retro-select"
+                        {% if not current_user.tts_enabled %}disabled{% endif %}>
+                    {% for speaker in speakers %}
+                        <option value="{{ speaker }}" {% if speaker == current_user.tts_speaker %}selected{% endif %}>
+                            {{ speaker }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <p class="settings-note">Narration is not yet active. Selecting a speaker pre-fills the future TTS integration.</p>
+        </section>
+
+        <!-- ── Lesson Difficulty ───────────────────────────────────── -->
+        <section class="settings-card">
+            <h2 class="settings-heading">Lesson Difficulty</h2>
+            <div class="difficulty-slider-wrap">
+                <input type="range" name="lesson_difficulty" id="difficulty-slider"
+                       class="difficulty-slider"
+                       min="0" max="2" step="1"
+                       list="difficulty-ticks"
+                       value="{{ difficulty_index }}">
+                <datalist id="difficulty-ticks">
+                    <option value="0"></option>
+                    <option value="1"></option>
+                    <option value="2"></option>
+                </datalist>
+                <div class="difficulty-labels">
+                    <span class="difficulty-tick" data-value="0">Easy</span>
+                    <span class="difficulty-tick" data-value="1">Normal</span>
+                    <span class="difficulty-tick" data-value="2">Hard</span>
+                </div>
+                <div class="difficulty-current">
+                    Current: <strong id="difficulty-current-value">{{ current_user.lesson_difficulty }}</strong>
+                </div>
+            </div>
+            <p class="settings-note">Difficulty is not yet active. The slider persists your preference for the upcoming feature.</p>
+        </section>
+
+        <div class="settings-actions">
+            <button type="submit" class="retro-button retro-button-primary">Save Settings</button>
+        </div>
+    </form>
+</div>
+
+<!-- ── Avatar Selection Modal ─────────────────────────────────────── -->
+<div class="avatar-modal-overlay" id="avatar-modal" hidden>
+    <div class="avatar-modal" role="dialog" aria-modal="true" aria-labelledby="avatar-modal-title">
+        <div class="avatar-modal-header">
+            <h3 id="avatar-modal-title">Select Your Avatar</h3>
+            <button type="button" class="avatar-modal-close" id="close-avatar-modal" aria-label="Close">×</button>
+        </div>
+        <div class="avatar-grid" id="avatar-grid">
+            {% for avatar in avatars %}
+                <button type="button"
+                        class="avatar-cell {% if avatar == current_user.avatar %}is-selected{% endif %}"
+                        data-avatar="{{ avatar }}"
+                        aria-label="Select {{ avatar }}">
+                    <img src="{{ url_for('static', filename='images/avatars/' ~ avatar) }}" alt="{{ avatar }}">
+                </button>
+            {% endfor %}
+        </div>
+        <div class="avatar-modal-footer">
+            <button type="button" class="retro-button" id="confirm-avatar">Select</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+{% endblock %}

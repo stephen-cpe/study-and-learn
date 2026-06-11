@@ -1,3 +1,6 @@
+/* Font faces — single source of truth in fonts.css */
+@import url("fonts.css");
+
 :root {
     --deck-bg: #0a1628;
     --deck-accent: #00b4d8;
@@ -6,17 +9,6 @@
     --deck-success: #7ee787;
     --deck-danger: #ff6b6b;
     --deck-warning: #ffd166;
-}
-
-@font-face {
-    font-family: "Retrograde Bold";
-    src: url("/static/fonts/Retrograde/Retrograde-Bold.otf") format("opentype");
-    font-weight: bold;
-}
-
-@font-face {
-    font-family: "BoldPixels";
-    src: url("/static/fonts/boldpixels/boldspixels.ttf") format("truetype");
 }
 
 * {

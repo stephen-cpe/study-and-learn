@@ -34,9 +34,18 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-BASE_PATH = SCRIPT_DIR / 'src' / 'static' / 'images' / 'mascot-robot.png'
-OUT_DIR = SCRIPT_DIR / 'src' / 'static' / 'images'
-os.makedirs(OUT_DIR, exist_ok=True)
+IMAGES_DIR = SCRIPT_DIR / 'src' / 'static' / 'images'
+BASE_PATH = IMAGES_DIR / 'mascots' / 'mascot-robot.png'
+MASCOTS_DIR = IMAGES_DIR / 'mascots'
+STATE_DIRS = {
+    'idle': MASCOTS_DIR / 'idle',
+    'busy': MASCOTS_DIR / 'busy',
+    'happy': MASCOTS_DIR / 'happy',
+    'error': MASCOTS_DIR / 'error',
+}
+for _state_dir in STATE_DIRS.values():
+    _state_dir.mkdir(parents=True, exist_ok=True)
+MASCOTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Hardcoded bounding boxes derived from analysis of mascot-robot.png
 EYE_LEFT = (305, 290, 360, 357)
@@ -372,22 +381,25 @@ def _prepare_frame_for_gif(frame: Image.Image) -> Image.Image:
     return p_frame
 
 
-def create_sprite_sheet(frames: list[Image.Image], filename: str) -> str:
+def create_sprite_sheet(frames: list[Image.Image], filename: str,
+                        out_dir: Path = None) -> str:
     if not frames:
         return ''
+    target_dir = Path(out_dir) if out_dir is not None else MASCOTS_DIR
     w, h = frames[0].size
     sheet = Image.new('RGBA', (w * len(frames), h), (0, 0, 0, 0))
     for i, frame in enumerate(frames):
         sheet.paste(frame, (i * w, 0), frame)
-    out_path = os.path.join(str(OUT_DIR), filename)
+    out_path = os.path.join(str(target_dir), filename)
     sheet.save(out_path, 'PNG')
     print(f"Saved sprite sheet: {out_path} ({len(frames)} frames, size {sheet.size})")
     return out_path
 
 
 def create_gif(frames: list[Image.Image], filename: str,
-               duration: int = 200) -> str:
-    out_path = os.path.join(str(OUT_DIR), filename)
+               duration: int = 200, out_dir: Path = None) -> str:
+    target_dir = Path(out_dir) if out_dir is not None else MASCOTS_DIR
+    out_path = os.path.join(str(target_dir), filename)
     prepared = [_prepare_frame_for_gif(f) for f in frames]
     prepared[0].save(
         out_path,
@@ -402,9 +414,11 @@ def create_gif(frames: list[Image.Image], filename: str,
     return out_path
 
 
-def save_individual_frames(frames: list[Image.Image], prefix: str) -> None:
+def save_individual_frames(frames: list[Image.Image], prefix: str,
+                           out_dir: Path = None) -> None:
+    target_dir = Path(out_dir) if out_dir is not None else MASCOTS_DIR
     for i, frame in enumerate(frames):
-        out = OUT_DIR / f'{prefix}-frame{i}.png'
+        out = target_dir / f'{prefix}-frame{i}.png'
         frame.save(out)
 
 
@@ -611,30 +625,30 @@ def main() -> None:
 
     print(f"\n=== Generating IDLE animation ({IDLE_FRAMES} frames) ===")
     idle_frames = build_idle_frames(base)
-    create_sprite_sheet(idle_frames, 'mascot-idle-sprite.png')
-    create_gif(idle_frames, 'mascot-idle.gif', duration=250)
-    save_individual_frames(idle_frames, 'mascot-idle')
+    create_sprite_sheet(idle_frames, 'mascot-idle-sprite.png', STATE_DIRS['idle'])
+    create_gif(idle_frames, 'mascot-idle.gif', duration=250, out_dir=STATE_DIRS['idle'])
+    save_individual_frames(idle_frames, 'mascot-idle', out_dir=STATE_DIRS['idle'])
 
     print(f"\n=== Generating BUSY animation ({BUSY_FRAMES} frames) ===")
     busy_frames = build_busy_frames(base)
-    create_sprite_sheet(busy_frames, 'mascot-busy-sprite.png')
-    create_gif(busy_frames, 'mascot-busy.gif', duration=140)
-    save_individual_frames(busy_frames, 'mascot-busy')
+    create_sprite_sheet(busy_frames, 'mascot-busy-sprite.png', STATE_DIRS['busy'])
+    create_gif(busy_frames, 'mascot-busy.gif', duration=140, out_dir=STATE_DIRS['busy'])
+    save_individual_frames(busy_frames, 'mascot-busy', out_dir=STATE_DIRS['busy'])
 
     print(f"\n=== Generating HAPPY animation ({HAPPY_FRAMES} frames) ===")
     happy_frames = build_happy_frames(base)
-    create_sprite_sheet(happy_frames, 'mascot-happy-sprite.png')
-    create_gif(happy_frames, 'mascot-happy.gif', duration=220)
-    save_individual_frames(happy_frames, 'mascot-happy')
+    create_sprite_sheet(happy_frames, 'mascot-happy-sprite.png', STATE_DIRS['happy'])
+    create_gif(happy_frames, 'mascot-happy.gif', duration=220, out_dir=STATE_DIRS['happy'])
+    save_individual_frames(happy_frames, 'mascot-happy', out_dir=STATE_DIRS['happy'])
 
     print(f"\n=== Generating ERROR animation ({ERROR_FRAMES} frames) ===")
     error_frames = build_error_frames(base)
-    create_sprite_sheet(error_frames, 'mascot-error-sprite.png')
-    create_gif(error_frames, 'mascot-error.gif', duration=220)
-    save_individual_frames(error_frames, 'mascot-error')
+    create_sprite_sheet(error_frames, 'mascot-error-sprite.png', STATE_DIRS['error'])
+    create_gif(error_frames, 'mascot-error.gif', duration=220, out_dir=STATE_DIRS['error'])
+    save_individual_frames(error_frames, 'mascot-error', out_dir=STATE_DIRS['error'])
 
-    base.save(os.path.join(str(OUT_DIR), 'mascot-robot-static.png'))
-    print("\nDone! Generated frames, sprites, and GIFs in", OUT_DIR)
+    base.save(os.path.join(str(MASCOTS_DIR), 'mascot-robot-static.png'))
+    print("\nDone! Generated frames, sprites, and GIFs in", MASCOTS_DIR)
 
 
 if __name__ == '__main__':

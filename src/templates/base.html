@@ -24,10 +24,12 @@
                 <a href="{{ url_for('main.lessons') }}" class="btn btn-outline-primary btn-sm nav-dashboard-btn">My Lessons</a>
                 <div class="dropdown">
                     <a href="#" class="user-avatar-toggle d-flex align-items-center" data-bs-toggle="dropdown" aria-expanded="false">
-                        <img src="{{ url_for('static', filename='images/avatar.png') }}" alt="User Avatar" class="user-avatar">
+                        <img src="{{ url_for('static', filename='images/avatars/' ~ current_user.avatar) }}" alt="User Avatar" class="user-avatar">
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end retro-dropdown-menu">
                         <li><span class="dropdown-item-text">Hi, {{ current_user.username }}!</span></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ url_for('main.settings') }}">Settings</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="{{ url_for('main.reset_password') }}">Reset Password</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('main.logout') }}">Logout</a></li>
