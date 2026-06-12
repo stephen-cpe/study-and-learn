@@ -1,8 +1,8 @@
 # STATUS.md
 Last Updated: 2026-06-11
 Sprint: 7 (In Progress)
-Last Task Completed: CSS badge truncation — widened .goal-badge max-width from 400px to 100% (matching .results-card-summary width) and added ellipsis truncation to .filename-badge for long filenames. Parent .results-meta got width:100% to provide proper reference. No template or JS changes needed. Full suite 283/283 passed.
-Commit Message Suggestion: fix(css): expand goal-badge and filename-badge truncation width to match card width
+Last Task Completed: Task #3 — Humor injection in quizzes and lesson example slides. Added HUMOR_INSTRUCTIONS constant (one ridiculous distractor per mcq/multi_select) to quiz_generator.py prompt. Added HUMOR_NOTE constant (light-hearted analogy in example slides) to lesson_generator.py prompt. Added 2 tests verifying constants appear in captured prompts. Full suite 64/64 passed.
+Commit Message Suggestion: feat(prompts): inject humor into quiz distractors and lesson example slides
 Known Issues:
   - AI output consistency: qwen3:0.6b is placeholder-only; use cloud models (gemma3:27b-cloud) for production quality
   - Session storage still FileSystemCache (DB-backed migration planned post-capstone)

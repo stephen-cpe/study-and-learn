@@ -15,6 +15,14 @@ from src.services.exceptions import AIServiceError
 logger = logging.getLogger(__name__)
 
 
+HUMOR_NOTE = (
+    "TONE NOTE: For example slides only, a light-hearted analogy or a mildly "
+    "absurd-but-fitting comparison is encouraged if it genuinely helps illustrate "
+    "the concept. Never undermine the educational content. One well-placed wit per "
+    "lesson is enough.\n"
+)
+
+
 def build_rag_context_for_module(
     module_title: str,
     learning_goal: str,
@@ -99,6 +107,7 @@ PEDAGOGICAL REQUIREMENTS:
 4. The summary slide must recap learning objectives and key takeaways.
 5. Use plain, jargon-free language. When a technical term is unavoidable, define it on first use.
 
+{HUMOR_NOTE}
 OUTPUT RULES:
 - Respond with ONLY a JSON object — no prose, no markdown, no preamble.
 - Every slide MUST have a "type" field that is exactly one of: title, content, example, summary.

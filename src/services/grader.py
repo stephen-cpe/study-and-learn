@@ -1,6 +1,6 @@
 """
 Grading service — evaluates learner answers against question definitions.
-Supports mcq, true_false, multi_select, and fill_blank question types.
+Supports mcq, true_false, multi_select, cloze_dropdown, and fill_blank question types.
 """
 from typing import Any
 
@@ -29,6 +29,8 @@ def _grade_single_question(question: dict, user_answer: Any) -> bool:
     qtype = question.get("type", "")
     if qtype == "mcq":
         return user_answer is not None and int(user_answer) == question.get("answer_index", -1)
+    elif qtype == "cloze_dropdown":
+        return user_answer is not None and int(user_answer) == question.get("answer_index", -1)
     elif qtype == "true_false":
         if isinstance(user_answer, str):
             user_answer = user_answer.lower() in ("true", "1", "yes")
@@ -39,6 +41,8 @@ def _grade_single_question(question: dict, user_answer: Any) -> bool:
         correct = question.get("answer_indices", [])
         return set(int(x) for x in user_answer) == set(correct)
     elif qtype == "fill_blank":
+        if "answer_index" in question and "options" in question:
+            return user_answer is not None and int(user_answer) == question.get("answer_index", -1)
         if not isinstance(user_answer, str):
             return False
         ua = user_answer.strip()
@@ -56,10 +60,14 @@ def _get_correct_answer(question: dict) -> Any:
     qtype = question.get("type", "")
     if qtype == "mcq":
         return question.get("answer_index")
+    elif qtype == "cloze_dropdown":
+        return question.get("answer_index")
     elif qtype == "true_false":
         return question.get("answer")
     elif qtype == "multi_select":
         return question.get("answer_indices")
     elif qtype == "fill_blank":
+        if "answer_index" in question:
+            return question.get("answer_index")
         return question.get("answer")
     return None

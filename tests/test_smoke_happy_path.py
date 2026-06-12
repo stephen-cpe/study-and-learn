@@ -109,9 +109,9 @@ def test_full_happy_path_mocked(client):
     answers = []
     fill_blank_answers = {}
     for q in questions:
-        if q['type'] == 'fill_blank':
+        if q['type'] == 'fill_blank' and 'options' not in q:
             fill_blank_answers[q['id']] = 'answer'
-        elif q['type'] in ('mcq', 'true_false'):
+        elif q['type'] in ('mcq', 'true_false', 'cloze_dropdown'):
             answers.append(0)
         elif q['type'] == 'multi_select':
             answers.append([0])

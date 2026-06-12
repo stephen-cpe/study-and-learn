@@ -1,10 +1,10 @@
 """
 Quiz generation service for the Study-and-Learn MVP.
 
-Generates mixed-type quizzes (mcq, true_false, multi_select, fill_blank)
+Generates mixed-type quizzes (mcq, true_false, multi_select, cloze_dropdown)
 and inline comprehension checkpoints grounded in RAG context. Applies
 pedagogical safeguards: plausible distractors, diversified true/false
-answers, shuffled option ordering, and single-word-only fill-in-the-blank.
+answers, shuffled option ordering, and cloze dropdown with plausible choices.
 """
 import json
 import logging
@@ -15,6 +15,19 @@ from src.services.ai_client import call_ollama
 from src.services.exceptions import AIServiceError
 
 logger = logging.getLogger(__name__)
+
+
+HUMOR_INSTRUCTIONS = (
+    "HUMOR REQUIREMENT:\n"
+    "For every mcq and multi_select question, at least ONE distractor (wrong answer) "
+    "must be obviously ridiculous — something a knowledgeable person would immediately "
+    "dismiss, but which is funny rather than mean or offensive. The humor must stay "
+    "within the topic domain. A biology question about cell division might have "
+    "'The cell sends a politely worded letter requesting division' as a distractor. "
+    "A history question might include an absurd anachronism. "
+    "Keep it classroom-appropriate. The other distractors must still be genuinely "
+    "plausible per PEDAGOGICAL REQUIREMENTS — only one per question should be ridiculous.\n"
+)
 
 
 def _shuffle_options(
@@ -57,7 +70,7 @@ def _shuffle_questions(
     """
     for q in questions:
         qtype = q.get('type', '')
-        if qtype == 'mcq':
+        if qtype in ('mcq', 'cloze_dropdown'):
             options = q.get('options', [])
             idx = q.get('answer_index', 0)
             if isinstance(idx, int) and 0 <= idx < len(options):
@@ -112,16 +125,19 @@ def _invert_statement(text: str) -> str:
 
 
 def _shuffle_checkpoint(cp: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-    """Shuffle the options in an inline checkpoint question.
+    """Shuffle the options in an inline checkpoint question (mcq/cloze_dropdown only).
 
     Args:
         cp: A checkpoint question dict, or None.
 
     Returns:
         The checkpoint with shuffled options and updated answer_index,
-        or unchanged if not a valid dict.
+        or unchanged if not a valid dict or not a shuffleable type.
     """
     if not isinstance(cp, dict):
+        return cp
+    cptype = cp.get('type', 'mcq')
+    if cptype not in ('mcq', 'cloze_dropdown'):
         return cp
     options = cp.get('options', [])
     idx = cp.get('answer_index', 0)
@@ -166,7 +182,7 @@ def generate_quiz(
         except Exception as e:
             logger.warning("RAG retrieval failed for quiz '%s': %s", module_title, str(e))
 
-    question_types = ['mcq', 'true_false', 'multi_select', 'fill_blank']
+    question_types = ['mcq', 'true_false', 'multi_select', 'cloze_dropdown']
     type_mix = _build_type_mix(n_questions, question_types)
 
     context_instruction = ""
@@ -194,14 +210,17 @@ PEDAGOGICAL REQUIREMENTS:
 1. Every distractor (wrong answer) MUST be plausible — a confident but mistaken learner could choose it.
    Avoid absurd, obviously wrong, or silly distractors.
 2. Every correct answer MUST be unambiguously correct based on the lesson content or Context.
-3. For fill_blank: the answer MUST be a single word only (no spaces, no hyphens, no multi-word phrases).
-   The blank MUST replace a key term directly stated in the preceding lesson content.
+3. For cloze_dropdown: the blank MUST replace a key term directly stated in the preceding lesson content.
+    Provide 3-4 short, plausible options. One must be the correct answer at 'answer_index'.
+    The wrong options must be plausible enough that a learner who hasn't read carefully might choose them.
+    Do NOT use obviously wrong options. The correct answer should not always be at the same index — vary the position.
 4. Explanations MUST explain WHY the correct answer is right and briefly why distractors are wrong.
 5. Distribute questions across the module's key concepts — do NOT cluster all questions on one detail.
 6. VARY the position of the correct answer across questions. No two consecutive mcq/multi_select
    questions should share the same answer index. For true_false, ensure a mix of True and False answers —
    do NOT make all answers the same boolean value.
 
+{HUMOR_INSTRUCTIONS}
 Create exactly {n_questions} questions with the following type distribution:
 {json.dumps(type_mix)}
 
@@ -209,7 +228,7 @@ For each question type:
 - mcq: 4 options, exactly 1 correct. Include prompt, options array, answer_index (0-based), explanation.
 - true_false: A clear factual statement. Include prompt, answer (boolean), explanation.
 - multi_select: 4 options, 2-3 correct. Include prompt, options array, answer_indices array (0-based), explanation.
-- fill_blank: A sentence with exactly one ___ placeholder replacing a single key term. Include prompt (with ___), answer string (single word only — no spaces), acceptable_answers array (each a single word), explanation.
+- cloze_dropdown: A sentence with a key concept replaced by '___'. Provide 3-4 short, plausible options in an 'options' array. One must be the correct answer at 'answer_index'. The wrong options must be plausible enough that a learner who hasn't read carefully might choose them. Do NOT use obviously wrong options. The correct answer should not always be at the same index — vary the position. Include prompt (with ___), options array, answer_index (0-based), explanation.
 
 Respond with ONLY a JSON object — no prose, no markdown, no commentary.
 
@@ -248,10 +267,10 @@ JSON FORMAT:
     }},
     {{
       "id": "q5",
-      "type": "fill_blank",
+      "type": "cloze_dropdown",
       "prompt": "The chemical symbol for water is ___. ",
-      "answer": "H2O",
-      "acceptable_answers": ["H2O", "h2o"],
+      "options": ["H2O", "CO2", "NaCl", "O2"],
+      "answer_index": 0,
       "explanation": "Water is composed of two hydrogen atoms and one oxygen atom, giving it the chemical formula H2O."
     }}
   ]
@@ -287,20 +306,31 @@ def generate_inline_checkpoint(
     module_title: str,
     slides_subset: List[Dict[str, Any]],
     retriever: Optional[Callable[[str], Dict[str, Any]]],
+    cp_type: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Generate a single inline comprehension checkpoint (MCQ).
+    """Generate a single inline comprehension checkpoint.
 
     Tests immediate recall of a key concept from a segment of slides.
+    Supports mcq, true_false, and cloze_dropdown types.
 
     Args:
         module_title: The module title.
         slides_subset: A subset of slides to base the checkpoint on.
         retriever: A callable that returns RAG context, or None.
+        cp_type: Optional checkpoint type. If None, randomly selects from
+            ['mcq', 'true_false', 'cloze_dropdown'] with weights [0.5, 0.3, 0.2].
 
     Returns:
         A shuffled checkpoint question dict with keys: id, type, prompt,
-        options, answer_index, explanation.
+        and type-specific answer fields.
     """
+    if cp_type is None:
+        cp_type = random.choices(
+            ['mcq', 'true_false', 'cloze_dropdown'],
+            weights=[0.5, 0.3, 0.2],
+            k=1
+        )[0]
+
     slide_summary = _summarize_slides(slides_subset)
     rag_context = ""
     if retriever:
@@ -313,9 +343,53 @@ def generate_inline_checkpoint(
         except Exception as e:
             logger.warning("RAG retrieval failed for checkpoint '%s': %s", module_title, str(e))
 
+    type_instruction = ""
+    json_format = ""
+    if cp_type == 'mcq':
+        type_instruction = (
+            "Create 1 multiple-choice question that tests IMMEDIATE RECALL of a key concept "
+            "from the lesson segment. Provide 4 plausible options with exactly 1 correct answer."
+        )
+        json_format = """{{
+  "id": "checkpoint",
+  "type": "mcq",
+  "prompt": "Question text here?",
+  "options": ["Option A", "Option B", "Option C", "Option D"],
+  "answer_index": <0-based index of correct option>,
+  "explanation": "Brief explanation of the correct answer."
+}}"""
+    elif cp_type == 'true_false':
+        type_instruction = (
+            "Create 1 true/false question that tests IMMEDIATE RECALL of a key concept "
+            "from the lesson segment. The statement must be a clear factual claim."
+        )
+        json_format = """{{
+  "id": "checkpoint",
+  "type": "true_false",
+  "prompt": "A clear factual statement that is either true or false.",
+  "answer": <true or false>,
+  "explanation": "Brief explanation of why the statement is true or false."
+}}"""
+    elif cp_type == 'cloze_dropdown':
+        type_instruction = (
+            "Create 1 cloze dropdown question that tests IMMEDIATE RECALL of a key concept "
+            "from the lesson segment. Replace a key term with '___'. Provide 3-4 short, "
+            "plausible options. One must be the correct answer at 'answer_index'. "
+            "Wrong options must be plausible enough that a learner who hasn't read "
+            "carefully might choose them. Do NOT use obviously wrong options."
+        )
+        json_format = """{{
+  "id": "checkpoint",
+  "type": "cloze_dropdown",
+  "prompt": "A sentence with a key concept replaced by '___'.",
+  "options": ["Correct term", "Plausible wrong A", "Plausible wrong B", "Plausible wrong C"],
+  "answer_index": <0-based index of correct option>,
+  "explanation": "Brief explanation of the correct answer."
+}}"""
+
     prompt = f"""You are an expert educator creating a quick comprehension checkpoint for high-school to early-college learners.
 
-Create 1 multiple-choice question that tests IMMEDIATE RECALL of a key concept from the lesson segment.
+{type_instruction}
 The question must be answerable using only the information provided below.
 
 Module: {module_title}
@@ -324,7 +398,7 @@ Context: {rag_context if rag_context else 'None'}
 
 CHECKPOINT RULES:
 1. The question MUST test a core concept directly stated in the segment content — NOT obscure trivia.
-2. All 4 options must be plausible — avoid absurd or obviously wrong distractors.
+2. For mcq and cloze_dropdown: all options must be plausible — avoid absurd or obviously wrong distractors.
 3. The correct answer must be unambiguously correct based on the segment content.
 4. The explanation must briefly justify why the answer is correct.
 5. Vary the position of the correct answer. Do NOT always place it at index 0.
@@ -332,14 +406,7 @@ CHECKPOINT RULES:
 Respond with ONLY a JSON object — no prose, no markdown.
 
 JSON FORMAT:
-{{
-  "id": "checkpoint",
-  "type": "mcq",
-  "prompt": "Question text here?",
-  "options": ["Option A", "Option B", "Option C", "Option D"],
-  "answer_index": <0-based index of correct option>,
-  "explanation": "Brief explanation of the correct answer."
-}}
+{json_format}
 
 Question:"""
 
@@ -355,8 +422,14 @@ Question:"""
         if start_idx != -1 and end_idx != 0:
             json_str = response[start_idx:end_idx]
             result = json.loads(json_str)
-            if all(k in result for k in ['type', 'prompt', 'options', 'answer_index']):
-                return _shuffle_checkpoint(result)
+            if cp_type == 'true_false':
+                if all(k in result for k in ['type', 'prompt', 'answer']):
+                    result['id'] = result.get('id', 'checkpoint')
+                    result['answer'] = bool(result['answer'])
+                    return result
+            elif cp_type in ('mcq', 'cloze_dropdown'):
+                if all(k in result for k in ['type', 'prompt', 'options', 'answer_index']):
+                    return _shuffle_checkpoint(result)
     except (json.JSONDecodeError, ValueError, KeyError, TypeError):
         pass
 
@@ -472,8 +545,27 @@ def _validate_questions(
                     'answer_indices': q['answer_indices'],
                     'explanation': q.get('explanation', '')
                 })
+        elif qtype == 'cloze_dropdown':
+            if all(k in q for k in ['prompt', 'options', 'answer_index']):
+                valid.append({
+                    'id': q.get('id', f'q{len(valid)+1}'),
+                    'type': 'cloze_dropdown',
+                    'prompt': q['prompt'],
+                    'options': q['options'],
+                    'answer_index': q['answer_index'],
+                    'explanation': q.get('explanation', '')
+                })
         elif qtype == 'fill_blank':
-            if all(k in q for k in ['prompt', 'answer']):
+            if all(k in q for k in ['prompt', 'options', 'answer_index']):
+                valid.append({
+                    'id': q.get('id', f'q{len(valid)+1}'),
+                    'type': 'cloze_dropdown',
+                    'prompt': q['prompt'],
+                    'options': q['options'],
+                    'answer_index': q['answer_index'],
+                    'explanation': q.get('explanation', '')
+                })
+            elif all(k in q for k in ['prompt', 'answer']):
                 answer = q['answer']
                 if not isinstance(answer, str):
                     continue
@@ -531,10 +623,10 @@ def _fallback_quiz(n_questions: int = 5) -> dict:
         },
         {
             'id': 'q4',
-            'type': 'fill_blank',
+            'type': 'cloze_dropdown',
             'prompt': 'The practice of actively retrieving information from memory is called ___.',
-            'answer': 'recall',
-            'acceptable_answers': ['recall', 'retrieval'],
+            'options': ['recall', 'cramming', 'skimming', 'highlighting'],
+            'answer_index': 0,
             'explanation': 'Active recall is the practice of actively stimulating memory during the learning process.'
         },
         {

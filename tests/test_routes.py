@@ -72,3 +72,17 @@ def test_process_max_files(client):
     response = client.post('/process', data=data, content_type='multipart/form-data', follow_redirects=True)
     assert response.status_code == 200
     assert b'Maximum' in response.data and b'5' in response.data
+
+
+def test_cloze_dropdown_grader():
+    from src.services.grader import _grade_single_question, _get_correct_answer
+    q = {
+        'id': 'q1', 'type': 'cloze_dropdown',
+        'prompt': 'Water is ___.',
+        'options': ['H2O', 'CO2', 'NaCl', 'O2'],
+        'answer_index': 0, 'explanation': 'Water is H2O.'
+    }
+    assert _grade_single_question(q, 0) is True
+    assert _grade_single_question(q, 1) is False
+    assert _grade_single_question(q, None) is False
+    assert _get_correct_answer(q) == 0

@@ -354,8 +354,19 @@ def _build_pdf(lesson, slides, quiz_questions, checkpoints, sources, score, now)
                 opts = q.get('options', [])
                 indices = q.get('answer_indices', [])
                 answer_text = ', '.join(opts[i] for i in indices if 0 <= i < len(opts))
+            elif qtype == 'cloze_dropdown':
+                opts = q.get('options', [])
+                idx = q.get('answer_index', 0)
+                if 0 <= idx < len(opts):
+                    answer_text = opts[idx]
             elif qtype == 'fill_blank':
-                answer_text = str(q.get('answer', ''))
+                if 'options' in q and 'answer_index' in q:
+                    opts = q.get('options', [])
+                    idx = q.get('answer_index', 0)
+                    if 0 <= idx < len(opts):
+                        answer_text = opts[idx]
+                else:
+                    answer_text = str(q.get('answer', ''))
             if answer_text:
                 pdf.set_x(pdf.l_margin)
                 pdf.set_font('Helvetica', 'B', 9)

@@ -69,15 +69,36 @@
             {% endif %}
 
             {% if checkpoints[si|string] %}
-            <section class="slide scrollable checkpoint-slide" data-checkpoint="{{ si }}" data-state="checkpoint-blocked" data-index="{{ si }}" data-answer="{{ checkpoints[si|string].answer_index }}">
+            {% set cp = checkpoints[si|string] %}
+            {% set cp_type = cp.type if cp.type else 'mcq' %}
+            <section class="slide scrollable checkpoint-slide" data-checkpoint="{{ si }}" data-state="checkpoint-blocked" data-index="{{ si }}" data-cp-type="{{ cp_type }}"
+                     {% if cp_type == 'mcq' or cp_type == 'cloze_dropdown' %}data-answer="{{ cp.answer_index }}"{% endif %}
+                     {% if cp_type == 'true_false' %}data-answer="{{ cp.answer|lower }}"{% endif %}>
                 <div class="slide-content-inner scroll-container">
                     <h3>Quick Check</h3>
-                    <p class="question-prompt">{{ checkpoints[si|string].prompt }}</p>
+                    <p class="question-prompt">{{ cp.prompt }}</p>
+                    {% if cp_type == 'mcq' %}
                     <div class="checkpoint-options">
-                        {% for opt in checkpoints[si|string].options %}
+                        {% for opt in cp.options %}
                         <div class="checkpoint-option" data-value="{{ loop.index0 }}">{{ opt }}</div>
                         {% endfor %}
                     </div>
+                    {% elif cp_type == 'true_false' %}
+                    <div class="checkpoint-options">
+                        <div class="checkpoint-option" data-value="true">True</div>
+                        <div class="checkpoint-option" data-value="false">False</div>
+                    </div>
+                    {% elif cp_type == 'cloze_dropdown' %}
+                    <div class="checkpoint-options cloze-dropdown-wrapper">
+                        <select class="checkpoint-select">
+                            <option value="" disabled selected>Select an answer...</option>
+                            {% for opt in cp.options %}
+                            <option value="{{ loop.index0 }}">{{ opt }}</option>
+                            {% endfor %}
+                        </select>
+                        <button class="checkpoint-check-btn" style="margin-top: 0.5rem;">Check</button>
+                    </div>
+                    {% endif %}
                     <div class="checkpoint-feedback"></div>
                     <button class="btn-submit-quiz" style="margin-top: 1rem; display: none;">Continue</button>
                 </div>
@@ -96,6 +117,7 @@
                              {% if q.type == 'mcq' %}data-answer="{{ q.answer_index }}"{% endif %}
                              {% if q.type == 'true_false' %}data-answer="{{ q.answer|lower }}"{% endif %}
                              {% if q.type == 'multi_select' %}data-answer="{{ q.answer_indices|join(',') }}"{% endif %}
+                             {% if q.type == 'cloze_dropdown' %}data-answer="{{ q.answer_index }}"{% endif %}
                              {% if q.type == 'fill_blank' %}data-answer="{{ q.answer }}"{% endif %}>
                             <div class="q-prompt">{{ loop.index }}. {{ q.prompt }}</div>
                             {% if q.type == 'mcq' or q.type == 'multi_select' %}
@@ -111,6 +133,15 @@
                             <div class="q-options">
                                 <label class="q-option"><input type="radio" name="{{ q.id }}" value="true"> True</label>
                                 <label class="q-option"><input type="radio" name="{{ q.id }}" value="false"> False</label>
+                            </div>
+                            {% elif q.type == 'cloze_dropdown' or (q.type == 'fill_blank' and q.options) %}
+                            <div class="q-options cloze-dropdown-wrapper">
+                                <select class="q-select cloze-select" name="{{ q.id }}" data-qid="{{ q.id }}">
+                                    <option value="" disabled selected>Select an answer...</option>
+                                    {% for opt in q.options %}
+                                    <option value="{{ loop.index0 }}">{{ opt }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                             {% elif q.type == 'fill_blank' %}
                             <input type="text" class="q-input" maxlength="20" data-qid="{{ q.id }}" name="{{ q.id }}" placeholder="Type a single word...">

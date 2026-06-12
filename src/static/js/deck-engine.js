@@ -92,16 +92,31 @@
 
         handleClick(e) {
             const option = e.target.closest('.checkpoint-option');
-            if (!option) return;
+            if (option) {
+                const slide = option.closest('.checkpoint-slide');
+                if (!slide || slide.dataset.answered === 'true') return;
 
-            const slide = option.closest('.checkpoint-slide');
-            if (!slide || slide.dataset.answered === 'true') return;
+                slide.querySelectorAll('.checkpoint-option').forEach(o => o.classList.remove('selected'));
+                option.classList.add('selected');
 
-            slide.querySelectorAll('.checkpoint-option').forEach(o => o.classList.remove('selected'));
-            option.classList.add('selected');
+                const cpType = slide.dataset.cpType || 'mcq';
+                if (cpType === 'cloze_dropdown') return;
 
-            const btn = slide.querySelector('.btn-submit-quiz');
-            if (btn) btn.style.display = 'inline-block';
+                const btn = slide.querySelector('.btn-submit-quiz');
+                if (btn) btn.style.display = 'inline-block';
+                return;
+            }
+
+            const checkBtn = e.target.closest('.checkpoint-check-btn');
+            if (checkBtn) {
+                const slide = checkBtn.closest('.checkpoint-slide');
+                if (!slide || slide.dataset.answered === 'true') return;
+
+                const select = slide.querySelector('.checkpoint-select');
+                if (!select || select.value === '') return;
+
+                this.advanceFromCheckpoint(checkBtn);
+            }
         }
 
         goToSlide(index) {
@@ -166,10 +181,24 @@
             const slide = btn.closest('.checkpoint-slide');
             if (!slide || slide.dataset.answered === 'true') return;
 
-            const selected = slide.querySelector('.checkpoint-option.selected');
-            if (!selected) return;
+            const cpType = slide.dataset.cpType || 'mcq';
+            let userValue;
 
-            const userValue = parseInt(selected.dataset.value);
+            if (cpType === 'cloze_dropdown') {
+                const select = slide.querySelector('.checkpoint-select');
+                if (!select || select.value === '') return;
+                userValue = parseInt(select.value);
+            } else {
+                const selected = slide.querySelector('.checkpoint-option.selected');
+                if (!selected) return;
+                const raw = selected.dataset.value;
+                if (cpType === 'true_false') {
+                    userValue = raw === 'true';
+                } else {
+                    userValue = parseInt(raw);
+                }
+            }
+
             const slideIndex = slide.dataset.checkpoint;
             const fb = slide.querySelector('.checkpoint-feedback');
 
@@ -204,6 +233,13 @@
                     } else {
                         allAnswered = false;
                     }
+                } else if (qtype === 'cloze_dropdown') {
+                    const select = qq.querySelector('.cloze-select');
+                    if (select && select.value !== '') {
+                        answers.push(parseInt(select.value));
+                    } else {
+                        allAnswered = false;
+                    }
                 } else if (qtype === 'true_false') {
                     const selected = qq.querySelector('input[type="radio"]:checked');
                     if (selected) {
@@ -219,13 +255,22 @@
                         allAnswered = false;
                     }
                 } else if (qtype === 'fill_blank') {
-                    const input = qq.querySelector('.q-input');
-                    if (input && input.value.trim()) {
-                        const val = input.value.trim();
-                        fillBlankAnswers[qid] = val;
-                        answers.push(null);
+                    const select = qq.querySelector('.cloze-select');
+                    if (select) {
+                        if (select.value !== '') {
+                            answers.push(parseInt(select.value));
+                        } else {
+                            allAnswered = false;
+                        }
                     } else {
-                        allAnswered = false;
+                        const input = qq.querySelector('.q-input');
+                        if (input && input.value.trim()) {
+                            const val = input.value.trim();
+                            fillBlankAnswers[qid] = val;
+                            answers.push(null);
+                        } else {
+                            allAnswered = false;
+                        }
                     }
                 }
             });

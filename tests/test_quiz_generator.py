@@ -81,8 +81,8 @@ def test_validate_questions():
             "options": ["A", "B", "C"], "answer_indices": [0, 1], "explanation": "Both"
         },
         {
-            "id": "q4", "type": "fill_blank", "prompt": "___ is the answer",
-            "answer": "42", "acceptable_answers": ["42", "forty two"], "explanation": "Hitchhiker"
+            "id": "q4", "type": "cloze_dropdown", "prompt": "___ is the answer",
+            "options": ["42", "7", "99", "0"], "answer_index": 0, "explanation": "Hitchhiker"
         },
         {
             "id": "q5", "type": "invalid", "prompt": "bad"
@@ -115,12 +115,12 @@ def test_summarize_slides():
 
 
 def test_build_type_mix():
-    types = ['mcq', 'true_false', 'fill_blank']
+    types = ['mcq', 'true_false', 'cloze_dropdown']
     result = _build_type_mix(5, types)
     assert sum(result.values()) == 5
     assert result['mcq'] == 2
     assert result['true_false'] == 2
-    assert result['fill_blank'] == 1
+    assert result['cloze_dropdown'] == 1
 
 
 def test_quiz_questions_have_explanations():
@@ -129,52 +129,44 @@ def test_quiz_questions_have_explanations():
         assert 'explanation' in q, f"Question {q['id']} missing explanation"
 
 
-def test_fill_blank_validation_rejects_multi_word():
+def test_cloze_dropdown_validation():
     questions = [
         {
-            "id": "q1", "type": "fill_blank", "prompt": "The capital of France is __.",
-            "answer": "paris", "acceptable_answers": ["paris", "france"],
+            "id": "q1", "type": "cloze_dropdown", "prompt": "The capital of France is ___.",
+            "options": ["Paris", "Berlin", "Madrid", "London"], "answer_index": 0,
             "explanation": "Paris is the capital."
         },
         {
-            "id": "q2", "type": "fill_blank", "prompt": "___ is the process of learning.",
-            "answer": "study", "acceptable_answers": ["study", "active recall", "memorization technique"],
+            "id": "q2", "type": "cloze_dropdown", "prompt": "___ is the process of learning.",
+            "options": ["Studying", "Sleeping", "Eating", "Running"], "answer_index": 0,
             "explanation": "Studying is key."
         },
         {
-            "id": "q3", "type": "fill_blank", "prompt": "The answer is __.",
-            "answer": "42",
+            "id": "q3", "type": "cloze_dropdown", "prompt": "The answer is ___.",
+            "options": ["42", "7", "99", "0"], "answer_index": 0,
             "explanation": "Ultimate answer."
         }
     ]
     valid = _validate_questions(questions, 3)
     assert len(valid) == 3
-
-    # q1: all single-word entries kept
-    assert len(valid[0]['acceptable_answers']) == 2
-    assert 'paris' in valid[0]['acceptable_answers']
-    assert 'france' in valid[0]['acceptable_answers']
-
-    # q2: multi-word "active recall" and "memorization technique" filtered out
-    assert len(valid[1]['acceptable_answers']) == 1
-    assert valid[1]['acceptable_answers'] == ['study']
-
-    # q3: no acceptable_answers provided, falls back to answer
-    assert len(valid[2]['acceptable_answers']) == 1
-    assert valid[2]['acceptable_answers'] == ['42']
+    for q in valid:
+        assert q['type'] == 'cloze_dropdown'
+        assert 'options' in q
+        assert 'answer_index' in q
+        assert len(q['options']) >= 3
 
 
-def test_fill_blank_answer_is_single_word_in_fallback():
+def test_cloze_dropdown_in_fallback():
     result = _fallback_quiz(5)
-    fb_q = None
+    cd_q = None
     for q in result['questions']:
-        if q['type'] == 'fill_blank':
-            fb_q = q
+        if q['type'] == 'cloze_dropdown':
+            cd_q = q
             break
-    assert fb_q is not None
-    assert ' ' not in fb_q['answer'], f"Fill-blank answer '{fb_q['answer']}' must be a single word"
-    for a in fb_q['acceptable_answers']:
-        assert ' ' not in a, f"Acceptable answer '{a}' must be a single word"
+    assert cd_q is not None
+    assert 'options' in cd_q
+    assert 'answer_index' in cd_q
+    assert len(cd_q['options']) >= 3
 
 
 def test_quiz_prompt_requires_plausible_distractors(monkeypatch):
@@ -195,8 +187,7 @@ def test_quiz_prompt_requires_plausible_distractors(monkeypatch):
 
     assert 'plausible' in p.lower()
     assert 'distractor' in p.lower() or 'wrong answer' in p.lower()
-    assert 'single word' in p.lower()
-    assert 'fill_blank' in p or 'fill blank' in p.lower()
+    assert 'cloze_dropdown' in p or 'cloze dropdown' in p.lower()
 
 
 def test_quiz_prompt_contains_pedagogical_requirements(monkeypatch):
@@ -279,7 +270,142 @@ def test_mock_responses_pass_validation_under_new_prompts(monkeypatch):
         assert 'type' in q
         assert 'prompt' in q
         assert 'explanation' in q
-        if q['type'] == 'fill_blank':
-            assert ' ' not in q['answer'], f"Fill-blank answer must be single word: {q['answer']}"
-            for a in q.get('acceptable_answers', []):
-                assert ' ' not in a, f"Acceptable answer must be single word: {a}"
+        if q['type'] == 'cloze_dropdown':
+            assert 'options' in q, f"Cloze dropdown must have options: {q['id']}"
+            assert 'answer_index' in q, f"Cloze dropdown must have answer_index: {q['id']}"
+            assert len(q['options']) >= 3, f"Cloze dropdown must have at least 3 options: {q['id']}"
+
+
+def test_cloze_dropdown_grading_correct():
+    from src.services.grader import _grade_single_question
+    question = {
+        'id': 'q1', 'type': 'cloze_dropdown',
+        'prompt': 'The capital of France is ___.',
+        'options': ['Paris', 'Berlin', 'Madrid', 'London'],
+        'answer_index': 0, 'explanation': 'Paris is the capital.'
+    }
+    assert _grade_single_question(question, 0) is True
+
+
+def test_cloze_dropdown_grading_wrong():
+    from src.services.grader import _grade_single_question
+    question = {
+        'id': 'q1', 'type': 'cloze_dropdown',
+        'prompt': 'The capital of France is ___.',
+        'options': ['Paris', 'Berlin', 'Madrid', 'London'],
+        'answer_index': 0, 'explanation': 'Paris is the capital.'
+    }
+    assert _grade_single_question(question, 1) is False
+
+
+def test_cloze_dropdown_options_shuffled():
+    from src.services.quiz_generator import _shuffle_questions
+    questions = [{
+        'id': 'q1', 'type': 'cloze_dropdown',
+        'prompt': 'Water is ___.',
+        'options': ['H2O', 'CO2', 'NaCl', 'O2'],
+        'answer_index': 0, 'explanation': 'Water is H2O.'
+    }]
+    shuffled = _shuffle_questions(questions)
+    q = shuffled[0]
+    assert q['type'] == 'cloze_dropdown'
+    assert 'H2O' in q['options']
+    assert q['options'][q['answer_index']] == 'H2O'
+
+
+def test_legacy_fill_blank_graded_as_mcq():
+    from src.services.grader import _grade_single_question
+    question = {
+        'id': 'q1', 'type': 'fill_blank',
+        'prompt': 'The capital of France is ___.',
+        'options': ['Paris', 'Berlin', 'Madrid', 'London'],
+        'answer_index': 0, 'explanation': 'Paris is the capital.'
+    }
+    assert _grade_single_question(question, 0) is True
+    assert _grade_single_question(question, 1) is False
+
+
+def test_checkpoint_mcq_type(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    slides = [
+        {"type": "content", "heading": "Intro", "bullets": ["Point A", "Point B"]}
+    ]
+    result = generate_inline_checkpoint("Test", slides, None, cp_type='mcq')
+    assert isinstance(result, dict)
+    assert result['type'] == 'mcq'
+    assert 'prompt' in result
+    assert 'options' in result
+    assert len(result['options']) >= 2
+    assert 'answer_index' in result
+    assert 'explanation' in result
+
+
+def test_checkpoint_true_false_type(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    import src.services.quiz_generator as qg_module
+
+    def mock_call_ollama(prompt, model=None):
+        return '{"id": "cp", "type": "true_false", "prompt": "The sky is blue.", "answer": true, "explanation": "Rayleigh scattering makes the sky appear blue."}'
+
+    monkeypatch.setattr(qg_module, 'call_ollama', mock_call_ollama)
+
+    slides = [
+        {"type": "content", "heading": "Intro", "bullets": ["Point A", "Point B"]}
+    ]
+    result = generate_inline_checkpoint("Test", slides, None, cp_type='true_false')
+    assert isinstance(result, dict)
+    assert result['type'] == 'true_false'
+    assert 'prompt' in result
+    assert 'answer' in result
+    assert isinstance(result['answer'], bool)
+    assert 'explanation' in result
+
+
+def test_checkpoint_cloze_dropdown_type(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    import src.services.quiz_generator as qg_module
+
+    def mock_call_ollama(prompt, model=None):
+        return '{"id": "cp", "type": "cloze_dropdown", "prompt": "The chemical symbol for water is ___.", "options": ["H2O", "CO2", "NaCl", "O2"], "answer_index": 0, "explanation": "Water is H2O."}'
+
+    monkeypatch.setattr(qg_module, 'call_ollama', mock_call_ollama)
+
+    slides = [
+        {"type": "content", "heading": "Intro", "bullets": ["Point A", "Point B"]}
+    ]
+    result = generate_inline_checkpoint("Test", slides, None, cp_type='cloze_dropdown')
+    assert isinstance(result, dict)
+    assert result['type'] == 'cloze_dropdown'
+    assert 'prompt' in result
+    assert '___' in result['prompt']
+    assert 'options' in result
+    assert len(result['options']) >= 3
+    assert 'answer_index' in result
+    assert 'explanation' in result
+
+
+def test_quiz_prompt_contains_humor_instructions(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    import src.services.quiz_generator as qg_module
+    captured_prompt = {}
+
+    def mock_call_ollama(prompt, model=None):
+        captured_prompt['prompt'] = prompt
+        return '{"questions": [{"id": "q1", "type": "mcq", "prompt": "Test?", "options": ["A","B","C","D"], "answer_index": 0, "explanation": "E"}]}'
+
+    monkeypatch.setattr(qg_module, 'call_ollama', mock_call_ollama)
+
+    generate_quiz("Test Module", [], None, n_questions=3)
+    p = captured_prompt['prompt']
+
+    assert 'HUMOR REQUIREMENT' in p
+    assert 'ridiculous' in p.lower()
+    assert 'classroom-appropriate' in p.lower()

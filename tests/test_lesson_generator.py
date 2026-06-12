@@ -175,3 +175,24 @@ def test_fallback_lesson():
     types = [s['type'] for s in result['slides']]
     assert 'title' in types
     assert 'content' in types
+
+
+def test_lesson_prompt_contains_humor_note(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    import src.services.lesson_generator as lg_module
+    captured_prompt = {}
+
+    def mock_call_ollama(prompt, model=None):
+        captured_prompt['prompt'] = prompt
+        return '{"module_title": "T", "slides": [{"type": "title", "title": "T", "subtitle": "T"}]}'
+
+    monkeypatch.setattr(lg_module, 'call_ollama', mock_call_ollama)
+
+    generate_lesson("Physics", "Learn mechanics", None)
+    p = captured_prompt['prompt']
+
+    assert 'TONE NOTE' in p
+    assert 'light-hearted' in p.lower() or 'absurd' in p.lower()
+    assert 'example slides' in p.lower()
