@@ -123,6 +123,8 @@ pytest -v tests/
 
 ## Using Ollama Cloud (Optional)
 
+The `AI_BACKEND` env var selects the AI provider. The default is `local` (Ollama on `http://localhost:11434`); setting `AI_BACKEND=cloud` routes all AI calls through the Ollama Cloud OpenAI-compatible endpoint.
+
 1. In your `.env` file, set:
    ```
    AI_BACKEND=cloud

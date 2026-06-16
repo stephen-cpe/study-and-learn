@@ -29,6 +29,29 @@ HUMOR_INSTRUCTIONS = (
     "plausible per PEDAGOGICAL REQUIREMENTS — only one per question should be ridiculous.\n"
 )
 
+DIFFICULTY_INSTRUCTIONS = {
+    'Easy': (
+        "AUDIENCE — Easy (age 10–11):\n"
+        "Use short sentences and simple vocabulary. Introduce every concept with a "
+        "concrete everyday analogy before stating the formal definition. Avoid jargon "
+        "entirely — if a technical term is unavoidable, define it immediately in plain "
+        "language. Use encouraging language. Never condescend; treat the learner as "
+        "curious and fully capable.\n"
+    ),
+    'Normal': (
+        "AUDIENCE — Normal (age 12–13):\n"
+        "Use clear, moderately detailed language. Some subject-specific terms are "
+        "appropriate — define each on first use before continuing. Assume the learner "
+        "has basic school-level knowledge. Balance depth with accessibility.\n"
+    ),
+    'Hard': (
+        "AUDIENCE — Hard (age 14–15):\n"
+        "Use full subject vocabulary without simplifying. Do not filter or dumb down "
+        "material. Assume a motivated learner who can handle nuance, multi-step "
+        "reasoning, and precise terminology. Keep examples concise and sophisticated.\n"
+    ),
+}
+
 
 def _shuffle_options(
     options: List[str],
@@ -151,6 +174,7 @@ def generate_quiz(
     slides: List[Dict[str, Any]],
     retriever: Optional[Callable[[str], Dict[str, Any]]],
     n_questions: int = 5,
+    difficulty: str = 'Normal',
 ) -> Dict[str, Any]:
     """Generate a mixed-type quiz for a module grounded in RAG context.
 
@@ -160,6 +184,8 @@ def generate_quiz(
         retriever: A callable that returns RAG context for a query string,
             or None if unavailable.
         n_questions: Number of questions to generate (default 5).
+        difficulty: One of 'Easy', 'Normal', 'Hard'. Controls vocabulary
+            and question complexity. Defaults to 'Normal'.
 
     Returns:
         A dict with key ``questions`` containing a list of validated,
@@ -199,9 +225,12 @@ def generate_quiz(
             "Use widely known facts only — do NOT invent specific data.\n\n"
         )
 
+    diff_instruction = DIFFICULTY_INSTRUCTIONS.get(difficulty, DIFFICULTY_INSTRUCTIONS['Normal'])
+
     prompt = f"""You are an expert educator creating a quiz for high-school to early-college learners.
 
 {context_instruction}
+{diff_instruction}
 Module: {module_title}
 Lesson Content: {slide_summary}
 Context: {rag_context if rag_context else 'None'}
@@ -307,6 +336,7 @@ def generate_inline_checkpoint(
     slides_subset: List[Dict[str, Any]],
     retriever: Optional[Callable[[str], Dict[str, Any]]],
     cp_type: Optional[str] = None,
+    difficulty: str = 'Normal',
 ) -> Dict[str, Any]:
     """Generate a single inline comprehension checkpoint.
 
@@ -319,6 +349,8 @@ def generate_inline_checkpoint(
         retriever: A callable that returns RAG context, or None.
         cp_type: Optional checkpoint type. If None, randomly selects from
             ['mcq', 'true_false', 'cloze_dropdown'] with weights [0.5, 0.3, 0.2].
+        difficulty: One of 'Easy', 'Normal', 'Hard'. Controls vocabulary
+            and question complexity. Defaults to 'Normal'.
 
     Returns:
         A shuffled checkpoint question dict with keys: id, type, prompt,
@@ -387,8 +419,11 @@ def generate_inline_checkpoint(
   "explanation": "Brief explanation of the correct answer."
 }}"""
 
+    diff_instruction = DIFFICULTY_INSTRUCTIONS.get(difficulty, DIFFICULTY_INSTRUCTIONS['Normal'])
+
     prompt = f"""You are an expert educator creating a quick comprehension checkpoint for high-school to early-college learners.
 
+{diff_instruction}
 {type_instruction}
 The question must be answerable using only the information provided below.
 

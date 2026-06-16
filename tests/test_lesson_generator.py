@@ -2,7 +2,10 @@
 Unit tests for the lesson generator service.
 """
 import pytest
-from src.services.lesson_generator import generate_lesson, _validate_slides, _fallback_lesson
+from src.services.lesson_generator import (
+    generate_lesson, _validate_slides, _fallback_lesson,
+    generate_narration_script, _build_narration_fallback,
+)
 
 
 def test_generate_lesson_with_mock(monkeypatch):
@@ -196,3 +199,137 @@ def test_lesson_prompt_contains_humor_note(monkeypatch):
     assert 'TONE NOTE' in p
     assert 'light-hearted' in p.lower() or 'absurd' in p.lower()
     assert 'example slides' in p.lower()
+
+
+def test_lesson_prompt_difficulty_easy(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    import src.services.lesson_generator as lg_module
+    captured_prompt = {}
+
+    def mock_call_ollama(prompt, model=None):
+        captured_prompt['prompt'] = prompt
+        return '{"module_title": "T", "slides": [{"type": "title", "title": "T", "subtitle": "T"}]}'
+
+    monkeypatch.setattr(lg_module, 'call_ollama', mock_call_ollama)
+
+    generate_lesson("Physics", "Learn mechanics", None, difficulty='Easy')
+    p = captured_prompt['prompt']
+
+    assert 'AUDIENCE — Easy' in p
+    assert 'age 10–11' in p
+    assert 'simple vocabulary' in p.lower() or 'short sentences' in p.lower()
+
+
+def test_lesson_prompt_difficulty_hard(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    import src.services.lesson_generator as lg_module
+    captured_prompt = {}
+
+    def mock_call_ollama(prompt, model=None):
+        captured_prompt['prompt'] = prompt
+        return '{"module_title": "T", "slides": [{"type": "title", "title": "T", "subtitle": "T"}]}'
+
+    monkeypatch.setattr(lg_module, 'call_ollama', mock_call_ollama)
+
+    generate_lesson("Physics", "Learn mechanics", None, difficulty='Hard')
+    p = captured_prompt['prompt']
+
+    assert 'AUDIENCE — Hard' in p
+    assert 'age 14–15' in p
+    assert 'full subject vocabulary' in p.lower() or 'do not filter' in p.lower()
+
+
+def test_lesson_prompt_difficulty_normal_default(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    import src.services.lesson_generator as lg_module
+    captured_prompt = {}
+
+    def mock_call_ollama(prompt, model=None):
+        captured_prompt['prompt'] = prompt
+        return '{"module_title": "T", "slides": [{"type": "title", "title": "T", "subtitle": "T"}]}'
+
+    monkeypatch.setattr(lg_module, 'call_ollama', mock_call_ollama)
+
+    generate_lesson("Physics", "Learn mechanics", None)
+    p = captured_prompt['prompt']
+
+    assert 'AUDIENCE — Normal' in p
+    assert 'age 12–13' in p
+
+
+def test_narration_script_has_intro_and_outro(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    slides = [
+        {'type': 'title', 'title': 'Intro', 'subtitle': 'Getting Started'},
+        {'type': 'content', 'heading': 'Overview', 'bullets': ['Point A', 'Point B']},
+    ]
+    script = generate_narration_script('Test Module', slides, 'Alice')
+    assert isinstance(script, list)
+    assert len(script) >= 3
+    assert script[0]['slide_index'] == -1
+    assert script[-1]['slide_index'] == len(slides)
+
+
+def test_narration_script_intro_contains_username(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    slides = [
+        {'type': 'title', 'title': 'Intro', 'subtitle': 'Getting Started'},
+    ]
+    script = generate_narration_script('Test Module', slides, 'Bob')
+    intro = script[0]['text']
+    assert 'Bob' in intro
+
+
+def test_narration_script_falls_back_on_ai_error(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    import src.services.lesson_generator as lg_module
+
+    def mock_call_ollama_raises(prompt, model=None):
+        from src.services.exceptions import AIServiceError
+        raise AIServiceError('Simulated AI failure')
+
+    monkeypatch.setattr(lg_module, 'call_ollama', mock_call_ollama_raises)
+
+    slides = [
+        {'type': 'title', 'title': 'Intro', 'subtitle': 'Getting Started'},
+    ]
+    script = generate_narration_script('Test Module', slides, 'Alice')
+    assert isinstance(script, list)
+    assert script[0]['slide_index'] == -1
+    assert script[-1]['slide_index'] == len(slides)
+    assert 'Alice' in script[0]['text']
+
+
+def test_narration_script_last_module_congratulatory(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    import src.services.lesson_generator as lg_module
+
+    def mock_call_ollama(prompt, model=None):
+        return json.dumps([
+            {'slide_index': -1, 'text': 'Hello Alice! Welcome to the final module.'},
+            {'slide_index': 0, 'text': 'Let us begin.'},
+            {'slide_index': 1, 'text': 'Congratulations on completing everything! You did great.'},
+        ])
+
+    monkeypatch.setattr(lg_module, 'call_ollama', mock_call_ollama)
+
+    slides = [
+        {'type': 'title', 'title': 'Final Module', 'subtitle': 'The End'},
+    ]
+    script = generate_narration_script('Final Module', slides, 'Alice', is_last_module=True)
+    assert script[-1]['slide_index'] == len(slides)
+    assert 'congratulations' in script[-1]['text'].lower() or 'completing' in script[-1]['text'].lower()

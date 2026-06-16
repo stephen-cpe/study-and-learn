@@ -14,6 +14,7 @@
   const avatarInput = document.getElementById('avatar-input');
   const currentImg = document.getElementById('current-avatar-img');
   const form = document.getElementById('settings-form');
+  const difficultyInput = document.getElementById('difficulty-input');
 
   let pendingAvatar = null;
 
@@ -72,15 +73,16 @@
     });
   }
 
-  // ── Difficulty slider → update label and current value display ───
+  // ── Difficulty slider → update label, current value display, and hidden input ───
   const difficultySlider = document.getElementById('difficulty-slider');
   const difficultyValue = document.getElementById('difficulty-current-value');
 
-  if (difficultySlider && difficultyValue) {
+  if (difficultySlider && difficultyValue && difficultyInput) {
     const sync = () => {
       const idx = parseInt(difficultySlider.value, 10) || 0;
       const label = DIFFICULTY_LABELS[idx] || 'Normal';
       difficultyValue.textContent = label;
+      difficultyInput.value = label;
     };
     difficultySlider.addEventListener('input', sync);
     sync();

@@ -56,7 +56,9 @@
         <section class="settings-card">
             <h2 class="settings-heading">Lesson Difficulty</h2>
             <div class="difficulty-slider-wrap">
-                <input type="range" name="lesson_difficulty" id="difficulty-slider"
+                <input type="hidden" name="lesson_difficulty" id="difficulty-input"
+                       value="{{ current_user.lesson_difficulty }}">
+                <input type="range" id="difficulty-slider"
                        class="difficulty-slider"
                        min="0" max="2" step="1"
                        list="difficulty-ticks"

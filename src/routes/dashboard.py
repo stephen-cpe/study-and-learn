@@ -3,11 +3,14 @@ Dashboard routes — user dashboard, path cancellation, and session reset.
 """
 import io
 import json
+import logging
 from datetime import datetime, timezone
 
 from flask import (Response, flash, redirect, render_template, request,
                    session, url_for)
 from flask_login import current_user, login_required
+
+logger = logging.getLogger(__name__)
 
 from src import db
 from src.models import LessonProgress, StudyPath
@@ -82,6 +85,11 @@ def complete_study_path(path_id):
     path.status = 'completed'
     path.updated_at = datetime.now(timezone.utc)
     db.session.commit()
+    try:
+        from src.services.tts_service import delete_lesson_audio
+        delete_lesson_audio(path_id)
+    except Exception as e:
+        logger.warning("TTS cleanup failed for path %s: %s", path_id, str(e))
     flash(f'"{path.title}" marked as complete!', 'success')
     return redirect(url_for('main.dashboard'))
 
@@ -96,6 +104,11 @@ def cancel_study_path(path_id):
 
     path.status = 'cancelled'
     db.session.commit()
+    try:
+        from src.services.tts_service import delete_lesson_audio
+        delete_lesson_audio(path_id)
+    except Exception as e:
+        logger.warning("TTS cleanup failed for path %s: %s", path_id, str(e))
     flash(f'"{path.title}" has been cancelled.', 'success')
     return redirect(url_for('main.dashboard'))
 
@@ -116,6 +129,11 @@ def delete_study_path(path_id):
     LessonProgress.query.filter_by(study_path_id=path.id).delete()
     db.session.delete(path)
     db.session.commit()
+    try:
+        from src.services.tts_service import delete_lesson_audio
+        delete_lesson_audio(path_id)
+    except Exception as e:
+        logger.warning("TTS cleanup failed for path %s: %s", path_id, str(e))
     flash(f'"{title}" has been permanently deleted.', 'success')
     return redirect(url_for('main.dashboard'))
 

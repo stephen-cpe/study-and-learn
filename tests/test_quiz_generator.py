@@ -409,3 +409,43 @@ def test_quiz_prompt_contains_humor_instructions(monkeypatch):
     assert 'HUMOR REQUIREMENT' in p
     assert 'ridiculous' in p.lower()
     assert 'classroom-appropriate' in p.lower()
+
+
+def test_quiz_prompt_difficulty_easy(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    import src.services.quiz_generator as qg_module
+    captured_prompt = {}
+
+    def mock_call_ollama(prompt, model=None):
+        captured_prompt['prompt'] = prompt
+        return '{"questions": [{"id": "q1", "type": "mcq", "prompt": "Test?", "options": ["A","B","C","D"], "answer_index": 0, "explanation": "E"}]}'
+
+    monkeypatch.setattr(qg_module, 'call_ollama', mock_call_ollama)
+
+    generate_quiz("Test Module", [], None, n_questions=3, difficulty='Easy')
+    p = captured_prompt['prompt']
+
+    assert 'AUDIENCE — Easy' in p
+    assert 'age 10–11' in p
+
+
+def test_quiz_prompt_difficulty_hard(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    import src.services.quiz_generator as qg_module
+    captured_prompt = {}
+
+    def mock_call_ollama(prompt, model=None):
+        captured_prompt['prompt'] = prompt
+        return '{"questions": [{"id": "q1", "type": "mcq", "prompt": "Test?", "options": ["A","B","C","D"], "answer_index": 0, "explanation": "E"}]}'
+
+    monkeypatch.setattr(qg_module, 'call_ollama', mock_call_ollama)
+
+    generate_quiz("Test Module", [], None, n_questions=3, difficulty='Hard')
+    p = captured_prompt['prompt']
+
+    assert 'AUDIENCE — Hard' in p
+    assert 'age 14–15' in p

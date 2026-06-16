@@ -1,6 +1,25 @@
 (function() {
     'use strict';
 
+    var _savePositionTimer = null;
+
+    function _debouncedSavePosition(container, idx) {
+        clearTimeout(_savePositionTimer);
+        _savePositionTimer = setTimeout(function() {
+            _savePosition(container, idx);
+        }, 500);
+    }
+
+    function _savePosition(container, idx) {
+        var moduleIndex = parseInt(container.dataset.moduleIndex);
+        var pathId = container.dataset.pathId || '';
+        fetch('/lessons/' + moduleIndex + '/save-position?path_id=' + encodeURIComponent(pathId), {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({slide_index: idx})
+        }).catch(function() {});
+    }
+
     class StudyAndLearnDeck {
         constructor(options) {
             this.currentSlide = 0;
@@ -29,7 +48,13 @@
             this.wheelCooldown = false;
 
             this.bindEvents();
-            this.goToSlide(0);
+
+            var resumeSlide = parseInt(this.container.dataset.resumeSlide) || 0;
+            if (resumeSlide > 0 && resumeSlide < this.totalSlides) {
+                this.goToSlide(resumeSlide);
+            } else {
+                this.goToSlide(0);
+            }
         }
 
         bindEvents() {
@@ -44,6 +69,7 @@
 
             this.container.addEventListener('wheel', (e) => this.handleWheel(e), { passive: false });
             this.container.addEventListener('click', (e) => this.handleClick(e));
+            this.container.addEventListener('change', (e) => this.handleCheckpointSelectChange(e));
 
             this.container.addEventListener('touchstart', (e) => {
                 this.touchStartY = e.touches[0].clientY;
@@ -99,24 +125,22 @@
                 slide.querySelectorAll('.checkpoint-option').forEach(o => o.classList.remove('selected'));
                 option.classList.add('selected');
 
-                const cpType = slide.dataset.cpType || 'mcq';
-                if (cpType === 'cloze_dropdown') return;
-
                 const btn = slide.querySelector('.btn-submit-quiz');
                 if (btn) btn.style.display = 'inline-block';
                 return;
             }
+        }
 
-            const checkBtn = e.target.closest('.checkpoint-check-btn');
-            if (checkBtn) {
-                const slide = checkBtn.closest('.checkpoint-slide');
-                if (!slide || slide.dataset.answered === 'true') return;
+        handleCheckpointSelectChange(e) {
+            const select = e.target.closest('.checkpoint-select');
+            if (!select) return;
 
-                const select = slide.querySelector('.checkpoint-select');
-                if (!select || select.value === '') return;
+            const slide = select.closest('.checkpoint-slide');
+            if (!slide || slide.dataset.answered === 'true') return;
+            if (select.value === '') return;
 
-                this.advanceFromCheckpoint(checkBtn);
-            }
+            const btn = slide.querySelector('.btn-submit-quiz');
+            if (btn) btn.style.display = 'inline-block';
         }
 
         goToSlide(index) {
@@ -132,13 +156,30 @@
             this.updateControls();
             this.updateProgressBar();
 
+            // Use the slide element's own data-deck-index (Task 4) as the
+            // canonical deck index. This is the single source of truth
+            // shared with the template and the TTS narration manifest.
+            // If the attribute is missing (legacy data-index), fall back
+            // to the array index.
+            var activeEl = this.slides[index];
+            var deckIndex = parseInt(activeEl.dataset.deckIndex);
+            if (isNaN(deckIndex)) {
+                deckIndex = parseInt(activeEl.dataset.index) || index;
+            }
+
             if (this.options.onSlideChange) {
                 this.options.onSlideChange({
                     index: this.currentSlide,
                     slide: this.slides[this.currentSlide],
-                    total: this.totalSlides
+                    total: this.totalSlides,
+                    deckIndex: deckIndex,
                 });
             }
+
+            document.dispatchEvent(new CustomEvent('deckSlideChanged', {
+                detail: { slideIndex: this.currentSlide, deckIndex: deckIndex }
+            }));
+            _debouncedSavePosition(this.container, this.currentSlide);
         }
 
         next() {
@@ -179,7 +220,29 @@
 
         advanceFromCheckpoint(btn) {
             const slide = btn.closest('.checkpoint-slide');
-            if (!slide || slide.dataset.answered === 'true') return;
+            if (!slide) return;
+
+            // Two-click progression for Quick Checks:
+            //
+            //   First click:  validate the answer, request per-question
+            //                 feedback from the server (if a grading
+            //                 endpoint is available), and mark the slide
+            //                 as answered. The slide's feedback element
+            //                 shows the correct/incorrect result. The
+            //                 Continue button stays visible so the
+            //                 learner can read the feedback at their own
+            //                 pace.
+            //
+            //   Second click: advance to the next slide.
+            //
+            // There is NO automatic timer — the user is always in
+            // control. The user can also press the right-arrow key to
+            // advance (deck-engine.js:next() unblocks once
+            // data-answered is true).
+            if (slide.dataset.answered === 'true') {
+                this.next();
+                return;
+            }
 
             const cpType = slide.dataset.cpType || 'mcq';
             let userValue;
@@ -202,18 +265,20 @@
             const slideIndex = slide.dataset.checkpoint;
             const fb = slide.querySelector('.checkpoint-feedback');
 
-            if (typeof window.gradeCheckpoint === 'function') {
-                window.gradeCheckpoint(slideIndex, userValue, fb, () => {
-                    this.checkpointAnswers[slideIndex] = userValue;
-                    slide.dataset.answered = 'true';
-                    this.updateControls();
-                    setTimeout(() => this.next(), 3000);
-                });
-            } else {
+            const markAnswered = () => {
                 this.checkpointAnswers[slideIndex] = userValue;
                 slide.dataset.answered = 'true';
+                const select = slide.querySelector('.checkpoint-select');
+                if (select) select.disabled = true;
                 this.updateControls();
-                setTimeout(() => this.next(), 3000);
+            };
+
+            if (typeof window.gradeCheckpoint === 'function') {
+                window.gradeCheckpoint(slideIndex, userValue, fb, () => {
+                    markAnswered();
+                });
+            } else {
+                markAnswered();
             }
         }
 

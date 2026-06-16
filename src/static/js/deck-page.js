@@ -52,6 +52,10 @@
       }
     });
 
+    window.deckGoToSlide = function(idx) {
+      deck.goToSlide(idx);
+    };
+
     window.gradeCheckpoint = function (slideIndex, userValue, feedbackEl, callback) {
       var url = '/lessons/' + moduleIndex + '/grade';
       if (pathId) url += '?path_id=' + encodeURIComponent(pathId);
@@ -124,6 +128,22 @@
       });
     }
 
+    /* Bind Start Over button */
+    var restartBtn = document.getElementById('restart-deck-btn');
+    if (restartBtn) {
+      restartBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        if (window.deckGoToSlide) window.deckGoToSlide(0);
+        var saveUrl = restartBtn.dataset.saveUrl || '';
+        if (saveUrl) {
+          fetch(saveUrl, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({slide_index: 0})
+          }).catch(function() {});
+        }
+      });
+    }
+
     /* Dump all lesson answers to console for testing */
     var quizData = [], cpData = [];
     document.querySelectorAll('.quiz-question').forEach(function (el) {
@@ -165,7 +185,12 @@
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (data.success) {
-          window.location.reload();
+          // Server tells us where to go: the deck for the retaken module,
+          // starting from slide 0. The server has already reset deck_position
+          // and persisted the regenerated quiz/checkpoints/slides.
+          var target = data.redirect ||
+            ('/lessons/' + mIdx + (pathId ? '?path_id=' + encodeURIComponent(pathId) : ''));
+          window.location.href = target;
         } else {
           alert('Error regenerating quiz. Please try again.');
           btnRetake.disabled = false;
@@ -220,11 +245,71 @@
     });
   }
 
+  function initClozeSelects() {
+    document.querySelectorAll('.cloze-select, .checkpoint-select').forEach(function (select) {
+      select.addEventListener('change', function () {
+        select.classList.toggle('has-value', select.value !== '');
+      });
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     if (document.querySelector('.deck-container')) {
       window.formatSlideText();
       window.initDeckPage();
       initSourceToggles();
+      initClozeSelects();
     }
   });
+
+  (function initTTSPlayer() {
+    var container = document.querySelector('.deck-container');
+    if (!container || container.dataset.ttsEnabled !== 'true') return;
+
+    var player   = document.getElementById('tts-player');
+    var toggle   = document.getElementById('tts-toggle-btn');
+    var label    = document.getElementById('tts-label');
+    var muted    = false;
+    var moduleIndex = container.dataset.moduleIndex;
+    var pathId   = container.dataset.pathId || '';
+
+    function audioUrl(deckIndex) {
+      return '/lessons/' + moduleIndex + '/audio/' + deckIndex
+             + '?path_id=' + encodeURIComponent(pathId);
+    }
+
+    function playSlide(deckIndex) {
+      if (muted || !player) return;
+      player.src = audioUrl(deckIndex);
+      player.load();
+      player.play().catch(function() {});
+    }
+
+    // Play the intro (slide_index -1) after a short delay so the deck's
+    // goToSlide(0) doesn't preempt it with the first content slide's audio.
+    function playIntro() { playSlide(-1); }
+    setTimeout(playIntro, 200);
+
+    document.addEventListener('deckSlideChanged', function(e) {
+      // Task 4: use the deck's own deckIndex (not the array position) so
+      // the TTS manifest stays in sync with the visible deck layout.
+      var di = e.detail.deckIndex;
+      if (typeof di !== 'number') di = e.detail.slideIndex || 0;
+      playSlide(di);
+    });
+
+    toggle && toggle.addEventListener('click', function() {
+      muted = !muted;
+      if (muted) {
+        player.pause();
+        label.textContent = 'Narration Off';
+        toggle.textContent = '🔇 ';
+        toggle.appendChild(label);
+      } else {
+        label.textContent = 'Narration On';
+        toggle.textContent = '🔊 ';
+        toggle.appendChild(label);
+      }
+    });
+  })();
 })();

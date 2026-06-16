@@ -778,6 +778,45 @@ h2, .section-title {
     color: var(--az-muted);
     border: 1px solid var(--az-muted);
 }
+.badge-difficulty {
+    display: inline-block;
+    font-size: 0.7em;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    margin-top: 0.3rem;
+    font-family: "BoldPixels", sans-serif;
+}
+.badge-difficulty-easy {
+    background: rgba(126, 231, 135, 0.15);
+    color: var(--az-success);
+    border: 1px solid var(--az-success);
+}
+.badge-difficulty-normal {
+    background: rgba(0, 180, 216, 0.15);
+    color: var(--az-cyan-light);
+    border: 1px solid var(--az-cyan-light);
+}
+.badge-difficulty-hard {
+    background: rgba(255, 107, 107, 0.15);
+    color: var(--az-danger);
+    border: 1px solid var(--az-danger);
+}
+.badge-tts {
+    display: inline-block;
+    font-size: 0.7em;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    margin-top: 0.3rem;
+    font-family: "BoldPixels", sans-serif;
+    background: rgba(126, 231, 135, 0.15);
+    color: var(--az-success);
+    border: 1px solid var(--az-success);
+}
+.badge-tts-off {
+    background: rgba(202, 240, 248, 0.08);
+    color: var(--az-muted);
+    border: 1px solid var(--az-muted);
+}
 .lesson-title {
     color: var(--az-cyan-light);
     font-weight: 800;
@@ -854,7 +893,9 @@ h2, .section-title {
     --crt-bezel-padding: 14px;
     --crt-screen-inset: 10px;
     --crt-text-line: 14.4px;   /* 9px * 1.6 line-height */
-    --crt-text-max-lines: 4;
+    --crt-text-max-lines: 5;    /* 5-line cap gives 4 full lines of text plus
+                                   descender headroom so the last line is not
+                                   clipped by the scanline/screen surface */
 
     position: fixed;
     bottom: 175px;
@@ -936,8 +977,8 @@ h2, .section-title {
     z-index: 0;
 }
 
-/* Vertical flex layout so the progress bar stays pinned to the bottom
-   of the CRT screen and the typewriter text fills the 4-line cap above it. */
+    /* Vertical flex layout so the progress bar stays pinned to the bottom
+    of the CRT screen and the typewriter text fills the 5-line cap above it. */
 #speech-bubble {
     display: flex;
     flex-direction: column;

@@ -3,7 +3,7 @@
 ### *Turn Any Documents into Interactive, Personalized Learning Experiences*
 
 **Purpose:** This document organizes the capstone work into MVP tasks, user stories, sprints, stretch goals, and submission requirements.  
-**Last updated:** June 9, 2026
+**Last updated:** June 14, 2026
 
 ---
 
@@ -38,10 +38,10 @@ Build the smallest working version first, then iterate:
 
 ## 2. Public Static Task Board
 
-- [x] Create `task-board/` folder
-- [x] Create `task-board/index.html`
-- [x] Create `task-board/styles.css`
-- [x] Create `task-board/app.js`
+- [x] Create `task-board-v1/` folder (separate public repo: https://github.com/stephen-cpe/task-board-v1/)
+- [x] Create `task-board-v1/index.html`
+- [x] Create `task-board-v1/assets/css/styles.css`
+- [x] Create `task-board-v1/assets/js/app.js` (rendering) + `task-board-v1/assets/js/data.js` (CONFIG + SNAPSHOTS data)
 - [x] Publish via GitHub Pages
 - [x] Add public task board link to `README.md`
 
@@ -106,7 +106,7 @@ Build the smallest working version first, then iterate:
 
 **Tasks:**
 - [x] Create `src/services/lesson_generator.py` (title/content/example/summary slide types, RAG-grounded)
-- [x] Create `src/services/quiz_generator.py` (mcq, true_false, multi_select, fill_blank question types)
+- [x] Create `src/services/quiz_generator.py` (mcq, true_false, multi_select, cloze_dropdown question types)
 - [x] Add `POST /generate-lessons` — loop over modules, sequential generation with loading UI
 - [x] Add `GET /lessons` — module list page with progress bar, gated locks, score badges
 - [x] Add `GET /lessons/<i>` — custom CSS/JS slide deck rendering lesson slides + checkpoints + quiz
@@ -232,7 +232,7 @@ Build the smallest working version first, then iterate:
 - Multi-collection retrieval merges results across all uploaded documents
 - Progress bar shows 9 stages including OCR progress
 - All new features gated behind env vars (OCR_FULL, OCR_FIGURE_DESCRIPTION, AI_MOCK)
-- 172 tests passing
+- 367 tests passing
 - README updated with OCR setup instructions
 
 ---
@@ -249,14 +249,13 @@ Build the smallest working version first, then iterate:
 - [x] Expand mascot animations to 14/16/14 distinct frames per status with transparent background (idle 14@250ms, busy 16@140ms, happy 14@220ms; gear-orbit + chest-chase for busy, rising particles + bounce for happy) + 26 pytest tests
 - [x] Add mascot error/failure state (mascot-error.gif, 14f @ 220ms, X-eyes + drooping bob + dimmed chest + red '!' banner + slow red/orange warning particles, base artwork preserved) + 11 pytest tests + template/JS/CSS wiring
 - [ ] Create proprietary demo document set (non-public, niche knowledge)
-- [ ] Update landing page copy to reflect Document-to-Learning Transformer framing
-- [ ] Integrate Web Speech API or TTS library for lesson narration
-- [ ] Add TTS toggle button on slide deck (disabled by default)
+- [x] Integrate Web Speech API or TTS library for lesson narration
+- [x] Add TTS toggle button on slide deck (disabled by default)
 - [x] Generate PDF from completed lesson slides and quiz results
 - [x] Add PDF export button on completed lesson page (per-lesson granularity)
-- [ ] Remove `extracted_texts` from session after lessons generated
-- [ ] Add difficulty/age-level selector on upload form (Easy/Moderate/Hard)
-- [ ] Inject difficulty level into lesson and quiz generation prompts
+- [x] Remove `extracted_texts` from session after lessons generated
+- [x] Add difficulty/age-level selector on upload form (Easy/Moderate/Hard)
+- [x] Inject difficulty level into lesson and quiz generation prompts
 - [x] Link generated lesson content back to source PDF/document
 - [x] Add citations showing which document a slide references (modal overlay)
 - [ ] Design badge/trophy system for completed modules
@@ -282,37 +281,58 @@ Build the smallest working version first, then iterate:
 - General refinement tasks completed
 - Test suite expanded and fully passing
 
+**Sprint 7 Status (as of 2026-06-14):** Core features complete (TTS narration, difficulty
+selector, session cleanup, cloze_dropdown, checkpoint variety, session resume, humor
+injection, narration scripts). Remaining items (demo documents,
+badge system) are deferred to Sprint 8 as lower-priority polish tasks.
+
 ---
 
 ### Sprint 8: Final Deployment & Capstone Demo 🟡 CURRENT FOCUS
 
-**Goal:** Deploy to free-tier host (Render or Railway), finalize documentation, record demo, and submit capstone.
+**Goal:** Deploy to free-tier host (Render or Railway), finalize documentation, record demo, fix remaining bugs, and submit capstone.
 
 **User Stories:** US-042, US-043, US-044, US-045
 
-**Tasks:**
-- [ ] Deploy web app to Render or Railway free tier
-- [ ] Configure production environment variables
-- [ ] Verify all routes and features work in production
-- [ ] Complete `DESIGN_AND_TESTING.md` with all ADRs and test results
-- [ ] Ensure `AI_AGENT_PROTOCOL.md` is current
-- [ ] Update task board to reflect final sprint status
+**Bug Fixes & Defects (Priority: High — Fix Before Demo):**
+- [x] Fix TTS 404 bug — path_id not propagated to lesson deck for first-time path (Task 11)
+- [ ] General QA pass: run full manual smoke test on all user flows
+- [ ] Fix any additional defects discovered during QA pass
+
+**UX/UI Polish:**
+- [ ] Design and implement badge/trophy system for completed modules (dashboard display)
+- [ ] General UX/UI refinement, visual consistency pass
+- [ ] Review and polish settings page (TTS speaker preview, difficulty preview)
+
+**Demo & Content:**
+- [ ] Create proprietary demo document set (non-public, niche knowledge domain)
 - [ ] Write demo script covering full workflow (goal → upload → results → lessons → quiz → grade → retake)
-- [ ] Record walkthrough of the app
+
+**Deployment:**
+- [ ] Deploy web app to Render or Railway free tier
+- [ ] Configure production environment variables (AI_BACKEND, DATABASE_URL, SECRET_KEY)
+- [ ] Verify all routes and features work in production
+- [ ] Document AI swap path in README (Ollama local → cloud API for deployment)
+
+**Documentation & Submission:**
+- [ ] Complete DESIGN_AND_TESTING.md final review for capstone rubric alignment
+- [ ] Ensure AI_AGENT_PROTOCOL.md reflects final Sprint 8 state
+- [ ] Update task board to reflect final sprint status
 - [ ] Add demo link to README
-- [ ] Triage and fix any remaining production bugs
 - [ ] Run full CI pipeline one final time
 - [ ] Confirm GitHub repo access for grader
 - [ ] Confirm task board access
 - [ ] Final review of all documentation against rubric
+- [ ] Record walkthrough of the app (15–20 minutes)
 - [ ] Submit capstone project
 
 **Sprint 8 Definition of Done:**
-- Deployed app link works
+- Deployed app link works (or AI_MOCK=true demo is documented and functional)
 - Task board link works
 - Repository is documented and accessible
-- Design/testing document is complete
-- Demo recorded and submission-ready
+- DESIGN_AND_TESTING.md is complete and up to date
+- Demo script recorded and submission-ready
+- All Sprint 8 bug fixes and UX polish items resolved
 - Capstone submitted
 
 ---
@@ -330,7 +350,7 @@ Build the smallest working version first, then iterate:
 - [x] Relevance check (strong/partial/weak)
 - [x] Study path generation (modules + effort)
 - [x] Interactive slide-based lesson generation
-- [x] Mixed-type quiz generation (4 question types)
+- [x] Mixed-type quiz generation (4 question types: mcq, true_false, multi_select, cloze_dropdown)
 - [x] Inline comprehension checkpoints
 - [x] Instant quiz grading with feedback
 - [x] Retake with fresh questions
@@ -343,7 +363,7 @@ Build the smallest working version first, then iterate:
 - [x] AI-powered OCR/vision (GLM-OCR local + Qwen3.5 cloud)
 - [x] Content-addressable global deduplication
 - [x] Multi-collection ChromaDB retrieval
-- [x] 202 automated tests
+- [x] 367 automated tests
 - [x] GitHub Actions CI
 - [x] Static task board
 - [x] Design/testing document
@@ -362,6 +382,9 @@ Build the smallest working version first, then iterate:
 - [x] Background progress indicators in mascot speech bubble (Sprint 4)
 - [x] Non-blocking loading indicator on `/process` route (Sprint 4)
 - [x] Responsive slide deck layout [SCOPE: OUT — mobile/responsive layout removed per SRS product owner directive]
+- [x] TTS narration (Edge-TTS, opt-in, AI narration scripts)
+- [x] Difficulty selector (Easy/Normal/Hard)
+- [x] Session save/resume (deck position)
 - [ ] Sample demo documents for consistent presentation
 
 ---
@@ -372,7 +395,7 @@ Build the smallest working version first, then iterate:
 - [x] Retro colors/fonts/cyberpunk theme
 - [x] Better prompt templates
 - [x] Static mascot image with progress-aware speech bubble
-- [x] Simple quiz generation (4 question types)
+- [x] Simple quiz generation (4 question types: mcq, true_false, multi_select, cloze_dropdown)
 - [x] Slide-style lesson viewer (custom CSS/JS)
 - [x] Editable generated summary
 - [x] Saved/loaded generated outputs in session
@@ -393,12 +416,12 @@ Build the smallest working version first, then iterate:
 - [x] Expanded test coverage (Sprint 6)
 - [x] OCR/Vision integration with content deduplication (Sprint 6)
 - [x] Mascot animation frames (Sprint 7)
-- [ ] Proprietary demo document set (Sprint 7)
-- [ ] Difficulty/age-level selector (Easy/Moderate/Hard) (Sprint 7)
-- [ ] TTS narration (opt-in) (Sprint 7)
-- [ ] Session cleanup (Sprint 7)
-- [ ] Source document citations in lessons (Sprint 7)
-- [ ] Badges/trophies for completed lessons (Sprint 7) (stretch)
+- [ ] Proprietary demo document set (Sprint 7 — deferred to Sprint 8)
+- [x] Difficulty/age-level selector (Easy/Moderate/Hard) (Sprint 7)
+- [x] TTS narration (opt-in) (Sprint 7)
+- [x] Session cleanup (Sprint 7)
+- [x] Source document citations in lessons (Sprint 7)
+- [ ] Badges/trophies for completed lessons (Sprint 7 — deferred to Sprint 8)
 - [ ] Deployment, demo recording, and capstone submission (Sprint 8)
 
 ### Post-Capstone
@@ -462,6 +485,21 @@ Build the smallest working version first, then iterate:
 - [x] Parser expansion tests (Sprint 6 — 5 tests for pptx, image, dedup)
 - [x] RAG service expansion tests (Sprint 6 — 4 tests for multi-collection, metadata)
 - [x] Retake route test (quiz regeneration, state reset)
+
+### Added (Sprint 7)
+- [x] TTS service tests (5 tests: voice mapping, manifest, empty text, cleanup)
+- [x] Narration script tests (4 tests: structure, username, fallback, outro)
+- [x] cloze_dropdown validation and grading tests
+- [x] Checkpoint variety tests (mcq/true_false/cloze_dropdown)
+- [x] Humor and difficulty prompt injection tests
+- [x] Route-level TTS flag tests and graceful failure
+- [x] Save-position and audio route tests
+- [x] extracted_texts cleanup test
+
+### To Add (Sprint 8)
+- [ ] Badge/trophy system tests (if implemented)
+- [ ] End-to-end deployment smoke test (production URL responds)
+- [x] TTS 404 regression test (path_id re-resolved after first save) — added in Task 11
 
 ### Manual Demo Tests
 - [ ] Demo document uploads successfully

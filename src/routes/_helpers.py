@@ -5,9 +5,9 @@ Extracts the repeated pattern of "prefer session, fall back to DB"
 used by multiple route handlers.
 """
 import json
-from typing import Any, List
+from typing import Any, List, Optional
 
-from flask import session
+from flask import request, session
 
 from flask_login import current_user
 
@@ -17,6 +17,26 @@ from src.repositories.lesson_repo import (
     get_learning_goal as _db_get_goal,
     get_most_recent_active_path,
 )
+
+
+def _resolve_path_id() -> Optional[str]:
+    """Return the path_id from either the query string or the JSON body.
+
+    The JS client historically sent path_id as a URL query-string parameter
+    (e.g. ``?path_id=<uuid>``) on grade/save-position/audio routes, but the
+    retake route originally sent it in the JSON body. To keep both contracts
+    working, accept it from either location. Query string wins when both
+    are present (it's the explicit URL-level selection).
+
+    Returns:
+        The path_id as a string, or None if neither location provides one.
+    """
+    from_query = request.args.get('path_id', None)
+    if from_query:
+        return from_query
+    body = request.get_json(silent=True) or {}
+    from_body = body.get('path_id', None)
+    return from_body or None
 
 
 def _resolve_goal() -> str:
@@ -29,7 +49,11 @@ def _resolve_goal() -> str:
 
 
 def _resolve_texts() -> List[str]:
-    """Return extracted texts, preferring session, falling back to DB."""
+    """Return extracted texts, preferring session, falling back to DB.
+
+    Returns [] when DB extracted_texts is None — this is the expected
+    post-generation state after session cleanup nullifies the field.
+    """
     texts = session.get('extracted_texts', [])
     if texts:
         return texts

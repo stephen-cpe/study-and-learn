@@ -1,9 +1,9 @@
 # Design and Testing Document
 # Study-and-Learn
 
-**Version:** 0.6
+**Version:** 0.7
 **Status:** Living document
-**Last updated:** June 9, 2026
+**Last updated:** June 14, 2026
 
 ---
 
@@ -33,14 +33,18 @@ flowchart TD
     K -->|No| L{"Generate Interactive Lessons?"}
     L --> M["Lesson Generator: slides JSON + sources"]
     L --> N["Quiz Generator: questions + checkpoints"]
-    M --> O["lessons.html: Module Grid with Gating + Export PDF buttons"]
+    M --> M2["Narration Script Generator (generate_narration_script)"]
+    M2 --> M3["Edge-TTS: MP3 per slide → data/tts/<path>/<module>/"]
+    M3 --> O
     N --> O
-    O --> P["lesson_deck.html: Custom Slide Deck + Sources modal"]
+    O["lessons.html: Module Grid with Gating + Export PDF buttons + difficulty/TTS badges"]
+    O --> P["lesson_deck.html: Custom Slide Deck + Sources modal + difficulty badge + TTS player bar + Exit & Save + session resume"]
     P --> Q["Inline Checkpoints: block advance"]
     P --> R["Final Quiz: 4 question types"]
     Q --> R
-    Q --> R["POST /grade: AJAX, instant feedback"]
-    R --> S["Results Slide: score, pass/fail"]
+    Q --> G2["POST /grade: AJAX, instant feedback"]
+    R --> G2
+    G2 --> S["Results Slide: score, pass/fail"]
     S --> T{"Score >= 80%?"}
     T -->|Yes| U["Unlock Next Module"]
     T -->|No| V["Retake: Regenerate Quiz"]
@@ -61,6 +65,14 @@ Core workflow:
 10. Results page displays structured output: summary, relevance (with partial warning banners or weak feedback card), and study path (if applicable).
 11. User clicks "Generate Interactive Lessons" to produce slide-based lessons (if not gated by weak relevance).
 12. AI generates lesson slides + inline checkpoints + mixed-type quiz per module.
+12a. If TTS is enabled (user opt-in), an AI-generated narration script is produced
+     per module (tutor-voice, personalized intro/outro) and converted to per-slide MP3
+     files via Edge-TTS (Microsoft Neural voices). Audio files are stored under
+     data/tts/<path_id>/<module_index>/ and served via authenticated Flask routes.
+12b. Difficulty level (Easy/Normal/Hard, from user settings at generation time) is
+     injected into all lesson and quiz prompts and snapshotted into each lesson record.
+12c. Deck slide position is auto-saved to DB on every slide change (debounced 500ms),
+     enabling session resume on revisit.
 13. Source citation metadata (chunk provenance) is preserved through retrieval and stored alongside lesson artifacts.
 14. Custom CSS/JS slide deck presents lessons with retro fonts, checkpoint blocking, and a "View Sources" button in the controls bar (opens modal overlay with document excerpts).
 15. Learner completes quiz, receives instant grading with per-question feedback.
@@ -167,7 +179,7 @@ Core workflow:
 
 **Decision:** Each learning goal processed via `POST /process` creates an independent `StudyPath` row (via `create_study_path()`), enabling up to 3 concurrent active study paths per user.
 
-**Reason:** Sprint 5 testing revealed that the initial single-path architecture overwrote previous learning goals when a new one was processed. Multi-path support allows learners to study multiple subjects simultaneously (e.g., "Computer Science" and "Software Engineering") with independent progress tracking per subject. The dashboard renders all active paths as a navigable grid, and all lesson routes accept a `path_id` query parameter to target specific paths. The session-leak bug (user A's session data appearing for user B) was also fixed by clearing session data on login rather than logout. Tradeoffs: ✅ Multi-subject study, independent progress, cleaner UX • ❌ More DB rows, path-aware routing complexity.
+**Reason:** Sprint 5 testing revealed that the initial single-path architecture overwrote previous learning goals when a new one was processed. Multi-path support allows learners to study multiple subjects simultaneously with independent progress tracking per subject. The dashboard renders all active paths as a navigable grid, and all lesson routes accept a `path_id` query parameter to target specific paths. The session-leak bug (user A's session data appearing for user B) was also fixed by clearing session data on login rather than logout. Tradeoffs: ✅ Multi-subject study, independent progress, cleaner UX • ❌ More DB rows, path-aware routing complexity.
 
 ### ADR-016: Admin Panel, Access Control, Password Reset, and Error Handlers
 
@@ -207,9 +219,62 @@ Core workflow:
 
 ### ADR-022: Per-Lesson PDF Export via fpdf2
 
-**Decision:** Implement per-lesson PDF export (`GET /lessons/<i>/export?path_id=...`) using the fpdf2 library (pure Python, no system dependencies) rather than WeasyPrint (requires GTK system libraries, unavailable on Windows). Each PDF contains: lesson slides, inline checkpoints with correct answers, quiz questions with answers and explanations, and source materials with filenames and chunk text. Export is available for any passed lesson (score ≥ 80%) regardless of the parent StudyPath status (active, completed, or cancelled). All AI-generated/user-provided text passes through a `_clean()` sanitizer (Unicode NFKD normalization + explicit character mapping for en-dash, em-dash, smart quotes, bullets, ellipsis, non-breaking space) to ensure Latin-1 compatibility with fpdf2's built-in Helvetica font.
+**Decision:** Implement per-lesson PDF export (`GET /lessons/<i>/export?path_id=...`) in `src/routes/dashboard.py` using the fpdf2 library (pure Python, no system dependencies) rather than WeasyPrint (requires GTK system libraries, unavailable on Windows). Each PDF contains: lesson slides, inline checkpoints with correct answers, quiz questions with answers and explanations, and source materials with filenames and chunk text. Export is available for any passed lesson (score ≥ 80%) regardless of the parent StudyPath status (active, completed, or cancelled). All AI-generated/user-provided text passes through a `_clean()` sanitizer (Unicode NFKD normalization + explicit character mapping for en-dash, em-dash, smart quotes, bullets, ellipsis, non-breaking space) — also defined in `dashboard.py` — to ensure Latin-1 compatibility with fpdf2's built-in Helvetica font.
 
 **Reason:** WeasyPrint was attempted first but failed at import time due to missing GTK/pango system libraries on Windows (`libgobject-2.0-0` not found). fpdf2 is already in the project's virtual environment (was a transitive dependency of markdown_pdf) and requires only the Python standard library. Per-lesson granularity (not per-path) allows learners to export individual completed modules even if they abandon the overall study path — analogous to keeping a textbook from a course you didn't finish. Tradeoffs: ✅ Pure Python, no system deps, per-lesson granularity, Latin-1 sanitization • ❌ Limited to built-in Helvetica font (no Unicode), text wrapping is manual, no header/footer page numbering, output is single-page-per-lesson (not multi-page)
+
+### ADR-023: Edge-TTS for Opt-In Audio Narration
+
+**Decision:** Use the `edge-tts` Python library (Microsoft Edge Neural voices) for
+opt-in TTS narration. Generate one MP3 per slide (intro: slide_index=-1, content slides:
+0..N-1, outro: slide_index=N) at lesson-generation time. Store under
+data/tts/<path_id>/<module_index>/. Serve via authenticated Flask routes. Delete on
+StudyPath cancel/complete/delete.
+
+**Reason:** edge-tts is zero-cost, requires no API key, produces high-quality Neural voices
+(Ava/Emma/Ryan/Andrew), and runs as a pure Python async library. Pre-generating audio at
+lesson creation time avoids latency during playback. Per-slide granularity enables the JS
+player to sync audio to the current slide via the deckSlideChanged custom event.
+
+**Important constraint:** Custom SSML has been blocked by Microsoft since edge-tts v5.0.0.
+Only plain text may be passed to edge_tts.Communicate(). The narration script is therefore
+generated as natural prose by a dedicated AI call (generate_narration_script()) rather than
+being assembled from raw slide bullets — this produces tutor-voice narration rather than
+robotic bullet reading.
+
+**Tradeoffs:** ✅ Zero cost, Neural quality, no API key, pre-generated (no playback lag),
+personalized tutor voice ✦ ❌ Requires Microsoft's online service (no offline mode),
+speaker change requires retake (audio is snapshotted at generation time).
+
+### ADR-024: Difficulty-Aware Content Generation with Prompt Injection
+
+**Decision:** Inject a `DIFFICULTY_INSTRUCTIONS` profile (Easy/Normal/Hard) into lesson,
+quiz, and checkpoint prompts at generation time. Difficulty is read from
+`current_user.lesson_difficulty` at generation time and snapshotted into each lesson dict
+as `lesson['difficulty']`. It is never re-read from user settings at deck/grade time.
+
+**Reason:** Snapshotting prevents retroactive changes (changing difficulty in Settings
+after generation does not alter existing lessons). Age-profile instructions (vocabulary,
+sentence complexity, jargon handling) produce measurably different output quality for
+different age groups compared to a single generic prompt.
+
+**Tradeoffs:** ✅ Deterministic per-lesson difficulty, profile-based prompts, difficulty
+badge visible on lessons list ✦ ❌ Requires retake/regeneration to change difficulty.
+
+### ADR-025: Session Save/Resume via content_data JSON (No Schema Change)
+
+**Decision:** Store the current deck slide index as `lesson['deck_position']` inside the
+existing `StudyPath.content_data` JSON blob. A debounced `POST /lessons/<i>/save-position`
+route is called on every slide advance (500ms debounce). On page load, deck-engine.js reads
+`data-resume-slide` from the container element and seeks to that slide. A "Start Over"
+button resets position to 0. Position is never saved on completed lessons.
+
+**Reason:** Adding a new DB column to `LessonProgress` for slide position was rejected
+because `content_data` already carries per-lesson JSON state. No migration needed. The
+save-position call is fire-and-forget (silent failure) so it never blocks navigation.
+
+**Tradeoffs:** ✅ No schema change, no migration, no new dependencies, auto-saves silently
+✦ ❌ content_data blob grows by one small int per lesson per save event (negligible).
 
 ---
 
@@ -218,6 +283,18 @@ Core workflow:
 - Service Layer Pattern: All AI, parsing, and RAG logic isolated in `src/services/`. Enables independent unit testing, easy mocking, and future provider swaps.
 - Repository/DAO Pattern: ChromaDB vector storage abstracted behind `vector_store.py`. Decouples ingestion from retrieval logic.
 - Mock Object Pattern: `AI_MOCK=true` and in-memory ChromaDB replace live LLM/vector calls in CI. Guarantees deterministic, zero-cost, GPU-free test execution.
+
+### Route Ownership (`src/routes/`)
+
+The single `main` blueprint is split across five route modules. URL paths do not necessarily map 1:1 to the file that owns them — this split is a code-organization decision, not a URL hierarchy.
+
+| File | Owns |
+|---|---|
+| `auth.py` | `/signup`, `/login`, `/logout`, `/reset-password`, `/reset` (token consumption), `/settings` |
+| `processing.py` | `/` (unified form), `/process` (POST upload+goal), `/results`, `/progress` (long-running progress polling) |
+| `lessons.py` | `/generate-lessons` (POST), `/lessons` (module grid), `/lessons/<i>` (deck), `/lessons/<i>/grade` (POST), `/lessons/<i>/retake` (POST), `/lessons/<i>/save-position` (POST), `/lessons/<i>/audio/<idx>` (GET), `/lessons/generation-status` (GET), `/lessons/<i>/audio/manifest` (GET) |
+| `dashboard.py` | `/dashboard`, `/study-path/<id>/complete` (POST), `/study-path/<id>/cancel` (POST), `/study-path/<id>/delete` (POST), `/lessons/<i>/export` (GET, PDF), `/reset` |
+| `admin.py` | `/admin`, `/admin/toggle/<user_id>`, `/admin/reset-password/<user_id>` (POST), `/seed-demo` |
 
 ---
 
@@ -241,11 +318,15 @@ Core workflow:
     - Lesson generator: mock, empty inputs, retriever, slide validation, fallback behavior,
     - Quiz generator: mock, empty inputs, retriever, inline checkpoint, question validation, type mix distribution, fallback quiz structure,
     - Slide validation (only known types accepted),
-    - Question validation (all 4 question types: mcq, true_false, multi_select, fill_blank),
+    - Question validation (all 4 question types: mcq, true_false, multi_select, cloze_dropdown; fill_blank is deprecated legacy),
     - Fallback lesson and quiz generation for error resilience,
     - Vision parser: OCR, file hashing, content registry, dedup, feature gates, concurrent handling (20 tests),
     - Parser expansion: pptx extraction, image files, dedup verification (5 tests),
-    - RAG expansion: multi-collection retrieval, metadata propagation, scores (4 tests).
+    - RAG expansion: multi-collection retrieval, metadata propagation, scores (4 tests),
+    - TTS service: voice mapping, manifest generation, empty text skipping, directory cleanup (5 tests),
+    - Lesson generator: narration script structure, intro username, AI fallback, last-module outro (4 tests),
+    - Quiz generator: cloze_dropdown validation and grading, checkpoint type variety (mcq/true_false/cloze_dropdown), humor instructions in prompt, difficulty injection in prompt (8 tests),
+    - Routes: TTS enabled/disabled flags in lesson dict, TTS failure graceful degradation, audio 404 when disabled, save-position stores deck_position, completed lesson blocks overwrite, extracted_texts nullified after generation, difficulty snapshotted from user (8 tests).
 
 ### Integration Tests
 
@@ -260,7 +341,10 @@ Integration tests cover routes and workflow behavior:
 - mocked generate-lessons flow: session data → lesson + quiz generation → redirect,
 - lesson deck route with pre-populated session lessons returns 200.
 
-Current test suite: **202 tests across 23 test modules covering core MVP, auth, models, dashboard, lesson repository, admin access, multi-path workflows, OCR/vision pipeline, multi-collection retrieval, access control, ChromaDB corruption recovery, reset path preservation, relevance gating (weak/partial matching), source citation metadata propagation, dashboard lifecycle (complete/delete), and retake quiz regeneration — 0 failures**.
+Current test suite: 367 tests passing (Sprint 8 active — suite rebuilt from Tasks 1–11).
+Sprint 7 test additions cover: TTS service (5), narration script (4), cloze_dropdown grading
+(3), checkpoint variety (3), humor/difficulty prompt injection (5), route-level TTS flags (3),
+save-position (2), audio routes (2), difficulty snapshotting (1), extracted_texts cleanup (1).
 
 ### Smoke Tests
 
@@ -352,3 +436,4 @@ Recommendation: Deploy to Render/Railway free tier with `AI_MOCK=true` for gradi
 | PostgreSQL privilege issues on live DB | Blocked migrations | Document `init_db.sql` workaround (includes DROP IF EXISTS + full schema + seed accounts) and `GRANT CREATE` procedure |
 | Session leakage between users | User A sees User B's data after logout/login swap | Fixed in Sprint 5 bug-fix rounds: clear session-scoped keys on login via `session.pop()` |
 | OCR model unavailable (GLM-OCR not pulled) | OCR pipeline fails for scanned PDFs | Graceful fallback to traditional text extraction; clear warning logged |
+| Edge-TTS online service dependency | TTS narration unavailable if Microsoft changes the service | TTS is opt-in and gracefully degrades (tts_enabled set to False on failure); lessons remain fully functional without audio |

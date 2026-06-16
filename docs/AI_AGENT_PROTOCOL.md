@@ -2,8 +2,8 @@
 ## Study-and-Learn Capstone Project
 
 ## Project Brief (Read First)
-- **App:** Study-and-Learn — a Flask web app where a learner uploads study documents and gets an AI-generated summary, relevance check (with weak-match gating: blocks study path + lesson generation), study path, interactive slide-based lessons, mixed-type quizzes, per-module grading with gated progression, source citation system (ChromaDB metadata → deck modal), per-lesson PDF export (fpdf2), and dashboard with Active/Completed/Cancelled tabs (Mark Complete, Delete).
-- **Stack:** Python 3.13, Flask, Flask-Session (cachelib), Bootstrap 5, PostgreSQL, pytest, LangChain, ChromaDB, Ollama (configurable chat + embedding models), fpdf2 (PDF export), pdf2image + Poppler (PDF rendering), Pillow (image handling), python-pptx (PPTX extraction), GLM-OCR (local OCR, 0.9B), Qwen3.5:397b-cloud (cloud figure descriptions, migrated from deprecated Qwen3-VL:235b-cloud), GitHub Actions (CI)
+- **App:** Study-and-Learn — a Flask web app where a learner uploads study documents and gets an AI-generated summary, relevance check (with weak-match gating: blocks study path + lesson generation), study path, interactive slide-based lessons with TTS narration (Edge-TTS, opt-in), mixed-type quizzes (mcq, true_false, multi_select, cloze_dropdown), inline comprehension checkpoints (mcq/true_false/cloze_dropdown variety), per-module grading with gated progression, difficulty-aware content generation (Easy/Normal/Hard), session save/resume (deck position auto-saved), source citation system (ChromaDB metadata → deck modal), per-lesson PDF export (fpdf2), and dashboard with Active/Completed/Cancelled tabs (Mark Complete, Delete).
+- **Stack:** Python 3.13, Flask, Flask-Session (cachelib), Bootstrap 5, PostgreSQL, pytest, LangChain, ChromaDB, Ollama (configurable chat + embedding models), fpdf2 (PDF export), pdf2image + Poppler (PDF rendering), Pillow (image handling), python-pptx (PPTX extraction), GLM-OCR (local OCR, 0.9B), Qwen3.5:397b-cloud (cloud figure descriptions, migrated from deprecated Qwen3-VL:235b-cloud), edge-tts (TTS narration, Microsoft Neural voices), GitHub Actions (CI)
 - **Structure:** See SRS.md for requirements. See TODO.md for sprint tasks. See DESIGN_AND_TESTING.md for ADRs and architecture. See docs/STATUS.md for current state.
 - **Repo root:** study-and-learn/
 - **Key rules:** No chat UI. Forms and result pages only. Custom CSS/JS slide deck (no reveal.js). Retro cyberpunk theme with Retrograde Bold and BoldPixels fonts. PostgreSQL-only database. Flask-Session (cachelib FileSystemCache) for transient form data; DB-backed lesson repository (PostgreSQL StudyPath + LessonProgress + extracted_texts + file_names) for lesson/progress persistence. Dashboard tabs (Active/Completed/Cancelled) with lifecycle: active → (complete | cancel) → delete. Source citations via retriever metadata propagation → modal overlay in slide deck. Per-lesson PDF export via GET /lessons/<i>/export available for any passed lesson regardless of parent path status.
@@ -32,8 +32,8 @@ You follow Spec-Driven Development strictly.
    - Never mock production AI endpoints without a `# TODO: replace mock` comment
    - Never hardcode secrets — use environment variables
    - Do not run git commands — suggest commit message only
-   - Limit each task to one logical unit of work; up to 6 files may be touched without prior approval
-   - If you need to touch more than 6 files, ask first
+   - Limit each task to one logical unit of work; up to 10 files may be touched without prior approval
+   - If you need to touch more than 10 files, ask first
    - Always read AI model from `OLLAMA_MODEL` env var (default: `qwen3:0.6b`); never hardcode model names
    - Always use `OLLAMA_EMBEDDING_MODEL` env var for vector_store embeddings; never hardcode
    - Use `AI_BACKEND` env var to control local vs cloud AI provider
@@ -56,7 +56,25 @@ You follow Spec-Driven Development strictly.
    - Delete route (`POST /study-path/<id>/delete`) must only allow completed or cancelled status; active paths cannot be deleted
    - Per-lesson PDF export (`GET /lessons/<i>/export`) available for any passed lesson regardless of parent StudyPath status
    - All AI/user text in PDF export must pass through `_clean()` (Unicode NFKD normalization + explicit char mapping) for Latin-1 compatibility
-   - StudyPath status lifecycle: active → `complete_study_path()` when all modules passed → `cancel_study_path()` anytime → `delete_study_path()` only on completed/cancelled
+    - StudyPath status lifecycle: active → `complete_study_path()` when all modules passed → `cancel_study_path()` anytime → `delete_study_path()` only on completed/cancelled
+    - TTS audio files are generated at lesson-generation time and stored under
+      data/tts/<path_id>/<module_index>/. They are deleted on cancel/complete/delete.
+      Never generate TTS during a live request — always at generation time only.
+    - Custom SSML is NOT supported by edge-tts >= 5.0.0. Always pass plain text to
+      edge_tts.Communicate(). Never attempt to construct SSML strings.
+    - Quiz question types are: mcq, true_false, multi_select, cloze_dropdown.
+      fill_blank is a deprecated legacy type — do not generate new fill_blank questions.
+      Backward-compat grading for old fill_blank records must be preserved in grader.py.
+    - Checkpoint types are: mcq, true_false, cloze_dropdown (randomly weighted 0.5/0.3/0.2).
+    - Difficulty level (Easy/Normal/Hard) is snapshotted into each lesson dict at generation
+      time as lesson['difficulty']. It is never read from user settings at deck/grade time.
+    - Narration scripts are generated by generate_narration_script() in lesson_generator.py
+      and stored as lesson['lesson']['narration'] (list of {slide_index, text} dicts).
+      slide_index -1 = intro, len(slides) = outro.
+    - Deck position (slide resume) is stored as lesson['deck_position'] in content_data JSON.
+      It is auto-saved via POST /lessons/<i>/save-position on every slide advance (debounced 500ms).
+    - path_id_val must be re-resolved after save_lessons() if it was None before the call
+      (first-time path creation). Never use a None path_id for TTS generation or redirect URLs.
 
 ## State Tracking
 After each task, update `docs/STATUS.md` using EXACTLY this format:

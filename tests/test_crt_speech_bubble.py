@@ -94,32 +94,37 @@ def test_speech_bubble_has_inner_text_margin():
     assert any(n > 0 for n in nums), 'padding must be non-zero on at least one side'
 
 
-def test_speech_bubble_caps_text_at_4_lines():
-    """User requirement: the text area must visually cap at 4 lines so the
-    progress bar at the bottom is never pushed off the CRT screen."""
+def test_speech_bubble_caps_text_at_5_lines():
+    """User requirement: the text area must visually cap at 5 lines so the
+    progress bar at the bottom is never pushed off the CRT screen.
+
+    The 5-line CSS cap provides 4 full lines of text plus descender
+    headroom, fixing the clipping that previously cut off the bottom
+    halves of the last line in a 4-line message.
+    """
     css = _read(RETRO_CSS)
     m = re.search(r'#bubble-text\s*\{[^}]*\}', css, re.S)
     assert m
     block = m.group(0)
     assert 'max-height' in block, '#bubble-text must cap its height'
-    assert 'overflow: hidden' in block, '#bubble-text must clip overflow at 4 lines'
+    assert 'overflow: hidden' in block, '#bubble-text must clip overflow'
     # The cap is expressed in line-height units. Accept any of:
-    #   4 * line-height, 4em, 5.6em, 4lh, calc(... * 4), calc(... * N), etc.
+    #   5 * line-height, 5em, 7em, 5lh, 72px, calc(... * 5), etc.
     cap_m = re.search(r'max-height:\s*([^;]+);', block)
     assert cap_m
     cap = cap_m.group(1)
-    four_line_patterns = [
-        r'4\s*\*\s*var\(--crt-text-line\)',
-        r'4em',
-        r'4lh',
-        r'5\.6em',
-        r'57\.6px',
-        r'calc\(var\(--crt-text-line\)\s*\*\s*4',
-        r'calc\(var\(--crt-text-line\)\s*\*\s*var\(--crt-text-max-lines\)\)',
-        r'4\b.*\*',
+    five_line_patterns = [
+        r'5\s*\*\s*var\(--crt-text-line\)',
+        r'5em',
+        r'5lh',
+        r'7em',
+        r'72px',
+        r'calc\(var\(--crt-text-line\)\s*\*\s*5',
+        r'calc\(var\(--crt-text-line\)\s*\*\s*var\(--crt-text-max-lines\)',
+        r'5\b.*\*',
     ]
-    assert any(re.search(p, cap) for p in four_line_patterns), (
-        f'max-height ({cap}) must represent a 4-line cap'
+    assert any(re.search(p, cap) for p in five_line_patterns), (
+        f'max-height ({cap}) must represent a 5-line cap'
     )
 
 

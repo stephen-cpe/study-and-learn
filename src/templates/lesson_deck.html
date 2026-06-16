@@ -9,17 +9,49 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/deck-components.css') }}">
 </head>
 <body>
-    <div class="deck-container" data-module-index="{{ module_index }}" data-path-id="{{ path_id or '' }}">
+    <div class="deck-container" data-module-index="{{ module_index }}" data-path-id="{{ path_id or '' }}" data-resume-slide="{{ lesson.get('deck_position', 0) }}" data-tts-enabled="{{ 'true' if lesson.get('tts_enabled') else 'false' }}" data-tts-speaker="{{ lesson.get('tts_speaker', 'Ava') or 'Ava' }}">
+        <a id="save-exit-btn"
+           href="{{ url_for('main.lessons', path_id=path_id) }}"
+           class="btn-exit-deck"
+           title="Your position is saved automatically. Click to exit.">
+          ✕ Exit &amp; Save
+        </a>
+        {% if lesson.get('deck_position', 0) > 0 and not lesson.get('completed') %}
+        <div class="deck-resume-hint">
+            Resuming from slide {{ lesson.get('deck_position', 0) + 1 }}
+            <button id="restart-deck-btn" class="btn-restart-deck"
+                    title="Restart from the beginning"
+                    data-save-url="{{ url_for('main.save_lesson_position', module_index=module_index, path_id=path_id) }}">↺ Start Over</button>
+        </div>
+        {% endif %}
+        <div id="tts-controls" class="tts-controls"
+             style="{{ '' if lesson.get('tts_enabled') else 'display:none' }}">
+            <button id="tts-toggle-btn" class="tts-toggle" title="Toggle narration">
+                🔊 <span id="tts-label">Narration On</span>
+            </button>
+            <select id="tts-speaker-select" class="tts-speaker-select"
+                    title="Speaker change applies on next retake">
+                {% for sp in ['Ava', 'Emma', 'Ryan', 'Andrew'] %}
+                <option value="{{ sp }}" {{ 'selected' if lesson.get('tts_speaker') == sp }}>
+                    {{ sp }}
+                </option>
+                {% endfor %}
+            </select>
+            <span class="tts-speaker-note">Change speaker on retake</span>
+            <audio id="tts-player" preload="none"></audio>
+        </div>
         <div class="slides-wrapper">
 
-            {% set slides = lesson.lesson.slides if lesson.lesson and lesson.lesson.slides else [] %}
-            {% set checkpoints = lesson.checkpoints if lesson.checkpoints else {} %}
+            {% set deck_layout = lesson.lesson.deck_layout if lesson.lesson and lesson.lesson.deck_layout else [] %}
             {% set quiz_questions = lesson.quiz.questions if lesson.quiz and lesson.quiz.questions else [] %}
 
-            {% for slide in slides %}
-            {% set si = loop.index0 %}
+            {% for entry in deck_layout %}
+            {% set di = entry.deck_index %}
+            {% if entry.type == 'content' %}
+            {% set slide = entry.slide %}
+            {% set ci = entry.content_index %}
             {% if slide.type == 'title' %}
-            <section class="slide slide-title" data-index="{{ si }}">
+            <section class="slide slide-title" data-deck-index="{{ di }}" data-content-index="{{ ci }}">
                 <div class="slide-content-inner">
                     <h2>{{ slide.title }}</h2>
                     {% if slide.subtitle %}
@@ -29,7 +61,7 @@
             </section>
 
             {% elif slide.type == 'content' %}
-            <section class="slide slide-content" data-index="{{ si }}">
+            <section class="slide slide-content" data-deck-index="{{ di }}" data-content-index="{{ ci }}">
                 <div class="slide-content-inner">
                     <h3>{{ slide.heading }}</h3>
                     {% if slide.bullets %}
@@ -46,7 +78,7 @@
             </section>
 
             {% elif slide.type == 'example' %}
-            <section class="slide slide-example" data-index="{{ si }}">
+            <section class="slide slide-example" data-deck-index="{{ di }}" data-content-index="{{ ci }}">
                 <div class="slide-content-inner">
                     <h3>{{ slide.heading }}</h3>
                     <div class="example-body">{{ slide.body }}</div>
@@ -54,7 +86,7 @@
             </section>
 
             {% elif slide.type == 'summary' %}
-            <section class="slide slide-summary" data-index="{{ si }}">
+            <section class="slide slide-summary" data-deck-index="{{ di }}" data-content-index="{{ ci }}">
                 <div class="slide-content-inner">
                     <h2>Module Summary</h2>
                     {% if slide.bullets %}
@@ -68,10 +100,10 @@
             </section>
             {% endif %}
 
-            {% if checkpoints[si|string] %}
-            {% set cp = checkpoints[si|string] %}
+            {% elif entry.type == 'checkpoint' %}
+            {% set cp = entry.checkpoint %}
             {% set cp_type = cp.type if cp.type else 'mcq' %}
-            <section class="slide scrollable checkpoint-slide" data-checkpoint="{{ si }}" data-state="checkpoint-blocked" data-index="{{ si }}" data-cp-type="{{ cp_type }}"
+            <section class="slide scrollable checkpoint-slide" data-checkpoint="{{ entry.content_index }}" data-state="checkpoint-blocked" data-deck-index="{{ di }}" data-cp-type="{{ cp_type }}"
                      {% if cp_type == 'mcq' or cp_type == 'cloze_dropdown' %}data-answer="{{ cp.answer_index }}"{% endif %}
                      {% if cp_type == 'true_false' %}data-answer="{{ cp.answer|lower }}"{% endif %}>
                 <div class="slide-content-inner scroll-container">
@@ -96,17 +128,15 @@
                             <option value="{{ loop.index0 }}">{{ opt }}</option>
                             {% endfor %}
                         </select>
-                        <button class="checkpoint-check-btn" style="margin-top: 0.5rem;">Check</button>
                     </div>
                     {% endif %}
                     <div class="checkpoint-feedback"></div>
                     <button class="btn-submit-quiz" style="margin-top: 1rem; display: none;">Continue</button>
                 </div>
             </section>
-            {% endif %}
-            {% endfor %}
 
-            <section class="slide scrollable quiz-slide" data-state="quiz-blocked" data-index="{{ slides|length }}">
+            {% elif entry.type == 'quiz' %}
+            <section class="slide scrollable quiz-slide" data-state="quiz-blocked" data-deck-index="{{ di }}">
                 <div class="slide-content-inner scroll-container">
                     <h3>Final Quiz</h3>
                     <p class="quiz-instructions">Answer all questions and submit for grading</p>
@@ -157,7 +187,8 @@
                 </div>
             </section>
 
-            <section class="slide results-slide" data-state="results-slide" data-index="{{ slides|length + 1 }}">
+            {% elif entry.type == 'results' %}
+            <section class="slide results-slide" data-state="results-slide" data-deck-index="{{ di }}">
                 <div class="slide-content-inner">
                     <h2>Your Results</h2>
                     <div class="score-circle" id="score-circle">--</div>
@@ -171,6 +202,8 @@
                     </div>
                 </div>
             </section>
+            {% endif %}
+            {% endfor %}
 
             {% set sources = lesson.sources if lesson.sources else [] %}
         </div>
@@ -189,6 +222,7 @@
         {% endif %}
 
         <div class="deck-progress">Module {{ module_index + 1 }} of {{ total_modules }}</div>
+        <span class="deck-difficulty-label">{{ lesson.get('difficulty', 'Normal') }} mode</span>
         <div class="deck-progress-bar"></div>
     </div>
 

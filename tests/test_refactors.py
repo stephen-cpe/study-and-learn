@@ -4,9 +4,7 @@ Tests for Sprint 5 Phase 0.2 refactors.
 Covers:
 - lesson_orchestrator.build_module_artifacts
 - grader._grade_single_question and _get_correct_answer
-- repositories.session_repo get_lessons / save_lessons round-trip
 """
-import flask
 import pytest
 import tempfile
 from unittest.mock import patch
@@ -146,27 +144,3 @@ def test_normalize_answer():
     assert normalize_answer("  Hello ") == "hello"
     assert normalize_answer(None) == ""
     assert normalize_answer(42) == "42"
-
-
-# ──────────────────────────────────────────────────────────────
-# session_repo
-# ──────────────────────────────────────────────────────────────
-
-import flask
-
-def test_session_repo_roundtrip(client):
-    """Exercise get_lessons / save_lessons inside a request context."""
-    from src.repositories.session_repo import save_lessons, get_lessons
-    with client.application.test_request_context():
-        flask.session["lessons"] = [{"title": "A"}]
-        assert get_lessons() == [{"title": "A"}]
-        save_lessons([{"title": "B"}, {"title": "C"}])
-        assert get_lessons() == [{"title": "B"}, {"title": "C"}]
-
-
-def test_session_repo_defaults_to_empty_list(client):
-    from src.repositories.session_repo import get_lessons
-    with client.application.test_request_context():
-        if "lessons" in flask.session:
-            del flask.session["lessons"]
-        assert get_lessons() == []

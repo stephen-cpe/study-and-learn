@@ -236,6 +236,17 @@ html, body {
     opacity: 0.5;
 }
 
+.deck-difficulty-label {
+    position: fixed;
+    bottom: 0.5em;
+    right: 0.5em;
+    z-index: 100;
+    color: var(--deck-accent);
+    font-size: 0.45em;
+    opacity: 0.5;
+    font-family: "BoldPixels", sans-serif;
+}
+
 .deck-progress-bar {
     position: fixed;
     bottom: 0;
@@ -244,6 +255,57 @@ html, body {
     background: var(--deck-accent);
     transition: width 0.35s ease;
     z-index: 101;
+}
+
+.btn-exit-deck {
+    position: fixed;
+    top: 0.5em;
+    right: 0.5em;
+    z-index: 200;
+    color: var(--deck-muted);
+    font-size: 0.5em;
+    font-family: "BoldPixels", sans-serif;
+    text-decoration: none;
+    padding: 0.3em 0.6em;
+    border: 1px solid var(--deck-muted);
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.3);
+    transition: color 0.2s, border-color 0.2s;
+}
+.btn-exit-deck:hover {
+    color: var(--deck-danger);
+    border-color: var(--deck-danger);
+}
+
+.deck-resume-hint {
+    position: fixed;
+    top: 0.5em;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 200;
+    color: var(--deck-accent);
+    font-size: 0.45em;
+    font-family: "BoldPixels", sans-serif;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 0.3em 0.8em;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+.btn-restart-deck {
+    background: none;
+    border: 1px solid var(--deck-accent);
+    color: var(--deck-accent);
+    font-size: 0.9em;
+    font-family: "BoldPixels", sans-serif;
+    cursor: pointer;
+    padding: 0.15em 0.4em;
+    border-radius: 3px;
+    transition: background 0.2s;
+}
+.btn-restart-deck:hover {
+    background: rgba(0, 180, 216, 0.15);
 }
 
 /* ── Responsive ── */

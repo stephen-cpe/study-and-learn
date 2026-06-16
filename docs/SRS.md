@@ -1,12 +1,12 @@
 # Software Requirements Specification (SRS)
 # Study-and-Learn
 
-**Version:** 1.3  
+**Version:** 1.4  
 **Project type:** AI-assisted learning web application  
 **Capstone track:** Software system / AI system  
 **Repository name:** `study-and-learn`  
 **Primary development approach:** Spec-Driven Development with AI tooling support  
-**Last updated:** June 9, 2026
+**Last updated:** June 14, 2026
 
 ---
 
@@ -41,12 +41,13 @@ The MVP is a web application that allows a learner or admin user to:
 3. extract text from those documents using both traditional parsers and AI-powered OCR for images and scanned content,
 4. generate an AI-assisted summary, relevance check, and recommended study path,
 5. generate interactive slide-based lessons with inline comprehension checkpoints,
-6. generate mixed-type quizzes (multiple choice, true/false, multi-select, fill-in-the-blank) per module,
+6. generate mixed-type quizzes (multiple choice, true/false, multi-select, cloze-dropdown) per module,
 7. take quizzes and receive instant grading with per-question feedback,
 8. retake lessons with freshly regenerated questions to avoid memorization,
 9. progress through gated modules (must pass module N to unlock N+1),
 10. view all results in a retro-themed guided web interface,
-11. check if learner wants to do the lessons again until they are satisfied with their progress
+11. receive personalized AI-narrated audio lessons via opt-in TTS (Edge-TTS Neural voices),
+12. generate lessons at a chosen difficulty level (Easy/Normal/Hard) with age-appropriate content complexity.
 
 The MVP will **not** use a chat interface. The user interacts primarily through forms, buttons, and structured result pages.
 
@@ -59,9 +60,9 @@ Primary users:
 - capstone evaluators reviewing the software artifact.
 
 Initial target content areas:
-- Computer Science,
-- Mathematics,
-- Fundamental Physics, if time allows.
+- Company Onboarding Documents,
+- Company Proprietary Training Manuals,
+- Other organization-specific, instructor-specific, or otherwise non-public knowledge sources that public foundation models were not trained on.
 
 ### 1.5 Definitions
 
@@ -311,16 +312,18 @@ study-and-learn/
 | ID | Requirement | Priority |
 |---|---|---|
 | FR-034 | The system shall generate structured slide-based lesson content for each module in the study path. | Must |
-| FR-035 | The system shall generate mixed-type quizzes per module supporting mcq, true_false, multi_select, and fill_blank question types. | Must |
+| FR-035 | The system shall generate mixed-type quizzes per module supporting mcq, true_false, multi_select, and cloze_dropdown question types. | Must |
 | FR-036 | The system shall insert inline comprehension checkpoints at regular intervals within lesson slides. | Must |
 | FR-037 | The system shall grade quiz answers instantly and return per-question correct/incorrect feedback with explanations. | Must |
 | FR-038 | The system shall regenerate fresh questions on lesson retake to prevent answer memorization. | Must |
 | FR-039 | The system shall gate module progression so the learner must pass module N before accessing module N+1. | Must |
 | FR-040 | The system shall enforce an 80% pass threshold for module completion with a pass/fail verdict. | Must |
-| FR-041 | The system could support a difficulty level selector (Easy/Moderate/Hard) mapped to age-appropriate content complexity. | Could |
+| FR-041 | The system shall support a difficulty level selector (Easy/Normal/Hard) that maps to age-appropriate content complexity. Difficulty is snapshotted at generation time. | Must — Implemented |
 | FR-042 | The system shall present lessons via a custom CSS/JS slide-deck engine styled with retro fonts and cyberpunk visuals. | Must |
 | FR-043 | The system shall allow the learner to view source document text excerpts that informed the generated lesson content via a modal overlay in the slide deck. | Must |
 | FR-044 | The system shall allow the learner to export a passed lesson (≥80% score) to PDF containing all slides, checkpoints with answers, quiz questions with answers and explanations, and source materials. | Must |
+| FR-045 | The system shall support opt-in TTS audio narration for lessons using Edge-TTS Neural voices (Ava/Emma/Ryan/Andrew). Audio is generated at lesson-creation time, stored per-slide, and played synchronized to deck navigation. TTS is snapshotted at generation time; disabling TTS after generation does not affect already-generated lessons. | Must — Implemented |
+| FR-046 | The system shall save the learner's current slide position automatically (debounced 500ms) and restore it on revisit, with an explicit "Exit & Save" button and a "Start Over" option. | Must — Implemented |
 
 ### 5.9 Admin / Editing Features
 
@@ -328,7 +331,7 @@ study-and-learn/
 |---|---|---|
 | FR-029 | The system may allow an admin to edit generated lesson text. | Could |
 | FR-030 | The system may export or display generated lesson content as slides. | Could |
-| FR-031 | The system may support AI-generated narration or subtitles. | Won't for MVP |
+| FR-031 | The system may support AI-generated narration or subtitles. | Implemented — Edge-TTS opt-in narration with AI-generated tutor-voice scripts. See FR-045. |
 
 ---
 
@@ -418,7 +421,7 @@ study-and-learn/
 | US-012 | As a learner, I want to generate interactive lessons from my study path so I can learn in a structured way. | "Generate Interactive Lessons" button triggers slide + quiz generation; loading indicator shown |
 | US-013 | As a learner, I want lessons presented as slides with retro fonts and visual styling. | Custom slide-deck renders title/content/example/summary slide types with Retrograde Bold and BoldPixels fonts |
 | US-014 | As a learner, I want comprehension checkpoints during my lesson so I stay engaged. | Inline checkpoint slides appear every N slides with a multiple-choice question; advance blocked until answered |
-| US-015 | As a learner, I want a final quiz at the end of each module to test my understanding. | 5 mixed-type questions (mcq, true_false, multi_select, fill_blank); instant grading with per-question feedback |
+| US-015 | As a learner, I want a final quiz at the end of each module to test my understanding. | 5 mixed-type questions (mcq, true_false, multi_select, cloze_dropdown); instant grading with per-question feedback |
 | US-016 | As a learner, I want to retake a failed module with fresh questions to improve my score. | Retake regenerates quiz; 80% threshold required to pass and unlock next module |
 | US-017 | As a learner, I want modules gated so I must master one before moving to the next. | Module N+1 locked until module N passed (≥80%); progress bar shown on module listing |
 
@@ -430,7 +433,7 @@ study-and-learn/
 | US-019 | As a learner, I want a retro mascot that provides simple visual feedback during my learning journey. | Mascot image displayed with idle/busy/happy animated GIF states; state-driven glow tints; progress-aware state switching via polling |
 | US-020 | As a learner, I want clear progress feedback during long AI operations so I know the app is working. | Background processing with visible progress bar or stage indicator instead of full-screen overlay |
 | US-021 | As a learner, I want the quality of generated lessons and quizzes to be acceptable for high-school to college-level material. | Prompt engineering refined; model research conducted for optimal quality/speed tradeoff on target hardware |
-| US-022 | As a learner, I want a difficulty toggle so content matches my age and skill level. *(Deferred to post-capstone — high effort, low impact for MVP.)* | Easy (10–11), Moderate (12–13), Hard (14–15) difficulty options; prompt adjusted accordingly |
+| US-022 | As a learner, I want a difficulty toggle so content matches my age and skill level. | Easy (10–11), Normal (12–13), Hard (14–15) difficulty options; prompt adjusted accordingly; difficulty snapshotted at generation time |
 
 ---
 
@@ -450,7 +453,7 @@ study-and-learn/
 - Relevance check (strong/partial/weak).
 - Study path generation (sequenced modules with effort estimates).
 - Interactive slide-based lesson generation per module.
-- Mixed-type quiz generation per module (mcq, true_false, multi_select, fill_blank).
+- Mixed-type quiz generation per module (mcq, true_false, multi_select, cloze_dropdown).
 - Inline comprehension checkpoints within lessons.
 - Instant quiz grading with per-question feedback.
 - Retake functionality with fresh question regeneration.
@@ -460,10 +463,13 @@ study-and-learn/
 - Server-side session storage (Flask-Session + cachelib).
 - Custom CSS/JS slide-deck engine (retro-themed).
 - Content-addressable global deduplication (SHA-256 + ContentRegistry).
-- pytest test suite (202 tests).
+- pytest test suite (367 tests).
 - GitHub Actions test workflow.
 - Static public task board.
 - Design and testing document.
+- Opt-in TTS audio narration (Edge-TTS Neural voices, AI-generated narration scripts).
+- Difficulty-aware content generation (Easy/Normal/Hard, prompt injection + snapshotting).
+- Session save/resume (deck position auto-saved to DB, Exit & Save button).
 
 ### 8.2 Should-Have MVP Polish
 
@@ -478,7 +484,6 @@ study-and-learn/
 ### 8.3 Deferred / Stretch
 
 - YouTube integration.
-- AI-generated TTS narration.
 - Export to PPTX or SCORM.
 - Short-answer (free-text) AI grading.
 - Adaptive difficulty based on learner performance.
@@ -503,7 +508,7 @@ Ranked from easier to harder. Items above the line are implemented; items below 
 6. Static mascot image with progress-aware speech bubble — done (mascot-robot.png, click-to-talk, progress bar)
 7. Retro theme improvements — done (Retrograde Bold, BoldPixels fonts, cyberpunk theme)
 8. Better prompt templates — done
-9. Simple quiz generation — done (4 question types: mcq, true_false, multi_select, fill_blank)
+9. Simple quiz generation — done (4 question types: mcq, true_false, multi_select, cloze_dropdown)
 10. Slide-style lesson pages — done (custom CSS/JS deck engine with inline checkpoints)
 11. Cloud model toggle — done (ai_client_cloud.py with import-override pattern)
 12. JS refactored into domain modules (mascot, progress, upload, deck-engine, deck-page, results) — done
@@ -532,29 +537,35 @@ Ranked from easier to harder. Items above the line are implemented; items below 
 34. Per-lesson PDF export — done (fpdf2, passed lessons only, includes slides/checkpoints/quiz/sources)
 
 ### Sprint 7 (Planned)
-31. Mascot animation frames (idle/busy/happy) — done (3 animated GIFs, sprite sheets, state-based glow tints, progress-driven switching, fallback to static PNG, centralized config)
-32. Text-to-speech narration (opt-in)
-33. PDF export for completed lessons
-34. Session cleanup (remove extracted_texts after lessons generated)
-35. Badges/trophies for completed lessons
-36. Source document referencing in lessons
-37. Cloud ChromaDB and cloud AI provider testing
-38. General application refinement and test expansion
+31. Mascot animation frames (idle/busy/happy) — done (idle 14f@250ms, busy 16f@140ms, happy 14f@220ms, error 14f@220ms)
+32. Text-to-speech narration — done (Edge-TTS opt-in, AI narration scripts, per-slide MP3, deck player)
+33. PDF export for completed lessons — done (fpdf2, per-lesson, slides/checkpoints/quiz/sources)
+34. Session cleanup (extracted_texts) — done (nullified after generate_lessons completes)
+35. Badges/trophies for completed lessons — NOT done (deferred to Sprint 8 stretch)
+36. Source document referencing — done (citation modal in deck)
+37. Cloud ChromaDB and cloud AI provider testing — NOT done (deferred)
+38. Difficulty level selector — done (Easy/Normal/Hard, prompt injection, badges)
+39. Session save/resume with Exit & Save — done (deck position auto-saved)
+40. Checkpoint question variety — done (mcq/true_false/cloze_dropdown)
+41. cloze_dropdown replaces fill_blank — done (legacy compat preserved)
+42. Humor injection in quiz distractors — done (HUMOR_INSTRUCTIONS in quiz prompt)
 
 ### Sprint 8 (Planned)
-39. Deployment to free-tier host (Render or Railway)
-40. Final documentation and demo recording
-41. Capstone submission
+43. Deployment to free-tier host (Render or Railway)
+44. Final documentation and demo recording
+45. Capstone submission
 
 ### Post-Capstone / Stretch
-39. Difficulty level selector (Easy/Moderate/Hard) — high effort, low impact for MVP
-40. Extended file type support (.docx, .html, .odt) — limited practical benefit for demo
-41. YouTube or external resource integration
-42. Short-answer (free-text) AI grading
-43. Spaced repetition and review scheduling
-44. Full adaptive study planner
-45. Social features (friends, chat, share lessons)
-46. Full offline mode (C/C++ rewrite without Ollama)
+- Badge/trophy system for completed modules (deferred from Sprint 7)
+- Matching question type for quizzes (future quiz variety expansion)
+- Speaker change without retake (pre-generate all 4 speakers at lesson time)
+- Extended file type support (.docx, .html, .odt) — limited practical benefit for demo
+- YouTube or external resource integration
+- Short-answer (free-text) AI grading
+- Spaced repetition and review scheduling
+- Full adaptive study planner
+- Social features (friends, chat, share lessons)
+- Full offline mode (C/C++ rewrite without Ollama)
 
 ---
 
@@ -568,7 +579,11 @@ Initial unit tests should cover:
 - text extraction helpers,
 - prompt formatting,
 - relevance label parsing,
-- curriculum output schema validation.
+- curriculum output schema validation,
+- TTS service: voice mapping, manifest structure, empty text handling, cleanup,
+- Quiz generator: cloze_dropdown type, checkpoint type variety, humor injection, difficulty injection,
+- Narration script: structure, personalization, fallback, last-module outro,
+- Route-level: TTS snapshotting, graceful TTS failure, save-position, audio routes.
 
 ### 10.2 Integration Tests
 
@@ -615,14 +630,15 @@ Later additions:
 
 1. ~~Should the first prototype use pgvector or ChromaDB?~~ → **ChromaDB** (chosen, implemented)
 2. ~~Which Ollama model gives acceptable local results on the target hardware?~~ → **qwen3:0.6b (chat) + qwen3-embedding:0.6b (embeddings)** (placeholder; upgrade path: `qwen3:1.7b`, `gemma3:4b`, or Ollama Cloud)
-3. ~~How many file types should be truly supported in the first sprint?~~ → **txt, md, pdf** (MVP); docx deferred to post-capstone
+3. ~~How many file types should be truly supported in the first sprint?~~ → **txt, md, pdf** (initial MVP); **docx, pptx, png, jpg, jpeg** added in Sprint 6 (OCR/vision integration with content-addressable dedup). Final supported set: `txt, md, pdf, docx, pptx, png, jpg, jpeg` (8 types — see `src/utils.py:ALLOWED_EXTENSIONS`).
 4. ~~Should OCR be postponed until after the main workflow works?~~ → **Implemented in Sprint 6** (GLM-OCR local + Qwen3.5 cloud, content-addressable dedup)
 5. ~~Should generated outputs be stored as JSON, Markdown, or database records?~~ → **JSON in Flask session (server-side via cachelib)**
 6. ~~Should the companion be purely visual or tied to progress?~~ → Visual feedback with click-to-talk implemented; animated GIF states (idle/busy/happy) with progress-driven switching implemented
 7. ~~Which deployment platform is easiest for the final capstone demo?~~ → Render or Railway free tier TBD in Sprint 8
 8. ~~What is the optimal model for lesson/quiz generation quality vs speed on 6GB VRAM?~~ → qwen3:0.6b chosen as placeholder; upgrade guidance documented (Sprint 4 prompt tuning ongoing)
 9. ~~Should loading UI use full-screen overlay or background processing with stage indicator?~~ → Background processing with progress bar + mascot speech bubble (implemented Sprint 4)
-10. ~~How many mascot animation frames are needed for adequate visual feedback?~~ → 3 animated GIFs (idle: 4 frames blink/antenna/chest, busy: 6 frames fast cycle, happy: 5 frames sparkle/glow); 3 sprite sheets; generated programmatically from base PNG
+10. ~~How many mascot animation frames are needed for adequate visual feedback?~~ → idle 14f@250ms, busy 16f@140ms, happy 14f@220ms, error 14f@220ms (all implemented)
+11. ~~Which TTS provider to use?~~ → Edge-TTS (edge-tts>=7.2.8), Microsoft Neural voices. Custom SSML blocked by Microsoft — plain text only. AI-generated narration scripts produce tutor-voice quality.
 
 ---
 

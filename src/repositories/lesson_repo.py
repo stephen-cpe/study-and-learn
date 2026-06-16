@@ -1,8 +1,6 @@
 """
 DB-backed lesson repository — persists lessons to StudyPath.content_data
 and module progress to LessonProgress rows.
-
-Replaces the session-backed session_repo.py (Sprint 5 Phase 2.2).
 """
 import json
 from typing import Any, Dict, List, Optional
@@ -64,6 +62,11 @@ def get_most_recent_active_path(user=None) -> Optional[StudyPath]:
 
 
 def get_extracted_texts(user=None, path_id: str = None) -> List[str]:
+    """Return extracted texts from the active StudyPath.
+
+    Returns [] when extracted_texts is None — this is the expected
+    post-generation state after session cleanup nullifies the field.
+    """
     if user is None:
         user = current_user
     if not user or not user.is_authenticated:

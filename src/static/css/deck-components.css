@@ -141,6 +141,94 @@
     font-size: 0.6em;
 }
 
+/* ── Themed cloze dropdown (checkpoint + quiz) ── */
+.cloze-dropdown-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5em;
+    width: 100%;
+    max-width: 520px;
+    margin: 0 auto;
+}
+
+.cloze-select,
+.checkpoint-select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+
+    width: 100%;
+    max-width: 420px;
+    padding: 0.35em 1.1em 0.35em 0.6em;
+    font-family: "BoldPixels", sans-serif;
+    /* Keep the select (and therefore the OS dropdown option list) compact.
+       The deck body font-size is 42px, so 0.45em ~= 19px rendered — small
+       enough that the popped-up options do not look oversized. */
+    font-size: 0.45em;
+    line-height: 1.4;
+    color: var(--deck-text);
+    background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2300b4d8'%3E%3Cpath d='M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z'/%3E%3C/svg%3E"),
+        linear-gradient(135deg, rgba(5, 11, 20, 0.92), rgba(16, 39, 66, 0.88));
+    background-repeat: no-repeat, no-repeat;
+    background-position: right 0.55em center, 0 0;
+    background-size: 0.85em auto, 100% 100%;
+    border: 1px solid rgba(0, 180, 216, 0.5);
+    border-radius: 6px;
+    box-shadow: inset 0 0 10px rgba(0, 180, 216, 0.08);
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+}
+
+.cloze-select:focus,
+.checkpoint-select:focus {
+    outline: none;
+    border-color: var(--deck-accent);
+    box-shadow: 0 0 14px rgba(0, 180, 216, 0.35), inset 0 0 10px rgba(0, 180, 216, 0.12);
+}
+
+.cloze-select:hover:not(:disabled),
+.checkpoint-select:hover:not(:disabled) {
+    border-color: var(--deck-accent-light);
+    background-color: rgba(0, 180, 216, 0.08);
+}
+
+.cloze-select:disabled,
+.checkpoint-select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(0.6);
+}
+
+.cloze-select option,
+.checkpoint-select option {
+    background: var(--deck-bg);
+    color: var(--deck-text);
+    font-family: "Segoe UI", system-ui, sans-serif;
+    /* Match the select's 0.45em scale so the closed and open states look
+       consistent; rem is used here because <option> rendering is OS-driven
+       and rem gives the browser a predictable root-relative size. */
+    font-size: 0.75rem;
+    padding: 0.3em;
+}
+
+.cloze-select option:first-child,
+.checkpoint-select option:first-child {
+    color: var(--deck-accent-light);
+    font-style: italic;
+}
+
+.cloze-select.has-value,
+.checkpoint-select.has-value {
+    border-color: var(--deck-success);
+    box-shadow: 0 0 12px rgba(126, 231, 135, 0.25);
+}
+
+/* ── Cloze "Check Answer" button ── */
+/* (Removed in Sprint 8 QA: cloze_dropdown checkpoints now reuse the shared
+   .btn-submit-quiz Continue button so styling matches mcq / true_false.) */
+
 .btn-submit-quiz {
     background: var(--deck-accent);
     color: var(--deck-bg);
@@ -373,4 +461,54 @@
 
 .source-toggle-btn:hover {
     background: rgba(0, 180, 216, 0.25);
+}
+
+/* ── TTS Controls ── */
+.tts-controls {
+    position: fixed;
+    top: 0.5em;
+    left: 0.5em;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    padding: 0.3em 0.6em;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(0, 180, 216, 0.3);
+    border-radius: 4px;
+    font-size: 0.45em;
+}
+
+.tts-toggle {
+    background: none;
+    border: 1px solid var(--deck-accent);
+    color: var(--deck-accent);
+    font-family: "BoldPixels", sans-serif;
+    cursor: pointer;
+    padding: 0.2em 0.5em;
+    border-radius: 3px;
+    font-size: 0.9em;
+    white-space: nowrap;
+    transition: background 0.2s;
+}
+.tts-toggle:hover {
+    background: rgba(0, 180, 216, 0.15);
+}
+
+.tts-speaker-select {
+    background: rgba(10, 22, 40, 0.9);
+    border: 1px solid rgba(0, 180, 216, 0.3);
+    color: var(--deck-text);
+    font-family: "BoldPixels", sans-serif;
+    font-size: 0.85em;
+    padding: 0.15em 0.3em;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.tts-speaker-note {
+    color: var(--deck-muted);
+    font-size: 0.8em;
+    font-style: italic;
+    opacity: 0.7;
 }

@@ -60,6 +60,7 @@ data/temp/
 data/chroma_db/
 data/flask_session/
 data/progress_cache/
+data/tts/
 
 # AI model caches (Ollama, etc.)
 .ollama/

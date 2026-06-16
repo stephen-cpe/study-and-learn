@@ -44,6 +44,11 @@
 {% if current_user.is_admin or current_user.can_generate_lessons %}
 <div class="form-section">
     <h2 class="section-title mb-4">Start Your Learning Journey</h2>
+    {% if current_user.is_authenticated %}
+    <p class="form-hint difficulty-hint">Lessons will be generated at
+        <strong>{{ current_user.lesson_difficulty }}</strong> difficulty.
+        Change in <a href="{{ url_for('main.settings') }}">Settings</a> before uploading.</p>
+    {% endif %}
     <form id="unified-form" action="{{ url_for('main.process') }}" method="POST" enctype="multipart/form-data">
         <div class="mb-4">
             <label for="learning_goal" class="form-label">What do you want to learn?</label>

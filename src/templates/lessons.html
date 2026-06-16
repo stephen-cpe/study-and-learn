@@ -16,9 +16,31 @@
     </div>
 </div>
 
+{% set any_audio_pending = lessons | selectattr('tts_audio_status', 'equalto', 'pending') | list | length > 0 %}
+{% if any_audio_pending %}
+<div class="alert alert-info generation-status-panel" id="generation-status-panel" role="status" aria-live="polite">
+    <div class="d-flex align-items-center">
+        <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+        <span>
+            Generating narration for
+            <strong id="gen-ready-count">0</strong> of
+            <strong id="gen-total-count">{{ lessons | length }}</strong>
+            modules&hellip;
+        </span>
+    </div>
+    <div class="progress mt-2" style="height: 6px;">
+        <div id="gen-progress-bar" class="progress-bar" role="progressbar" style="width: 0%"></div>
+    </div>
+</div>
+{% endif %}
+
 <div class="lessons-grid">
     {% for lesson in lessons %}
-    <div class="card lesson-card {% if not lesson.unlocked %}lesson-locked{% endif %} {% if lesson.passed %}lesson-completed{% endif %}">
+    {% set tts_status = lesson.get('tts_audio_status', 'n/a') %}
+    <div class="card lesson-card {% if not lesson.unlocked %}lesson-locked{% endif %} {% if lesson.passed %}lesson-completed{% endif %}"
+         data-module-index="{{ lesson.index }}"
+         data-tts-status="{{ tts_status }}"
+         data-tts-enabled="{{ 'true' if lesson.get('tts_enabled') else 'false' }}">
         <div class="card-body">
             <div class="lesson-card-header d-flex align-items-start justify-content-between">
                 <div class="lesson-module-number">{{ loop.index }}</div>
@@ -37,6 +59,25 @@
 
             <h3 class="lesson-title">{{ lesson.module_title }}</h3>
             <p class="lesson-effort">Estimated effort: {{ lesson.estimated_effort }}</p>
+            {% set diff = lesson.get('difficulty', 'Normal') %}
+            <span class="badge-difficulty badge-difficulty-{{ diff|lower }}">
+                {{ '🟢' if diff == 'Easy' else ('🟡' if diff == 'Normal' else '🔴') }}
+                {{ diff }}
+            </span>
+            {% if lesson.get('tts_enabled') %}
+                {% if tts_status == 'ready' %}
+                <span class="badge-tts">🔊 Narration Ready</span>
+                {% elif tts_status == 'pending' %}
+                <span class="badge-tts badge-tts-pending"
+                      data-card-tts-pending="true">🔊 Generating narration…</span>
+                {% elif tts_status == 'failed' %}
+                <span class="badge-tts badge-tts-failed">🔊 Narration unavailable</span>
+                {% else %}
+                <span class="badge-tts">🔊 Narration</span>
+                {% endif %}
+            {% else %}
+            <span class="badge-tts badge-tts-off">No Narration</span>
+            {% endif %}
 
             {% set slide_count = lesson.lesson.slides | length if lesson.lesson and lesson.lesson.slides else 0 %}
             {% set check_count = lesson.checkpoints | length if lesson.checkpoints else 0 %}
@@ -48,7 +89,9 @@
 
             <div class="lesson-actions">
                 {% if lesson.unlocked %}
-                <a href="{{ url_for('main.lesson_deck', module_index=lesson.index, path_id=path_id) }}" class="btn btn-primary btn-lg w-100">
+                <a href="{{ url_for('main.lesson_deck', module_index=lesson.index, path_id=path_id) }}"
+                   class="btn btn-primary btn-lg w-100 lesson-start-btn"
+                   data-requires-audio-ready="{{ 'true' if tts_status == 'pending' else 'false' }}">
                     {% if lesson.completed and not lesson.passed %}
                     Retake Lesson
                     {% elif lesson.completed and lesson.passed %}
@@ -75,4 +118,64 @@
     <a href="{{ url_for('main.results') }}" class="btn btn-outline-primary">Back to Results</a>
     <a href="{{ url_for('main.index') }}" class="btn btn-primary">Start Over</a>
 </div>
+
+{% if any_audio_pending %}
+<script>
+  (function() {
+    'use strict';
+    var pathId = {{ path_id|tojson }};
+    function poll() {
+      var url = '/lessons/generation-status?path_id=' + encodeURIComponent(pathId || '');
+      fetch(url, { headers: { 'Accept': 'application/json' } })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data || !data.modules) return;
+          var ready = data.ready_count || 0;
+          var total = data.total || 0;
+          var bar = document.getElementById('gen-progress-bar');
+          var readyEl = document.getElementById('gen-ready-count');
+          var totalEl = document.getElementById('gen-total-count');
+          if (readyEl) readyEl.textContent = String(ready);
+          if (totalEl) totalEl.textContent = String(total);
+          if (bar) bar.style.width = total > 0 ? Math.round((ready / total) * 100) + '%' : '0%';
+
+          // Update per-card badges
+          data.modules.forEach(function(m) {
+            var card = document.querySelector(
+              '.lesson-card[data-module-index="' + m.module_index + '"]'
+            );
+            if (!card) return;
+            var badge = card.querySelector('[data-card-tts-pending]');
+            if (!badge) return;
+            if (m.status === 'ready') {
+              badge.classList.remove('badge-tts-pending');
+              badge.textContent = '🔊 Narration Ready';
+              card.removeAttribute('data-tts-status');
+              card.setAttribute('data-tts-status', 'ready');
+              var startBtn = card.querySelector('.lesson-start-btn');
+              if (startBtn) startBtn.setAttribute('data-requires-audio-ready', 'false');
+            } else if (m.status === 'failed') {
+              badge.classList.remove('badge-tts-pending');
+              badge.classList.add('badge-tts-failed');
+              badge.textContent = '🔊 Narration unavailable';
+            }
+          });
+
+          // Hide the panel once all TTS is done
+          if (data.all_ready) {
+            var panel = document.getElementById('generation-status-panel');
+            if (panel) panel.style.display = 'none';
+            return;
+          }
+          setTimeout(poll, 1500);
+        })
+        .catch(function() {
+          // Silent retry on transient errors
+          setTimeout(poll, 3000);
+        });
+    }
+    poll();
+  })();
+</script>
+{% endif %}
 {% endblock %}

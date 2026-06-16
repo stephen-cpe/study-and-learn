@@ -1,7 +1,8 @@
 """
 Lesson routes — generation, slide deck, grading, and retake.
 """
-from flask import (flash, jsonify, redirect, render_template,
+import logging
+from flask import (current_app, flash, jsonify, redirect, render_template,
                    request, session, url_for)
 from flask_login import current_user, login_required
 
@@ -14,10 +15,12 @@ from src.repositories.lesson_repo import (
     save_lessons,
 )
 from src.routes import PASS_THRESHOLD, bp
-from src.routes._helpers import _build_retriever, _resolve_goal, _resolve_hashes, _resolve_texts, _resolve_filenames
+from src.routes._helpers import _build_retriever, _resolve_goal, _resolve_hashes, _resolve_path_id, _resolve_texts, _resolve_filenames
 from src.services import progress_tracker
 from src.services.grader import _get_correct_answer, _grade_single_question
 from src.services.lesson_orchestrator import build_module_artifacts
+
+logger = logging.getLogger(__name__)
 
 
 @bp.route('/generate-lessons', methods=['POST'])
@@ -59,11 +62,28 @@ def generate_lessons():
     file_names_data = _resolve_filenames()
     retriever = _build_retriever(learning_goal, extracted_texts, file_hashes_data, file_names_data)
 
+    tts_enabled = getattr(current_user, 'tts_enabled', False)
+    tts_speaker = getattr(current_user, 'tts_speaker', 'Ava') or 'Ava'
+    difficulty = getattr(current_user, 'lesson_difficulty', 'Normal') or 'Normal'
+    username = current_user.username
+
     progress_tracker.update_progress(task_id, 1)
 
     for i, module in enumerate(modules):
         progress_tracker.update_progress(task_id, 2)
-        artifacts = build_module_artifacts(module, learning_goal, retriever)
+        artifacts = build_module_artifacts(
+            module,
+            learning_goal,
+            retriever,
+            difficulty=difficulty,
+            tts_enabled=tts_enabled,
+            username=username,
+            tts_speaker=tts_speaker,
+            next_module_title=modules[i+1]['title'] if i+1 < len(modules) else None,
+            is_last_module=(i == len(modules) - 1),
+            path_id=path_id_val,
+            module_index=i,
+        )
         progress_tracker.update_progress(task_id, 3)
 
         lessons.append({
@@ -74,6 +94,14 @@ def generate_lessons():
             'quiz': artifacts['quiz'],
             'checkpoints': artifacts['checkpoints'],
             'sources': artifacts.get('sources', []),
+            'difficulty': difficulty,
+            'tts_enabled': tts_enabled,
+            'tts_speaker': tts_speaker if tts_enabled else None,
+            # tts_audio_status is the per-module generation state used by
+            # the lessons page UI to show "Generating narration..." badges
+            # and by the audio route to return 202 when pending. The
+            # background worker updates this field as it runs.
+            'tts_audio_status': 'pending' if tts_enabled else 'n/a',
             'completed': False,
             'score': None,
             'passed': False
@@ -89,14 +117,46 @@ def generate_lessons():
                  file_names_val=file_names_data,
                  path_id=path_id_val)
 
+    if path_id_val is None:
+        from src.models import StudyPath
+        refreshed = StudyPath.query.filter_by(
+            user_id=current_user.id, status='active'
+        ).order_by(StudyPath.created_at.desc()).first()
+        if refreshed:
+            path_id_val = refreshed.id
+
+    # Task 5: TTS generation runs in a background thread so the request
+    # handler can return immediately. The lessons page polls
+    # /lessons/generation-status to display per-module audio status.
+    if tts_enabled and path_id_val:
+        from src.services.tts_worker import spawn_tts_background_task
+        spawn_tts_background_task(
+            flask_app=current_app._get_current_object(),
+            user_id=current_user.id,
+            path_id=path_id_val,
+            task_id=task_id,
+        )
+
+    from src import db
+    from src.models import StudyPath
+    path = StudyPath.query.filter_by(id=path_id_val, user_id=current_user.id).first() if path_id_val else None
+    if not path:
+        path = StudyPath.query.filter_by(user_id=current_user.id, status='active').order_by(StudyPath.created_at.desc()).first()
+    if path:
+        path.extracted_texts = None
+        db.session.commit()
+
     flash(f'Generated {len(modules)} lessons successfully!', 'success')
-    return jsonify({'redirect': url_for('main.lessons', path_id=path_id_val)})
+    return jsonify({
+        'redirect': url_for('main.lessons', path_id=path_id_val),
+        'task_id': task_id,
+    })
 
 
 @bp.route('/lessons')
 @login_required
 def lessons():
-    path_id = request.args.get('path_id', None)
+    path_id = _resolve_path_id()
     lessons_data = get_lessons(current_user, path_id=path_id)
     if not lessons_data:
         flash('No lessons generated yet. Generate lessons from your results first.', 'info')
@@ -115,10 +175,62 @@ def lessons():
                            path_id=path_id)
 
 
+@bp.route('/lessons/generation-status')
+@login_required
+def generation_status():
+    """Return per-module TTS audio generation status for the current user.
+
+    Used by the lessons page (via JS polling) to display per-card badges
+    while TTS generation is in progress. The endpoint accepts a ``path_id``
+    query string; when missing, falls back to the user's most recent
+    active StudyPath.
+
+    Response shape::
+
+        {
+            "path_id": "<uuid>",
+            "modules": [
+                {"module_index": 0, "title": "M1", "tts_enabled": true,
+                 "status": "ready" | "pending" | "n/a" | "failed"},
+                ...
+            ],
+            "all_ready": true | false,
+            "ready_count": int,
+            "total": int,
+            "task_status": {"stage": int, "label": str, "pct": int, "mascot": str}
+                         | null  (when no active task for this user)
+        }
+    """
+    path_id = _resolve_path_id()
+    if not path_id:
+        path = get_most_recent_active_path(current_user)
+        path_id = path.id if path else None
+    if not path_id:
+        return jsonify({
+            'path_id': None,
+            'modules': [],
+            'all_ready': False,
+            'ready_count': 0,
+            'total': 0,
+            'task_status': None,
+        })
+    from src.services.tts_worker import get_path_audio_status
+    status = get_path_audio_status(user_id=current_user.id, path_id=path_id)
+    status['path_id'] = path_id
+    # Also include the live progress_tracker status for the user's
+    # current task (used by the JS to show the overall mascot progress).
+    task_status = None
+    task_id = request.args.get('task_id') or session.sid
+    if task_id:
+        task_status = progress_tracker.get_progress(task_id)
+    status['task_status'] = task_status
+    return jsonify(status)
+
+
 @bp.route('/lessons/<int:module_index>')
 @login_required
 def lesson_deck(module_index):
-    path_id = request.args.get('path_id', None)
+    path_id = _resolve_path_id()
     lessons_data = get_lessons(current_user, path_id=path_id)
     if not lessons_data:
         flash('No lessons generated yet.', 'error')
@@ -146,7 +258,7 @@ def lesson_deck(module_index):
 @bp.route('/lessons/<int:module_index>/grade', methods=['POST'])
 @login_required
 def grade_lesson(module_index):
-    path_id = request.args.get('path_id', None)
+    path_id = _resolve_path_id()
     lessons_data = get_lessons(current_user, path_id=path_id)
     if not lessons_data:
         return jsonify({'error': 'No lessons found'}), 404
@@ -224,7 +336,7 @@ def grade_lesson(module_index):
 @bp.route('/lessons/<int:module_index>/retake', methods=['POST'])
 @login_required
 def retake_lesson(module_index):
-    path_id = request.args.get('path_id', None)
+    path_id = _resolve_path_id()
     lessons_data = get_lessons(current_user, path_id=path_id)
     if not lessons_data:
         return jsonify({'error': 'No lessons found'}), 404
@@ -241,18 +353,137 @@ def retake_lesson(module_index):
     names_data = _resolve_filenames()
     retriever = _build_retriever(goal, texts, hashes_data, names_data)
 
+    difficulty = lesson.get('difficulty', 'Normal')
+    tts_enabled = lesson.get('tts_enabled', False)
+    tts_speaker = lesson.get('tts_speaker', 'Ava') or 'Ava'
+    username = current_user.username
+
     artifacts = build_module_artifacts(
         {'title': module_title},
         goal,
         retriever,
         existing_slides=slides,
+        difficulty=difficulty,
+        tts_enabled=tts_enabled,
+        username=username,
+        tts_speaker=tts_speaker,
     )
 
     lessons_data[module_index]['quiz'] = artifacts['quiz']
     lessons_data[module_index]['checkpoints'] = artifacts['checkpoints']
+    lessons_data[module_index]['lesson'] = artifacts['lesson']
     lessons_data[module_index]['completed'] = False
     lessons_data[module_index]['score'] = None
     lessons_data[module_index]['passed'] = False
+    # Reset the user's saved deck position so they restart the lesson from
+    # slide 0 instead of being dropped mid-deck with stale UI from the
+    # previous (failed) attempt.
+    lessons_data[module_index]['deck_position'] = 0
     save_lessons(lessons_data, current_user, path_id=path_id)
 
-    return jsonify({'success': True})
+    if tts_enabled:
+        from src.services.tts_service import delete_module_audio, generate_lesson_audio
+        delete_module_audio(path_id, module_index)
+        narration = artifacts['lesson'].get('narration', [])
+        if narration:
+            try:
+                generate_lesson_audio(
+                    path_id=path_id,
+                    module_index=module_index,
+                    narration_script=narration,
+                    speaker=tts_speaker,
+                )
+            except Exception as e:
+                logger.warning("TTS retake audio failed for module %d: %s", module_index, str(e))
+
+    # Return a redirect URL so the client navigates the user to the deck for
+    # this module with the regenerated content, instead of blind-reloading
+    # the results slide they clicked Retake on.
+    return jsonify({
+        'success': True,
+        'redirect': url_for('main.lesson_deck', module_index=module_index, path_id=path_id),
+    })
+
+
+@bp.route('/lessons/<int:module_index>/save-position', methods=['POST'])
+@login_required
+def save_lesson_position(module_index):
+    path_id = _resolve_path_id()
+    lessons_data = get_lessons(current_user, path_id=path_id)
+    if not lessons_data or module_index >= len(lessons_data):
+        return jsonify({'ok': False}), 404
+    data = request.get_json(silent=True) or {}
+    slide_index = int(data.get('slide_index', 0))
+    if not lessons_data[module_index].get('completed', False):
+        lessons_data[module_index]['deck_position'] = slide_index
+        save_lessons(lessons_data, current_user, path_id=path_id)
+    return jsonify({'ok': True})
+
+
+@bp.route('/lessons/<int:module_index>/audio/<string:slide_index>')
+@login_required
+def lesson_audio(module_index, slide_index):
+    """Serve a TTS audio file for a specific deck slot.
+
+    ``slide_index`` is a string (not int) because the intro audio uses the
+    sentinel value ``-1`` which the int URL converter rejects. The value
+    is parsed and looked up as a key in the manifest's ``slides`` dict.
+
+    Status codes:
+      - 200: audio file is ready and being served.
+      - 202: TTS is enabled for this module but the manifest doesn't
+        exist on disk yet (the background worker is still generating it).
+        The JS player should retry in ~2 seconds.
+      - 404: TTS is disabled for this module, OR the manifest exists
+        but the requested slide_index has no audio entry.
+    """
+    path_id = _resolve_path_id()
+    if not path_id:
+        # The JS may navigate to /lessons/<i>/audio/<j> without a ?path_id=
+        # query string (e.g. when the user enters the deck from a deep link
+        # or refreshes a page that already filters by active path). Fall
+        # back to the user's most recent active StudyPath so the audio
+        # route can still resolve the manifest.
+        path_id = get_most_recent_active_path_id()
+    lessons_data = get_lessons(current_user, path_id=path_id)
+    if not lessons_data or module_index >= len(lessons_data):
+        return ('', 404)
+    if not lessons_data[module_index].get('tts_enabled'):
+        return ('', 404)
+    from src.services.tts_service import TTS_DIR, get_audio_manifest
+    manifest = get_audio_manifest(path_id or '', module_index)
+    # Distinguish 'TTS not enabled' (404) from 'TTS pending' (202).
+    # We use get_audio_manifest (not is_module_audio_ready from tts_worker)
+    # so both checks use the same TTS_DIR that generate_lesson_audio writes to.
+    if not manifest:
+        return ('', 202)
+    rel_path = manifest['slides'].get(str(slide_index))
+    if not rel_path:
+        return ('', 404)
+    full_path = TTS_DIR / rel_path
+    if not full_path.exists():
+        return ('', 202)
+    from flask import send_file
+    return send_file(str(full_path), mimetype='audio/mpeg', conditional=True)
+
+
+@bp.route('/lessons/<int:module_index>/audio/manifest')
+@login_required
+def lesson_audio_manifest(module_index):
+    path_id = _resolve_path_id()
+    if not path_id:
+        path_id = get_most_recent_active_path_id()
+    from src.services.tts_service import get_audio_manifest
+    manifest = get_audio_manifest(path_id or '', module_index)
+    return jsonify(manifest or {})
+
+
+def get_most_recent_active_path_id() -> str:
+    """Return the user's most recent active StudyPath.id, or empty string.
+
+    Used as a fallback when audio routes are hit without an explicit
+    path_id in the URL. Returns empty string when the user has no active
+    paths so the audio route can return a clean 404.
+    """
+    path = get_most_recent_active_path(current_user)
+    return path.id if path else ''
