@@ -77,3 +77,27 @@ def test_initial_migration_creates_users_table(app):
         # Verify primary key
         pk = inspector.get_pk_constraint('users')
         assert pk['constrained_columns'] == ['id']
+
+
+def test_migration_adds_generation_completed_at(app):
+    """The latest migration must add the generation_completed_at
+    column to study_paths. This is the canonical "navigate now"
+    signal read by the JS via /lessons/generation-status.
+    """
+    with app.app_context():
+        alembic_cfg = Config('migrations/alembic.ini')
+        alembic_cfg.set_main_option('script_location', 'migrations')
+        command.upgrade(alembic_cfg, 'head')
+
+        inspector = inspect(db.engine)
+        tables = inspector.get_table_names()
+        assert 'study_paths' in tables
+
+        columns = {col['name']: col for col in inspector.get_columns('study_paths')}
+        assert 'generation_completed_at' in columns, (
+            "study_paths is missing the generation_completed_at "
+            "column. The JS redirect signal relies on this column."
+        )
+        # The column must be nullable — the column is set when
+        # generation completes, NULL while it is in progress.
+        assert columns['generation_completed_at']['nullable'] is True

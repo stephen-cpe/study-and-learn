@@ -37,7 +37,9 @@ def create_task(task_id=None, stages=None):
     if task_id is None:
         task_id = str(uuid.uuid4())
     stage_list = stages or STAGES
-    _cache.set(task_id, dict(stage_list[0]))
+    entry = dict(stage_list[0])
+    entry['done'] = False
+    _cache.set(task_id, entry)
     _cache.set(task_id + ':stages', stage_list)
     logger.info(f"[progress] create_task: {task_id} → stage 0")
     return task_id
@@ -49,8 +51,39 @@ def update_progress(task_id, stage):
         return
     stage_list = _cache.get(task_id + ':stages') or STAGES
     if 0 <= stage < len(stage_list):
-        _cache.set(task_id, dict(stage_list[stage]))
+        entry = dict(stage_list[stage])
+        entry['done'] = False
+        _cache.set(task_id, entry)
         logger.info(f"[progress] update: {task_id} → stage {stage} ({stage_list[stage]['label']})")
+
+
+def update_cosmetic(task_id, **fields):
+    """Merge cosmetic fields (label/mascot/pct/mascot_state) into the
+    existing task entry without changing its stage number or stage list.
+
+    Used by background components (e.g. the TTS worker) that need to
+    publish UI progress against the same task_id the request handler
+    created, but with their own labels and mascot messages. The
+    ``done`` flag is preserved; ``stage`` and any other non-cosmetic
+    fields are preserved.
+
+    Accepted keyword arguments: label, mascot, pct, mascot_state. Any
+    other keys are ignored.
+
+    A no-op when the task_id is unknown (e.g. already cleaned up by the
+    request handler) or when no cosmetic fields are provided.
+    """
+    cosmetic_keys = {'label', 'mascot', 'pct', 'mascot_state'}
+    payload = {k: v for k, v in fields.items() if k in cosmetic_keys}
+    if not payload:
+        return
+    if not _cache.has(task_id):
+        logger.info(f"[progress] update_cosmetic skipped — task {task_id} not found")
+        return
+    data = _cache.get(task_id) or {}
+    data.update(payload)
+    _cache.set(task_id, data)
+    logger.info(f"[progress] update_cosmetic: {task_id} → {payload}")
 
 
 def get_progress(task_id):
@@ -65,8 +98,36 @@ def get_progress(task_id):
 def complete_task(task_id):
     stage_list = _cache.get(task_id + ':stages') or STAGES
     if _cache.has(task_id):
-        _cache.set(task_id, dict(stage_list[-1]))
-        logger.info(f"[progress] complete: {task_id} → stage {len(stage_list) - 1}")
+        entry = dict(stage_list[-1])
+        entry['done'] = True
+        _cache.set(task_id, entry)
+        logger.info(f"[progress] complete: {task_id} → stage {len(stage_list) - 1} (done)")
+
+
+def mark_done(task_id):
+    """Mark a task as fully complete, independent of the stage value.
+
+    The ``done`` flag is the canonical "navigate now" signal for the JS
+    client. It is set by whichever component finishes last (either the
+    request handler for a non-TTS generation, or the TTS worker for a
+    TTS-enabled generation). The redirect logic in
+    ``static/js/progress.js`` reads ``data.done`` rather than relying on
+    a specific stage number, so the two components can use different
+    stage lists without clobbering each other's progress.
+
+    The current stage label/mascot are preserved; only ``done`` is
+    flipped to True. This means the bubble can still display a
+    "Polishing..." or "All done!" message while the redirect fires.
+
+    A no-op when the task_id is unknown (e.g. already cleaned up).
+    """
+    if not _cache.has(task_id):
+        logger.info(f"[progress] mark_done skipped — task {task_id} not found")
+        return
+    data = _cache.get(task_id) or {}
+    data['done'] = True
+    _cache.set(task_id, data)
+    logger.info(f"[progress] mark_done: {task_id} → done=True")
 
 
 def cleanup_task(task_id):

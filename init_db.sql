@@ -32,17 +32,18 @@ CREATE UNIQUE INDEX ix_users_email    ON users (email);
 
 -- 2. study_paths
 CREATE TABLE study_paths (
-    id              VARCHAR(36)  NOT NULL,
-    user_id         VARCHAR(36)  NOT NULL,
-    title           VARCHAR(200) NOT NULL,
-    learning_goal   TEXT         NOT NULL,
-    status          VARCHAR(20)  NOT NULL DEFAULT 'active',
-    content_data    TEXT         NULL,
-    extracted_texts TEXT         NULL,
-    file_hashes     TEXT         NULL,
-    file_names      TEXT         NULL,
-    created_at      TIMESTAMP    NULL,
-    updated_at      TIMESTAMP    NULL,
+    id                     VARCHAR(36)  NOT NULL,
+    user_id                VARCHAR(36)  NOT NULL,
+    title                  VARCHAR(200) NOT NULL,
+    learning_goal          TEXT         NOT NULL,
+    status                 VARCHAR(20)  NOT NULL DEFAULT 'active',
+    content_data           TEXT         NULL,
+    extracted_texts        TEXT         NULL,
+    file_hashes            TEXT         NULL,
+    file_names             TEXT         NULL,
+    generation_completed_at TIMESTAMP   NULL,
+    created_at             TIMESTAMP    NULL,
+    updated_at             TIMESTAMP    NULL,
     CONSTRAINT pk_study_paths PRIMARY KEY (id),
     CONSTRAINT fk_study_paths_user
         FOREIGN KEY (user_id) REFERENCES users (id)
@@ -87,7 +88,7 @@ CREATE TABLE alembic_version (
     CONSTRAINT pk_alembic_version PRIMARY KEY (version_num)
 );
 
-INSERT INTO alembic_version (version_num) VALUES ('7477e6809a28');
+INSERT INTO alembic_version (version_num) VALUES ('d4e5f6a7b8c9');
 
 -- 6. Seed users (development only -- not for production)
 --

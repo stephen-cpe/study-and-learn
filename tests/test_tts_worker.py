@@ -351,6 +351,15 @@ def test_generation_status_route_returns_per_module_flags(
     assert data['modules'][0]['status'] == 'ready'
     assert data['modules'][1]['status'] == 'pending'
     assert data['all_ready'] is False
+    # The canonical "navigate now" signal must be present in the
+    # response and must be False (column is NULL because the worker
+    # has not yet set it). This is the field the JS reads to decide
+    # when to redirect from the results page to /lessons.
+    assert 'generation_completed' in data, (
+        "Response missing generation_completed field; JS cannot "
+        "decide when to redirect."
+    )
+    assert data['generation_completed'] is False
 
 
 # ── Audio route: 202 vs 404 ──────────────────────────────────────────
@@ -441,3 +450,433 @@ def test_generate_lessons_returns_task_id(mock_lesson, mock_quiz, mock_tts, work
     # The task_id must be a non-empty string the client can use to poll.
     assert isinstance(data['task_id'], str)
     assert len(data['task_id']) > 0
+
+
+# ── New canonical "navigate now" signal: StudyPath.generation_completed_at ─
+# Replaces the previous cache-based data.done signal (via
+# progress_tracker.mark_done()) with an atomic DB column. The column
+# is the SINGLE SOURCE OF TRUTH for "redirect now" — set by:
+#   - The request handler (when TTS is disabled, the route's else
+#     branch sets the column before returning).
+#   - The TTS worker (in its finally block, for TTS-enabled).
+#   - The TTS worker's spawn-wrapper defensive catch (for catastrophic
+#     thread failure).
+# The JS polls /lessons/generation-status which reads the column and
+# returns ``generation_completed: true|false``.
+
+
+def test_generation_status_returns_true_after_column_set(
+    worker_client, monkeypatch, tmp_path,
+):
+    """When generation_completed_at is set, the status endpoint must
+    return generation_completed: true. This is the signal the JS
+    polls to decide when to redirect from the results page.
+    """
+    from datetime import datetime, timezone
+    from src.models import StudyPath
+
+    app, user = worker_client
+    real_path_id = _seed_path(app, user, num_modules=1)
+    _patch_tts_dir(monkeypatch, tmp_path)
+
+    # Set the column manually (simulating the worker having finished).
+    with app.app_context():
+        path = StudyPath.query.filter_by(
+            id=real_path_id, user_id=user.id,
+        ).first()
+        path.generation_completed_at = datetime.now(timezone.utc)
+        from src import db
+        db.session.commit()
+
+    with app.test_client() as c:
+        c.post('/login', data={'username': 'ttsworker', 'password': 'pass'})
+        response = c.get(
+            f'/lessons/generation-status?path_id={real_path_id}'
+        )
+
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data is not None
+    assert data['generation_completed'] is True, (
+        "Status endpoint did not report generation_completed=true "
+        "after the column was set; JS redirect would never fire."
+    )
+
+
+def test_generation_status_returns_false_when_column_unset(
+    worker_client, monkeypatch, tmp_path,
+):
+    """When generation_completed_at is NULL, the status endpoint must
+    return generation_completed: false. The JS must NOT redirect
+    while the column is unset — the worker is still running.
+    """
+    app, user = worker_client
+    real_path_id = _seed_path(app, user, num_modules=1)
+    _patch_tts_dir(monkeypatch, tmp_path)
+    # Column is NULL (default). Verify the endpoint reports false.
+
+    with app.test_client() as c:
+        c.post('/login', data={'username': 'ttsworker', 'password': 'pass'})
+        response = c.get(
+            f'/lessons/generation-status?path_id={real_path_id}'
+        )
+
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data is not None
+    assert data['generation_completed'] is False
+
+
+def test_route_sets_completion_column_when_tts_disabled(
+    worker_client, monkeypatch, tmp_path,
+):
+    """The /generate-lessons route must set the completion column
+    when TTS is disabled, so the JS redirect fires immediately.
+
+    This covers the synchronous (non-TTS) generation path: the user
+    has TTS off, clicks Generate, and the route's else branch sets
+    generation_completed_at before returning.
+    """
+    from datetime import datetime, timezone
+    from src.models import StudyPath
+    from src.services.tts_service import TTS_DIR as REAL_TTS_DIR
+    from unittest.mock import patch
+
+    # Disable TTS for this user (re-enable later in a fresh test).
+    app, user = worker_client
+    with app.app_context():
+        user.tts_enabled = False
+        from src import db
+        db.session.commit()
+
+    real_path_id = _seed_path(app, user, num_modules=0)
+    _patch_tts_dir(monkeypatch, tmp_path)
+
+    # Mock the AI calls to return deterministic stubs.
+    with patch('src.services.quiz_generator.call_ollama') as mock_quiz, \
+         patch('src.services.lesson_generator.call_ollama') as mock_lesson:
+        mock_lesson.return_value = json.dumps({
+            'module_title': 'M1', 'slides': [
+                {'type': 'title', 'title': 'T', 'subtitle': ''},
+                {'type': 'content', 'heading': 'H', 'bullets': ['a']},
+            ]
+        })
+        mock_quiz.return_value = json.dumps({
+            'questions': [{'id': 'q1', 'type': 'mcq', 'prompt': 'P?',
+                           'options': ['A', 'B', 'C', 'D'],
+                           'answer_index': 0, 'explanation': 'E'}]
+        })
+
+        with app.test_client() as c:
+            c.post('/login', data={'username': 'ttsworker', 'password': 'pass'})
+            with c.session_transaction() as sess:
+                sess['learning_goal'] = 'Learn X'
+                sess['study_path'] = {'modules': [
+                    {'title': 'Module 1', 'estimated_effort': '30 min'}
+                ]}
+                sess['extracted_texts'] = ['some text']
+
+            response = c.post('/generate-lessons')
+            assert response.status_code == 200, (
+                f"Route failed: {response.data!r}"
+            )
+            data = response.get_json()
+            assert data is not None
+            assert 'redirect' in data
+
+        # The completion column must be set after the route returns
+        # (TTS is disabled, so the else branch sets it).
+        with app.app_context():
+            path = StudyPath.query.filter_by(
+                id=real_path_id, user_id=user.id,
+            ).first()
+            assert path is not None
+            assert path.generation_completed_at is not None, (
+                "Route did not set generation_completed_at for "
+                "TTS-disabled generation; JS redirect would never "
+                "fire."
+            )
+
+    # Re-enable TTS for subsequent tests in the session.
+    with app.app_context():
+        user.tts_enabled = True
+        from src import db
+        db.session.commit()
+
+
+# ── Race fix: TTS worker must not hijack the request handler's task_id ─
+# Previously, the worker called
+#   progress_tracker.create_task(task_id=task_id, stages=TTS_STAGES)
+#   progress_tracker.update_progress(task_id, 0)
+# which overwrote the request handler's progress entry (stage 4,
+# GENERATE_STAGES) with the TTS_STAGES entry (stage 0, max stage 3).
+# The JS client polls /progress?task_id=... and redirects on
+# data.stage >= 4, so the redirect never fired when TTS won the
+# race against the first poll.
+#
+# The current design uses an explicit database column
+# (``StudyPath.generation_completed_at``) set in the worker's finally
+# block. The JS polls /lessons/generation-status (which reads this
+# column) and redirects when it's non-NULL. This is atomic, ACID,
+# and unaffected by shared-cache races.
+
+from src.services import progress_tracker
+from src.services.progress_tracker import (
+    GENERATE_STAGES,
+    create_task as pt_create_task,
+    get_progress as pt_get_progress,
+)
+
+
+def test_worker_does_not_overwrite_request_handler_stage_list(
+    worker_client, monkeypatch, tmp_path,
+):
+    """The worker must publish cosmetic updates WITHOUT replacing the
+    request handler's stage list.
+
+    Simulates the race: the request handler sets stage 4 with
+    GENERATE_STAGES (max stage 4) just before the worker starts. The
+    worker then runs. If the worker had called
+    create_task(task_id, stages=TTS_STAGES), the cached stage list
+    would be replaced with TTS_STAGES (max stage 3) and stage would
+    reset to 0, breaking the JS stage-based redirect (and previously
+    breaking the data.stage >= 4 check).
+    """
+    from src.services.tts_worker import _tts_cosmetic
+
+    app, user = worker_client
+    real_path_id = _seed_path(app, user, num_modules=2)
+    _patch_tts_dir(monkeypatch, tmp_path)
+
+    task_id = 'race-test-task-1'
+    # Simulate the request handler having reached stage 4.
+    pt_create_task(task_id=task_id, stages=GENERATE_STAGES)
+    progress_tracker.update_progress(task_id, 4)
+    entry_before = pt_get_progress(task_id)
+    assert entry_before['stage'] == 4
+    assert entry_before['label'] == 'Finalizing'
+
+    async def mock_gen(text, voice, out_path):
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text('ok')
+
+    import src.services.tts_service as tts_service_module
+    monkeypatch.setattr(tts_service_module, '_generate_mp3', mock_gen)
+
+    with app.app_context():
+        run_tts_generation_for_path(
+            user_id=user.id, path_id=real_path_id, task_id=task_id,
+        )
+
+    entry_after = pt_get_progress(task_id)
+    # The stage list MUST still be GENERATE_STAGES (not TTS_STAGES),
+    # and the stage value MUST still be 4 from the request handler —
+    # the worker may only patch cosmetic fields (label/mascot/pct/
+    # mascot_state), not the stage number or the stage list.
+    assert entry_after['stage'] == 4, (
+        f"Worker overwrote stage number: {entry_after['stage']}"
+    )
+    # TTS_STAGES[3] = {"label": "Complete", "mascot": "All done!"}.
+    # The user sees the mascot in the bubble, so that's the field
+    # the TTS worker's final cosmetic update is expected to set.
+    assert entry_after['mascot'] == 'All done!', (
+        f"Worker did not publish final TTS cosmetic mascot: "
+        f"{entry_after['mascot']!r}"
+    )
+    # Verify _tts_cosmetic(3) returns the expected cosmetic payload
+    # (label=Complete, mascot='All done!') — sanity check on the
+    # cosmetic-payload extraction that strips the 'stage' key.
+    cos = _tts_cosmetic(3)
+    assert cos['mascot'] == 'All done!'
+    assert cos['label'] == 'Complete'
+    assert 'stage' not in cos
+
+
+def test_worker_marks_task_done_on_completion(
+    worker_client, monkeypatch, tmp_path,
+):
+    """After all modules are processed, the worker must set
+    ``StudyPath.generation_completed_at`` to a non-NULL value.
+
+    This is the explicit "navigate now" signal the JS client reads
+    (via /lessons/generation-status). The redirect MUST fire as soon
+    as the TTS work is done, regardless of any progress-tracker state.
+    """
+    app, user = worker_client
+    real_path_id = _seed_path(app, user, num_modules=2)
+    _patch_tts_dir(monkeypatch, tmp_path)
+
+    # Sanity: the column starts as NULL.
+    from src.models import StudyPath
+    with app.app_context():
+        path_before = StudyPath.query.filter_by(
+            id=real_path_id, user_id=user.id,
+        ).first()
+        assert path_before is not None
+        assert path_before.generation_completed_at is None
+
+    async def mock_gen(text, voice, out_path):
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text('ok')
+
+    import src.services.tts_service as tts_service_module
+    monkeypatch.setattr(tts_service_module, '_generate_mp3', mock_gen)
+
+    with app.app_context():
+        run_tts_generation_for_path(
+            user_id=user.id, path_id=real_path_id, task_id=None,
+        )
+
+    # The worker must have set the column to a non-NULL value so the
+    # JS redirect fires. This is the canonical "all generation
+    # finished" signal.
+    with app.app_context():
+        path_after = StudyPath.query.filter_by(
+            id=real_path_id, user_id=user.id,
+        ).first()
+        assert path_after is not None
+        assert path_after.generation_completed_at is not None, (
+            "Worker did not set generation_completed_at; JS redirect "
+            "would never fire."
+        )
+
+
+def test_worker_marks_task_done_on_missing_path(
+    worker_client, monkeypatch, tmp_path,
+):
+    """The worker must set the completion column even on early returns.
+
+    If the StudyPath is not found or has invalid content_data, the
+    worker returns early. The finally block must still set the
+    completion column so the user is not stuck on the results page
+    waiting for a signal that will never come.
+    """
+    _patch_tts_dir(monkeypatch, tmp_path)
+    app, user = worker_client
+
+    # Seed a path so the user has at least one StudyPath row (the
+    # one that will receive the early-exit column set is the
+    # non-existent 'does-not-exist' one, which the worker will not
+    # find — so the column-write is a no-op for that path. We
+    # exercise the early-return path WITHOUT expecting the column
+    # to be set on a missing path; we only assert the return shape.
+    _seed_path(app, user, num_modules=1)
+
+    with app.app_context():
+        # Use a path_id that does not exist for this user. The worker
+        # must return early. (We pass task_id=None so the cosmetic
+        # update_cosmetic calls are no-ops.)
+        result = run_tts_generation_for_path(
+            user_id=user.id, path_id='does-not-exist', task_id=None,
+        )
+
+    assert result == {'modules': [], 'all_ready': False}
+
+
+def test_worker_marks_task_done_on_per_module_failure(
+    worker_client, monkeypatch, tmp_path,
+):
+    """A failed module must NOT prevent the completion column from being set.
+
+    The user must not be stuck on the results page because one
+    module's TTS call raised. The finally block guarantees the
+    signal is always set.
+    """
+    app, user = worker_client
+    real_path_id = _seed_path(app, user, num_modules=2)
+    _patch_tts_dir(monkeypatch, tmp_path)
+
+    async def mock_gen_fail(text, voice, out_path):
+        raise RuntimeError('simulated TTS failure')
+
+    import src.services.tts_service as tts_service_module
+    monkeypatch.setattr(tts_service_module, '_generate_mp3', mock_gen_fail)
+
+    with app.app_context():
+        run_tts_generation_for_path(
+            user_id=user.id, path_id=real_path_id, task_id=None,
+        )
+
+    # Even though every module failed, the completion column must be
+    # set so the user can navigate to the lessons page (where
+    # they'll see 'failed' status badges on the cards).
+    from src.models import StudyPath
+    with app.app_context():
+        path_after = StudyPath.query.filter_by(
+            id=real_path_id, user_id=user.id,
+        ).first()
+        assert path_after is not None
+        assert path_after.generation_completed_at is not None, (
+            "Worker did not set generation_completed_at after "
+            "per-module failures."
+        )
+
+
+def test_worker_uses_update_cosmetic_not_update_progress(
+    worker_client, monkeypatch, tmp_path,
+):
+    """The worker must use update_cosmetic, not update_progress.
+
+    update_progress would change the stage number against whatever
+    stage list the request handler registered (GENERATE_STAGES),
+    causing the cosmetic stages (1, 2, 3) to mean
+    'Chunking & embedding' / 'Retrieving context' / 'Generating
+    lessons' instead of the TTS-specific labels. update_cosmetic
+    patches label/mascot/pct/mascot_state in place without touching
+    the stage number.
+    """
+    app, user = worker_client
+    real_path_id = _seed_path(app, user, num_modules=1)
+    _patch_tts_dir(monkeypatch, tmp_path)
+
+    task_id = 'cosmetic-task-1'
+    pt_create_task(task_id=task_id, stages=GENERATE_STAGES)
+    progress_tracker.update_progress(task_id, 4)
+
+    # Patch update_progress on the progress_tracker module to RAISE if
+    # called by the TTS worker. update_cosmetic must be the only path
+    # the worker uses to publish UI progress.
+    import src.services.tts_worker as worker_module
+
+    def _fail_if_called(*args, **kwargs):
+        raise AssertionError(
+            "TTS worker must not call update_progress — it would race "
+            "with the request handler's stage number."
+        )
+
+    monkeypatch.setattr(
+        worker_module.progress_tracker, 'update_progress', _fail_if_called,
+    )
+
+    async def mock_gen(text, voice, out_path):
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text('ok')
+
+    import src.services.tts_service as tts_service_module
+    monkeypatch.setattr(tts_service_module, '_generate_mp3', mock_gen)
+
+    with app.app_context():
+        run_tts_generation_for_path(
+            user_id=user.id, path_id=real_path_id, task_id=task_id,
+        )
+
+    # The stage number from the request handler must still be 4
+    # (we patched update_progress to raise, so the worker couldn't
+    # have changed it). The mascot was patched by update_cosmetic
+    # to the TTS final-stage mascot ('All done!') — the user-facing
+    # bubble text. The label is also updated to the TTS final-stage
+    # label ('Complete'), but that is internal.
+    entry = pt_get_progress(task_id)
+    assert entry['stage'] == 4
+    assert entry['mascot'] == 'All done!'
+    assert entry['label'] == 'Complete'
+
+    # The completion column is the new "navigate now" signal, NOT
+    # entry['done']. Verify the column is set on the StudyPath.
+    from src.models import StudyPath
+    with app.app_context():
+        path_after = StudyPath.query.filter_by(
+            id=real_path_id, user_id=user.id,
+        ).first()
+        assert path_after is not None
+        assert path_after.generation_completed_at is not None

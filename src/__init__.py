@@ -70,4 +70,17 @@ def create_app():
     from src import routes
     app.register_blueprint(routes.bp)
 
+    # ── Static-file cache control ───────────────────────────────────────
+    # Flask's default static-file handler sends strong cache headers
+    # (12-hour max-age), which causes the browser to keep stale
+    # .js and .css files across code changes. This produced a
+    # "phantom" bug during manual testing where the new server
+    # code was correct but the browser kept running the old
+    # client-side JS that fired a 10-minute hard-timeout redirect.
+    # Setting ``SEND_FILE_MAX_AGE_DEFAULT=0`` makes the dev server
+    # always serve "no-cache" so the browser revalidates every
+    # static file on each page load. (In production this would be
+    # handled by a CDN or by serving hashed asset names.)
+    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
     return app

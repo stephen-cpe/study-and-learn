@@ -128,17 +128,46 @@ def generate_lessons():
     # Task 5: TTS generation runs in a background thread so the request
     # handler can return immediately. The lessons page polls
     # /lessons/generation-status to display per-module audio status.
-    if tts_enabled and path_id_val:
-        from src.services.tts_worker import spawn_tts_background_task
-        spawn_tts_background_task(
-            flask_app=current_app._get_current_object(),
-            user_id=current_user.id,
-            path_id=path_id_val,
-            task_id=task_id,
-        )
-
+    #
+    # The redirect signal is ``StudyPath.generation_completed_at``:
+    #   - tts_enabled=False  → this handler sets the column now, so
+    #     the JS poll-based redirect fires immediately.
+    #   - tts_enabled=True   → the TTS background worker sets the
+    #     column in its finally block once every module has finished
+    #     (success, skipped, or failed). The JS redirect fires when
+    #     the user sees the bubble say "All done!".
+    # The column is the canonical "navigate now" signal — atomic with
+    # the lesson-dict persistence, no shared cache state, no race
+    # conditions. The previous cache-based signal (``data.done``) had
+    # a race condition where the TTS worker overwrote the request
+    # handler's stage 4 (max GENERATE_STAGES) with its own max
+    # stage 3 (TTS_STAGES), causing the JS poll-based redirect
+    # (``data.stage >= 4``) to never fire.
+    from datetime import datetime, timezone
     from src import db
     from src.models import StudyPath
+
+    if tts_enabled and path_id_val:
+        try:
+            from src.services.tts_worker import spawn_tts_background_task
+            spawn_tts_background_task(
+                flask_app=current_app._get_current_object(),
+                user_id=current_user.id,
+                path_id=path_id_val,
+                task_id=task_id,
+            )
+        except Exception as e:
+            # Defensive: if the background thread cannot even be
+            # started, set the completion column here so the user
+            # is not stuck on the results page forever.
+            logger.warning("TTS background thread failed to spawn: %s", str(e))
+            _set_generation_completed(path_id_val, current_user.id)
+    else:
+        # No TTS worker spawned — this handler is the only producer
+        # of the completion signal, so it must set the column before
+        # returning or the JS poll will hang at "Generating…".
+        _set_generation_completed(path_id_val, current_user.id)
+
     path = StudyPath.query.filter_by(id=path_id_val, user_id=current_user.id).first() if path_id_val else None
     if not path:
         path = StudyPath.query.filter_by(user_id=current_user.id, status='active').order_by(StudyPath.created_at.desc()).first()
@@ -151,6 +180,45 @@ def generate_lessons():
         'redirect': url_for('main.lessons', path_id=path_id_val),
         'task_id': task_id,
     })
+
+
+def _set_generation_completed(path_id: str, user_id: str) -> None:
+    """Set ``StudyPath.generation_completed_at`` to NOW().
+
+    This is the canonical "redirect now" signal for the JS client.
+    Used by:
+      - The ``generate_lessons`` route when TTS is disabled (or path
+        is unknown), so the redirect fires immediately on return.
+      - The TTS worker's finally block, so the redirect fires when
+        every TTS module has reached a terminal state.
+
+    Defensive: if the path cannot be found or the DB write fails,
+    the error is logged but not raised — the user must never be
+    stuck because the completion flag failed to set. (The JS
+    client has a 2-hour hard-timeout safety net that stops
+    polling with a "still working" message rather than redirecting
+    — this covers the worst case where the column is never set.)
+    """
+    from src import db
+    from src.models import StudyPath
+    from datetime import datetime, timezone
+    if not path_id:
+        return
+    try:
+        path = StudyPath.query.filter_by(id=path_id, user_id=user_id).first()
+        if path is None:
+            return
+        path.generation_completed_at = datetime.now(timezone.utc)
+        db.session.commit()
+    except Exception as e:
+        logger.warning(
+            "Failed to set generation_completed_at for path %s: %s",
+            path_id, str(e),
+        )
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
 
 
 @bp.route('/lessons')
@@ -180,10 +248,19 @@ def lessons():
 def generation_status():
     """Return per-module TTS audio generation status for the current user.
 
-    Used by the lessons page (via JS polling) to display per-card badges
-    while TTS generation is in progress. The endpoint accepts a ``path_id``
-    query string; when missing, falls back to the user's most recent
-    active StudyPath.
+    Used by the results page (via JS polling) to decide when to
+    redirect the user to the lessons page. The endpoint accepts a
+    ``path_id`` query string; when missing, falls back to the user's
+    most recent active StudyPath.
+
+    The endpoint is the SINGLE SOURCE OF TRUTH for the "navigate
+    now" signal. The JS polls this endpoint and redirects when
+    ``generation_completed`` is true. The signal is sourced from
+    the ``StudyPath.generation_completed_at`` column (set by the
+    request handler for TTS-disabled generations, or by the TTS
+    background worker's finally block for TTS-enabled generations).
+    This replaces the previous cache-based ``progress_tracker.mark_done()``
+    signal, which had a race condition.
 
     Response shape::
 
@@ -197,6 +274,7 @@ def generation_status():
             "all_ready": true | false,
             "ready_count": int,
             "total": int,
+            "generation_completed": true | false,   # ← redirect when true
             "task_status": {"stage": int, "label": str, "pct": int, "mascot": str}
                          | null  (when no active task for this user)
         }
@@ -212,11 +290,19 @@ def generation_status():
             'all_ready': False,
             'ready_count': 0,
             'total': 0,
+            'generation_completed': False,
             'task_status': None,
         })
     from src.services.tts_worker import get_path_audio_status
     status = get_path_audio_status(user_id=current_user.id, path_id=path_id)
     status['path_id'] = path_id
+    # Read the canonical "redirect now" signal from the StudyPath row.
+    # This is atomic, ACID, and unaffected by shared-cache races.
+    from src.models import StudyPath
+    path = StudyPath.query.filter_by(id=path_id, user_id=current_user.id).first()
+    status['generation_completed'] = (
+        path is not None and path.generation_completed_at is not None
+    )
     # Also include the live progress_tracker status for the user's
     # current task (used by the JS to show the overall mascot progress).
     task_status = None

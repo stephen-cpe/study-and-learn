@@ -230,3 +230,205 @@ def test_old_long_mascot_messages_removed():
     blob = js + '\n' + tpl
     for snippet in stale:
         assert snippet not in blob, f'Stale verbose mascot line still present: {snippet!r}'
+
+
+# ── Hard-timeout regression: 2026-06-17 ──────────────────────────────
+# During manual testing the user reported the post-generation
+# redirect was firing prematurely. Root cause: progress.js had a
+# 10-minute ``HARD_TIMEOUT_MS`` safety net that, on expiry, called
+# ``window.location.href = '/lessons'`` — which 302-bounced to
+# /results (lessons not yet saved) and made it LOOK like the
+# server-side redirect was firing prematurely. With cloud AI
+# (gemma3:27b-cloud) and 3+ modules, generation can take 15-25
+# minutes; the 10-minute cap was too aggressive. The new
+# contract: when the hard cap expires the JS simply stops polling
+# and shows a "still working" message; the user can navigate
+# away manually. The cap was extended to 30 minutes.
+
+def test_progress_js_hard_timeout_does_not_redirect():
+    """progress.js must NOT redirect to /lessons on hard timeout.
+
+    Previously a 10-minute hard cap fired
+    ``window.location.href = '/lessons'`` which 302-bounced to
+    /results when lessons were not yet saved, making it appear
+    that the redirect was firing prematurely. The new contract:
+    on hard-cap expiry the JS stops polling and shows a message.
+    """
+    js = _read(PROGRESS_JS)
+
+    # The hard-timeout block in the new code must set a bubble
+    # message and stop polling — it must NOT navigate to /lessons.
+    # Locate the "Hard timeout" comment block and assert no
+    # ``window.location.href`` is invoked inside it.
+    m = re.search(
+        r'//\s*Hard timeout:.*?(?=\n\s*//\s*[A-Z]|\n\s*$)',
+        js, re.S,
+    )
+    assert m, 'progress.js missing the "Hard timeout" comment block'
+    block = m.group(0)
+    assert 'window.location.href' not in block, (
+        'progress.js hard-timeout block must NOT call '
+        'window.location.href. The previous behavior of redirecting '
+        'to /lessons on hard timeout 302-bounced to /results and '
+        'was the root cause of the "premature redirect" user '
+        'reports.'
+    )
+    # The block must call stopProgressPoll and setBubblePersistent
+    # so the user knows the page is still working.
+    assert 'stopProgressPoll' in block
+    assert 'setBubblePersistent' in block
+
+
+def test_progress_js_hard_timeout_is_at_least_2_hours():
+    """HARD_TIMEOUT_MS must be at least 2 hours (7,200,000 ms).
+
+    With cloud AI (gemma3:27b-cloud) and 3+ modules, a full
+    generation (lessons + checkpoints + quiz + narration
+    script + edge-tts audio) can take 45-90 minutes end-to-end.
+    The cap was raised to 2 hours to accommodate the slowest
+    realistic cloud-AI run.
+
+    The previous 10-minute cap (600,000 ms) and 30-minute cap
+    (1,800,000 ms) were both too aggressive and caused
+    false-positive "premature redirect" reports.
+    """
+    js = _read(PROGRESS_JS)
+    m = re.search(
+        r'var\s+HARD_TIMEOUT_MS\s*=\s*(\d+)\s*;',
+        js,
+    )
+    assert m, 'progress.js missing HARD_TIMEOUT_MS constant'
+    value = int(m.group(1))
+    assert value >= 7_200_000, (
+        f'HARD_TIMEOUT_MS = {value} ms is less than 2 hours '
+        f'(7,200,000 ms). Cloud-AI generation of 3+ modules '
+        f'with TTS can take 45-90 minutes end-to-end; the cap '
+        f'must accommodate this.'
+    )
+
+
+def test_app_factory_disables_static_file_cache():
+    """src/__init__.py must set SEND_FILE_MAX_AGE_DEFAULT=0.
+
+    Flask's dev server sends strong cache headers (12-hour
+    max-age) for static files by default. This caused a phantom
+    "bug" during manual testing: the new server code was correct
+    but the browser kept the OLD ``progress.js`` (with the 10-min
+    hard timeout) cached. The fix: disable the dev server's
+    static-file cache so the browser revalidates every file on
+    every page load.
+    """
+    src_init = (ROOT / 'src' / '__init__.py').read_text(encoding='utf-8')
+    assert "SEND_FILE_MAX_AGE_DEFAULT" in src_init, (
+        "src/__init__.py must configure "
+        "SEND_FILE_MAX_AGE_DEFAULT to prevent the dev server from "
+        "serving stale static files to the browser."
+    )
+    # Confirm the value is 0 (no-cache). Allow for whitespace
+    # between the key and the value.
+    m = re.search(
+        r"SEND_FILE_MAX_AGE_DEFAULT['\"]?\s*=\s*(\d+)",
+        src_init,
+    )
+    assert m, (
+        "SEND_FILE_MAX_AGE_DEFAULT assignment not found in "
+        "src/__init__.py"
+    )
+    value = int(m.group(1))
+    assert value == 0, (
+        f"SEND_FILE_MAX_AGE_DEFAULT = {value}; expected 0 "
+        f"(no-cache) so the browser revalidates static files on "
+        f"every page load."
+    )
+
+
+# ── Two-poll design regression: 2026-06-17 ─────────────────────────
+# After fixing the 10-minute hard-timeout redirect bug we lost
+# real-time bubble updates during the 45-90 minute cloud-AI
+# generation (the resolvedPathId gate meant /lessons/generation-status
+# wasn't polled until the POST response returned — which is after
+# ALL modules are generated). The fix: poll BOTH /progress (for
+# cosmetic updates) and /lessons/generation-status (for the redirect
+# decision) in parallel. The cosmetic poll must NEVER trigger a
+# redirect; the redirect-decision poll must NEVER update the bubble.
+
+def test_progress_js_polls_both_endpoints_in_parallel():
+    """progress.js must poll /progress AND /lessons/generation-status.
+
+    /progress is for cosmetic bubble updates (mascot text,
+    progress bar fill). It runs as soon as the user clicks
+    Generate. /lessons/generation-status is for the redirect
+    decision only (generation_completed === true). It runs only
+    after the POST response has set resolvedPathId. Together they
+    give the user real-time feedback during the 45-90 minute
+    cloud-AI generation.
+    """
+    js = _read(PROGRESS_JS)
+
+    # Cosmetic poll: /progress must be present in startGenerateLessons.
+    # Match a fetch to /progress inside the startGenerateLessons
+    # function (not inside startProcessProgressPoll).
+    start_gen_idx = js.find('window.startGenerateLessons')
+    assert start_gen_idx >= 0, 'startGenerateLessons not found'
+    start_gen = js[start_gen_idx:]
+    assert "'/progress?task_id='" in start_gen or '"/progress?task_id="' in start_gen, (
+        'progress.js startGenerateLessons must poll /progress '
+        'for cosmetic bubble updates during the long generation.'
+    )
+
+    # Redirect-decision poll: /lessons/generation-status must be
+    # present in startGenerateLessons.
+    assert "'/lessons/generation-status?path_id='" in start_gen or '"/lessons/generation-status?path_id="' in start_gen, (
+        'progress.js startGenerateLessons must poll '
+        '/lessons/generation-status for the redirect decision.'
+    )
+
+
+def test_progress_js_cosmetic_poll_never_triggers_redirect():
+    """The /progress poll must NOT trigger a window.location.href
+    redirect.
+
+    The previous code used ``data.stage >= 4`` and ``data.done ===
+    true`` from this endpoint to trigger the redirect, which
+    caused the premature-redirect bug. The new design uses this
+    endpoint only for cosmetic updates and the redirect-decision
+    lives exclusively on /lessons/generation-status. This test
+    is the regression guard.
+    """
+    js = _read(PROGRESS_JS)
+
+    start_gen_idx = js.find('window.startGenerateLessons')
+    assert start_gen_idx >= 0, 'startGenerateLessons not found'
+    start_gen = js[start_gen_idx:]
+
+    # The /progress fetch response handler must NOT contain
+    # ``window.location.href`` (which is the redirect action).
+    progress_poll_idx = start_gen.find("'/progress?task_id='")
+    assert progress_poll_idx >= 0, (
+        '/progress cosmetic poll not found in startGenerateLessons'
+    )
+    # Find the matching ``.then(function (data) { ... })`` block
+    # that handles the cosmetic response. Look for the next
+    # ``window.location.href`` after the /progress fetch and
+    # assert it is NOT inside that .then handler.
+    #
+    # We approximate "inside the .then handler" by searching for
+    # the next ``.catch`` after the /progress fetch — any
+    # window.location.href BEFORE the .catch is inside the .then.
+    progress_response_idx = start_gen.find(
+        '.then(function (data)', progress_poll_idx,
+    )
+    assert progress_response_idx >= 0, (
+        '/progress response handler not found in startGenerateLessons'
+    )
+    catch_idx = start_gen.find('.catch(function () {}', progress_response_idx)
+    assert catch_idx > progress_response_idx, (
+        '/progress .catch handler not found after .then handler'
+    )
+
+    cosmetic_block = start_gen[progress_response_idx:catch_idx]
+    assert 'window.location.href' not in cosmetic_block, (
+        '/progress cosmetic poll must NOT trigger '
+        'window.location.href. The redirect-decision lives '
+        'exclusively on /lessons/generation-status.'
+    )

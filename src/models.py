@@ -67,6 +67,7 @@ class StudyPath(db.Model):
     extracted_texts = db.Column(db.Text, nullable=True)
     file_hashes = db.Column(db.Text, nullable=True)
     file_names = db.Column(db.Text, nullable=True)
+    generation_completed_at = db.Column(DateTime, nullable=True)
     created_at = db.Column(DateTime, default=_utcnow)
     updated_at = db.Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
