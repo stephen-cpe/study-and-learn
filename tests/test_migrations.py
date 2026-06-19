@@ -64,7 +64,6 @@ def test_initial_migration_creates_users_table(app):
         assert 'email' in columns
         assert 'password_hash' in columns
         assert 'is_admin' in columns
-        assert 'active_lessons' in columns
         assert 'created_at' in columns
         assert 'updated_at' in columns
 

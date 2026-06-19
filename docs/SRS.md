@@ -257,14 +257,14 @@ study-and-learn/
 
 | Parameter | Description | Notes |
 |---|---|---|
-| Serving framework | Ollama (default) | Local-first via Ollama; cloud API via `ai_client_cloud.py` import toggle or `AI_BACKEND=cloud` env var |
-| Chat model | Configured via `OLLAMA_MODEL` env var | Default when `AI_BACKEND=local`: `qwen3:0.6b` (in `ai_client.py`, suitable for 6GB VRAM). Default when `AI_BACKEND=cloud`: `gemma3:27b-cloud` (in `ai_client_cloud.py` and `config.py`). Local dev without a GPU should keep `OLLAMA_MODEL=qwen3:0.6b` in `.env`; cloud dev should set `OLLAMA_MODEL=gemma3:27b-cloud`. |
+| Serving framework | Ollama (default) | Local-first via Ollama; cloud API selected via the `AI_BACKEND=cloud` env var (the Sprint-5 "import toggle" pattern has been removed — backend selection is exclusively env-var-driven in `ai_client.py::call_ollama`) |
+| Chat model | Configured via `OLLAMA_MODEL` env var | `config.py` ships `gemma3:27b-cloud` as the single package default (used by `Config.summary()` only). When `AI_BACKEND=local` and `OLLAMA_MODEL` is unset at call time, `ai_client.py` falls back to `qwen3:0.6b` (suitable for 6GB VRAM). For local dev without cloud credentials, set `OLLAMA_MODEL=qwen3:0.6b` and `AI_BACKEND=local` in `.env`. |
 | Embedding model | Configured via `OLLAMA_EMBEDDING_MODEL` env var | Used exclusively for ChromaDB vector embeddings. Swappable via env var. |
 | Testing mode | `AI_MOCK=true` returns a deterministic plain-text stub string (e.g. `Mock response for prompt: <first 50 chars>...`), NOT structured JSON. Downstream services must parse defensively and fall back to defaults when the mock string is returned. | Ensures deterministic CI/CD without GPU or cloud dependency |
 | OCR model | GLM-OCR (0.9B, local-only) | AI-powered text/table/figure recognition for scanned PDFs and images |
 
 ### 4.5 RAG & Multi-Document Architecture
-- **Chunking**: `RecursiveCharacterTextSplitter` (LangChain) with configurable size/overlap
+- **Chunking**: `RecursiveCharacterTextSplitter` (LangChain) with hardcoded `chunk_size=1000`, `chunk_overlap=200` (no env vars or config settings expose these — see `src/services/chunker.py:20-25`)
 - **Vector Storage**: Persistent ChromaDB (`./data/chroma_db`) for dev; in-memory fallback for CI
 - **Multi-Upload**: Route accepts `request.files.getlist('files')` with max 5 files per submission
 - **Retrieval**: Top-k similarity search against goal-aligned chunks before AI prompt injection

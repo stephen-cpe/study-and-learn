@@ -115,13 +115,11 @@ def is_content_registered(file_hash: str) -> Optional[str]:
     return None
 
 
-def register_content(file_hash: str, extracted_text: str, ocr_text: str = "") -> str:
+def register_content(file_hash: str, extracted_text: str) -> str:
     collection_name = get_collection_name(file_hash)
     existing = ContentRegistry.query.filter_by(file_hash=file_hash).first()
     if existing:
         existing.extracted_text = extracted_text
-        if ocr_text:
-            existing.ocr_text = ocr_text
         db.session.commit()
         return existing.chroma_collection
 
@@ -129,7 +127,6 @@ def register_content(file_hash: str, extracted_text: str, ocr_text: str = "") ->
         file_hash=file_hash,
         chroma_collection=collection_name,
         extracted_text=extracted_text,
-        ocr_text=ocr_text,
     )
     db.session.add(entry)
     try:
@@ -455,8 +452,7 @@ def extract_text_with_vision(file_path: str, progress_callback=None) -> str:
         else:
             result = ""
 
-    ocr_combined = "\n\n".join(ocr_outputs) if ocr_outputs else ""
-    register_content(file_hash, result, ocr_text=ocr_combined)
+    register_content(file_hash, result)
 
     for img_path in page_images:
         try:

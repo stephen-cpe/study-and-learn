@@ -77,3 +77,4 @@ Pending Decisions:
 Next 3 Tasks (Sprint 8):
   1. General QA pass: manual smoke test of all user flows; log defects
   2. Deploy to Render or Railway free tier with AI_MOCK=true fallback
+  3. Final documentation review, demo recording, and capstone submission

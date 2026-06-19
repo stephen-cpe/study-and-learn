@@ -34,14 +34,16 @@ You follow Spec-Driven Development strictly.
    - Do not run git commands — suggest commit message only
    - Limit each task to one logical unit of work; up to 10 files may be touched without prior approval
    - If you need to touch more than 10 files, ask first
-    - Always read AI model from `OLLAMA_MODEL` env var (default when `AI_BACKEND=local`: `qwen3:0.6b` in `ai_client.py`; default when `AI_BACKEND=cloud`: `gemma3:27b-cloud` in `ai_client_cloud.py`/`config.py`); never hardcode model names
-   - Always use `OLLAMA_EMBEDDING_MODEL` env var for vector_store embeddings; never hardcode
-   - Use `AI_BACKEND` env var to control local vs cloud AI provider
-   - Never hardcode Ollama endpoints
-   - Use persistent ChromaDB (`./data/chroma_db`) for dev; in-memory for CI tests
-   - Multi-upload route must cap at 5 files; validate before processing
-   - CI tests must use in-memory ChromaDB and `AI_MOCK=true`
-   - Never rely on live embeddings in CI
+   - Always read AI model from `OLLAMA_MODEL` env var. Note `config.py` ships `gemma3:27b-cloud` as the package default (used only by `Config.summary()` diagnostics); `ai_client.py` falls back to `qwen3:0.6b` when `AI_BACKEND=local` and `OLLAMA_MODEL` is unset at call time. Never hardcode model names
+    - Always use `OLLAMA_EMBEDDING_MODEL` env var for vector_store embeddings; never hardcode
+    - Use `AI_BACKEND` env var to control local vs cloud AI provider. `AI_BACKEND` is read at call time in `ai_client.py::call_ollama` (line 99), NOT from `config.py` — there is no `Config.AI_BACKEND` attribute; do not read it from `current_app.config`
+    - Never hardcode Ollama endpoints
+    - `call_ollama(prompt, model, force_local=False)` has a `force_local` parameter (`ai_client.py:84`). OCR/vision calls always pass `force_local=True` because GLM-OCR has no cloud variant and must run on local Ollama regardless of `AI_BACKEND`. Never route OCR calls through `AI_BACKEND=cloud` — the cloud endpoint has no GLM-OCR model and will fail silently
+    - OCR behavior is dual-gated. Pulling `glm-ocr` is necessary but NOT sufficient: OCR is also gated by `OCR_FULL=true` (default `false`, `config.py:77`, `vision_parser.py:316`) which switches from text-only extraction to text+table+figure OCR per page. `OCR_FIGURE_DESCRIPTION=true` (default `false`, `config.py:79`, `vision_parser.py:332`) additionally enables cloud Qwen3.5 figure descriptions. With `OCR_FULL=false` the app does traditional text-layer extraction even if `glm-ocr` is installed
+    - Use persistent ChromaDB (`./data/chroma_db`) for dev; in-memory for CI tests
+    - Multi-upload route must cap at 5 files; validate before processing
+    - CI tests must use in-memory ChromaDB and `AI_MOCK=true`. In-memory ChromaDB is activated by the `CI=true` env var (`vector_store.py:24`) — there is no conftest-level default that sets it automatically; set it explicitly in the CI workflow or per-test via `monkeypatch.setenv('CI', 'true')`. Likewise `AI_MOCK` is re-read at call time in `ai_client.py:92` and `ai_client_cloud.py:33` (not just `config.py:92`) so tests can `monkeypatch.setenv` before invoking `call_ollama`
+    - Never rely on live embeddings in CI
    - RAG services must include deterministic test stubs
    - Use Flask-Session with cachelib FileSystemCache for server-side sessions; never rely on cookie-only sessions
    - PostgreSQL is the only supported database; app factory validates `DATABASE_URL` begins with `postgresql`
@@ -67,6 +69,10 @@ You follow Spec-Driven Development strictly.
       single failed module sets `tts_audio_status='failed'` and
       `tts_enabled=False` on that lesson dict and continues to the next module).
       The worker runs inside a Flask app context so it can read/write the DB.
+      There is NO retry — a failed module is terminal for that module; the user
+      must retake the lesson to regenerate audio for it. Do not add retry loops
+      that would delay `generation_completed_at` or strand the user on the
+      results page.
     - The canonical "navigate now" redirect signal is the
       `StudyPath.generation_completed_at` DB column (atomic, ACID), NOT the
       cache-based `progress_tracker.mark_done()`. It is set by the request
@@ -84,8 +90,14 @@ You follow Spec-Driven Development strictly.
     - Custom SSML is NOT supported by edge-tts >= 5.0.0. Always pass plain text to
       edge_tts.Communicate(). Never attempt to construct SSML strings.
     - Quiz question types are: mcq, true_false, multi_select, cloze_dropdown.
-      fill_blank is a deprecated legacy type — do not generate new fill_blank questions.
-      Backward-compat grading for old fill_blank records must be preserved in grader.py.
+      fill_blank is a deprecated legacy type — the generator prompt requests
+      only the 4 active types, but `_validate_questions` in quiz_generator.py
+      still *tolerates* an AI-emitted fill_blank (normalizing it to cloze_dropdown
+      when it carries options+answer_index, or passing it through as fill_blank
+      when it carries a free-text `answer`). This tolerance is intentional
+      backward-compat for legacy lesson JSON — do not remove it. The grader
+      (`grader.py::_grade_single_question`) must keep its `fill_blank` branch
+      to grade legacy records. Do not author new fill_blank prompts.
     - Checkpoint types are: mcq, true_false, cloze_dropdown (randomly weighted 0.5/0.3/0.2).
     - Difficulty level (Easy/Normal/Hard) is snapshotted into each lesson dict at generation
       time as lesson['difficulty']. It is never read from user settings at deck/grade time.
@@ -107,6 +119,17 @@ You follow Spec-Driven Development strictly.
       It is auto-saved via POST /lessons/<i>/save-position on every slide advance (debounced 500ms).
     - path_id_val must be re-resolved after save_lessons() if it was None before the call
       (first-time path creation). Never use a None path_id for TTS generation or redirect URLs.
+    - The audio route `GET /lessons/<i>/audio/<slide_index>` returns a load-bearing status
+      triad the JS player (`deck-page.js`) depends on: 200 (file ready), 202 (TTS enabled
+      but manifest missing OR file missing on disk — JS retries in ~2s), 404 (TTS disabled,
+      module_index out of range, OR manifest present but slide_index has no entry — JS
+      stops retrying). Do not collapse 202 into 404 or vice versa; the retry-vs-stop
+      decision in deck-page.js keys off this distinction. See `lessons.py:518-553`.
+    - Dev server forces `SEND_FILE_MAX_AGE_DEFAULT=0` (`src/__init__.py:84`) to prevent
+      stale JS/CSS caching. Never remove or increase this in development — the browser
+      will cache old client code and produce phantom bugs (e.g. the premature 10-minute
+      hard-timeout redirect that masked earlier TTS fixes) that are invisible on the
+      server side. In production, asset hashing or a CDN handles caching instead.
 
 ## State Tracking
 After each task, update `docs/STATUS.md` using EXACTLY this format:

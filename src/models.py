@@ -25,7 +25,6 @@ class User(db.Model, UserMixin):
     password_hash = db.Column(String(255), nullable=False)
     is_admin = db.Column(Boolean, default=False, nullable=False)
     can_generate_lessons = db.Column(Boolean, default=False, nullable=False)
-    active_lessons = db.Column(Integer, default=0, nullable=False)
     avatar = db.Column(String(32), nullable=False, default='avatar-0.png')
     tts_enabled = db.Column(Boolean, nullable=False, default=False)
     tts_speaker = db.Column(String(16), nullable=False, default='Ava')
@@ -84,7 +83,6 @@ class ContentRegistry(db.Model):
     file_hash = db.Column(String(64), unique=True, index=True, nullable=False)
     chroma_collection = db.Column(String(128), unique=True, nullable=False)
     extracted_text = db.Column(db.Text, nullable=True)
-    ocr_text = db.Column(db.Text, nullable=True)
     created_at = db.Column(DateTime, default=_utcnow)
 
     def __repr__(self) -> str:

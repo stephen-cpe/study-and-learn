@@ -385,32 +385,6 @@ h2, .section-title {
 }
 
 /* Loading spinner */
-.spinner-overlay {
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(5, 11, 20, 0.9);
-  z-index: 9999;
-  justify-content: center;
-  align-items: center;
-  flex-direction: column;
-}
-
-.spinner-overlay.active {
-  display: flex;
-}
-
-.spinner-text {
-  margin-top: 1rem;
-  font-size: 1.2rem;
-  color: var(--az-cyan-light);
-  font-family: "PressStart2P", "Courier New", monospace;
-  font-size: 0.7em;
-}
-
 .spinner-border {
   color: var(--az-cyan);
 }
@@ -683,11 +657,6 @@ h2, .section-title {
     color: var(--az-muted);
     font-size: 0.85em;
     margin-top: 0.5rem;
-}
-.spinner-subtext {
-    margin-top: 0.5rem;
-    color: var(--az-cyan);
-    font-size: 0.9em;
 }
 
 /* ===== LESSONS PAGE ===== */

@@ -85,7 +85,9 @@ To verify Poppler is installed correctly:
 pdftoppm -v
 ```
 
-### 6. Pull Ollama models
+### 6. Pull Ollama models (local backend only)
+
+If you will run with `AI_BACKEND=local` (the default) and no `OLLAMA_MODEL` override:
 
 ```bash
 ollama pull qwen3:0.6b
@@ -95,7 +97,9 @@ ollama pull glm-ocr
 
 The default models are placeholders. For better results, use larger models such as `qwen3:8b` or `gemma3:4b` if your hardware can accommodate them.
 
-`glm-ocr` (0.9B) enables AI-powered OCR for PDFs and images. If you skip this step, the app falls back to traditional text-only extraction.
+Note: `config.py` ships `OLLAMA_MODEL=gemma3:27b-cloud` as the package default — to run locally without a `.env`, set `AI_BACKEND=local` and `OLLAMA_MODEL=qwen3:0.6b` in your `.env` (see `.env.example`).
+
+`glm-ocr` (0.9B) is the local OCR model. Pulling it alone does NOT enable OCR — OCR is additionally gated by `OCR_FULL=true` (default `false`). With `OCR_FULL=false` the app uses traditional text-layer extraction even if `glm-ocr` is installed; set `OCR_FULL=true` to run AI-powered OCR on PDFs and images. Set `OCR_FIGURE_DESCRIPTION=true` to additionally generate cloud Qwen3.5 figure descriptions.
 
 ### 7. Create .env file
 

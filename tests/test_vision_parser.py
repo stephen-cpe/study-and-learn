@@ -91,7 +91,7 @@ class TestContentRegistry:
             mock_existing.chroma_collection = "doc_existing"
             mock_cr.query.filter_by.return_value.first.return_value = mock_existing
             from src.services.vision_parser import register_content
-            result = register_content("h" * 64, "updated text", ocr_text="ocr")
+            result = register_content("h" * 64, "updated text")
             assert result == "doc_existing"
 
 

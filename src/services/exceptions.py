@@ -16,11 +16,3 @@ class AICloudAPIError(AIServiceError):
 
 class AITimeoutError(AIServiceError):
     pass
-
-
-class OCRUnavailableError(AIServiceError):
-    pass
-
-
-class EmbeddingServiceError(StudyAndLearnError):
-    pass

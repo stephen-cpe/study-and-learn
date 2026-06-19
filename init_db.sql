@@ -17,7 +17,6 @@ CREATE TABLE users (
     password_hash          VARCHAR(255) NOT NULL,
     is_admin               BOOLEAN      NOT NULL DEFAULT FALSE,
     can_generate_lessons   BOOLEAN      NOT NULL DEFAULT FALSE,
-    active_lessons         INTEGER      NOT NULL DEFAULT 0,
     avatar                 VARCHAR(32)  NOT NULL DEFAULT 'avatar-0.png',
     tts_enabled            BOOLEAN      NOT NULL DEFAULT FALSE,
     tts_speaker            VARCHAR(16)  NOT NULL DEFAULT 'Ava',
@@ -57,7 +56,6 @@ CREATE TABLE content_registry (
     file_hash         VARCHAR(64)  NOT NULL,
     chroma_collection VARCHAR(128) NOT NULL,
     extracted_text    TEXT         NULL,
-    ocr_text          TEXT         NULL,
     created_at        TIMESTAMP    NULL,
     CONSTRAINT pk_content_registry PRIMARY KEY (id)
 );
@@ -88,7 +86,7 @@ CREATE TABLE alembic_version (
     CONSTRAINT pk_alembic_version PRIMARY KEY (version_num)
 );
 
-INSERT INTO alembic_version (version_num) VALUES ('d4e5f6a7b8c9');
+INSERT INTO alembic_version (version_num) VALUES ('f6a7b8c9d0e1');
 
 -- 6. Seed users (development only -- not for production)
 --

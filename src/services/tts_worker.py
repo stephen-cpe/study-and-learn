@@ -85,19 +85,6 @@ def is_module_audio_ready(path_id: str, module_index: int) -> bool:
     return manifest_path.exists()
 
 
-def get_module_status(path_id: str, module_index: int) -> str:
-    """Return the canonical status string for a module's audio:
-    - 'ready'   : manifest exists on disk
-    - 'pending' : tts_enabled is True but manifest not yet written
-    - 'n/a'     : tts_enabled is False for this module
-    - 'missing' : path/module not in the layout
-    """
-    if is_module_audio_ready(path_id, module_index):
-        return 'ready'
-    # Caller can layer their own tts_enabled check; default to 'pending'.
-    return 'pending'
-
-
 def get_path_audio_status(user_id: str, path_id: str) -> Dict[str, Any]:
     """Return a status summary for a path's TTS generation.
 

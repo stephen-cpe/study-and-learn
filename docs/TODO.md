@@ -3,7 +3,7 @@
 ### *Turn Any Documents into Interactive, Personalized Learning Experiences*
 
 **Purpose:** This document organizes the capstone work into MVP tasks, user stories, sprints, stretch goals, and submission requirements.  
-**Last updated:** June 14, 2026
+**Last updated:** June 19, 2026
 
 ---
 
@@ -185,7 +185,7 @@ Build the smallest working version first, then iterate:
 - [x] Create super admin role with per-user lesson generation toggle
 - [x] Deny lesson generation by default for new registrations
 - [x] Landing page shows access-denied message for unauthorized users
-- [x] Seed demo accounts (Bob, Alice) with lesson generation access
+- [~] Seed demo accounts (Bob, Alice) with lesson generation access — superseded by init_db.sql seed (runtime seed-demo route removed in Sprint 8; see STATUS.md)
 - [x] Allow public registration but auto-deny lesson access
 - [x] Write unit and integration tests for auth flow
 - [x] Update task board with sprint progress
@@ -223,7 +223,7 @@ Build the smallest working version first, then iterate:
 - [x] Write 5 additional parser tests (pptx, image, dedup)
 - [x] Write 4 additional RAG tests (multi-collection retrieval, metadata)
 - [x] Add `ollama pull glm-ocr` to README setup instructions
-- [x] Run full test suite — 172 passing tests (143 original + 29 new)
+- [x] Run full test suite — 172 passing tests at Sprint 6 close (143 original + 29 new); suite has since grown to 381 tests by Sprint 8
 
 **Sprint 6 Definition of Done:**
 - OCR pipeline processes scanned PDFs with text/table/figure recognition
@@ -232,7 +232,7 @@ Build the smallest working version first, then iterate:
 - Multi-collection retrieval merges results across all uploaded documents
 - Progress bar shows 9 stages including OCR progress
 - All new features gated behind env vars (OCR_FULL, OCR_FIGURE_DESCRIPTION, AI_MOCK)
-- 367 tests passing
+- 367 tests passing at Sprint 6 close (suite is now 381 tests as of Sprint 8)
 - README updated with OCR setup instructions
 
 ---
@@ -295,6 +295,7 @@ badge system) are deferred to Sprint 8 as lower-priority polish tasks.
 **User Stories:** US-042, US-043, US-044, US-045
 
 **Bug Fixes & Defects (Priority: High — Fix Before Demo):**
+- [x] TTS bug-fix items #1-#11 (see STATUS.md lines 16-72 for the full list; covers path_id transport, audio-route fallback, retake redirect UX, flattened deck layout + narration regen, background TTS worker idempotency/failure-resilience/generation-status polling, checkpoint-before-narration ordering, removal of auto-advance after Quick Check, cache→DB redirect signal, 2-hour hard-timeout-no-redirect, two-poll parallel design)
 - [x] Fix TTS 404 bug — path_id not propagated to lesson deck for first-time path (Task 11)
 - [ ] General QA pass: run full manual smoke test on all user flows
 - [ ] Fix any additional defects discovered during QA pass
@@ -363,7 +364,7 @@ badge system) are deferred to Sprint 8 as lower-priority polish tasks.
 - [x] AI-powered OCR/vision (GLM-OCR local + Qwen3.5 cloud)
 - [x] Content-addressable global deduplication
 - [x] Multi-collection ChromaDB retrieval
-- [x] 367 automated tests
+- [x] 381 automated tests (Sprint 8 active; suite rebuilt from Tasks 1–11)
 - [x] GitHub Actions CI
 - [x] Static task board
 - [x] Design/testing document
@@ -481,7 +482,7 @@ badge system) are deferred to Sprint 8 as lower-priority polish tasks.
 - [x] Dashboard route and access control tests (Sprint 5)
 - [x] Lesson repository unit and integration tests (Sprint 5)
 - [x] Admin role tests (Sprint 5)
-- [~] seed-demo endpoint — removed (redundant; init_db.sql handles seeding)
+- [x] seed-demo endpoint — removed (redundant; init_db.sql handles seeding; see STATUS.md Sprint 8)
 - [x] OCR/vision parser tests (Sprint 6 — 20 tests)
 - [x] Parser expansion tests (Sprint 6 — 5 tests for pptx, image, dedup)
 - [x] RAG service expansion tests (Sprint 6 — 4 tests for multi-collection, metadata)
