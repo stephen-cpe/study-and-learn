@@ -129,7 +129,7 @@ The `AI_BACKEND` env var selects the AI provider. The default is `local` (Ollama
    ```
    AI_BACKEND=cloud
    OLLAMA_CLOUD_API_KEY=your-api-key-here
-   OLLAMA_MODEL=gemma3:12b-cloud
+   OLLAMA_MODEL=gemma3:27b-cloud
    ```
 
 2. Restart the application. All AI calls will route through the Ollama Cloud API instead of your local Ollama instance.
@@ -143,6 +143,8 @@ Set `AI_MOCK=true` in your `.env` file to use mock responses. This is useful for
 - SRS.md - Software requirements and user stories
 - TODO.md - Sprint plan and task backlog
 - DESIGN_AND_TESTING.md - Architecture and testing strategy
+- STATUS.md - Current sprint state and known issues
+- AI_AGENT_PROTOCOL.md - AI agent execution protocol and guardrails
 
 ## Links
 - [Public Task Board](https://stephen-cpe.github.io/task-board-v1/)

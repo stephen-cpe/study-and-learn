@@ -14,7 +14,7 @@ Environment variables
 ---------------------
 OLLAMA_CLOUD_API_KEY   (required)  Ollama Cloud API key
 OLLAMA_CLOUD_BASE_URL  (optional)  Default: https://ollama.com
-OLLAMA_MODEL           (optional)  Default: gemma3:12b-cloud
+OLLAMA_MODEL           (optional)  Default: gemma3:27b-cloud
 OLLAMA_TIMEOUT         (optional)  Default: 300 seconds
 """
 import os

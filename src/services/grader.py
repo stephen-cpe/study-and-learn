@@ -5,15 +5,6 @@ Supports mcq, true_false, multi_select, cloze_dropdown, and fill_blank question 
 from typing import Any
 
 
-def normalize_answer(value: Any) -> str:
-    """Return a lower-cased, whitespace-trimmed string for comparison."""
-    if value is None:
-        return ""
-    if isinstance(value, str):
-        return value.strip().lower()
-    return str(value).strip().lower()
-
-
 def _grade_single_question(question: dict, user_answer: Any) -> bool:
     """
     Grade a single question against a user-supplied answer.

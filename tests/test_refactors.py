@@ -12,7 +12,7 @@ from unittest.mock import patch
 from cachelib import FileSystemCache
 from src import create_app
 from src.services.lesson_orchestrator import build_module_artifacts, make_retriever
-from src.services.grader import _grade_single_question, _get_correct_answer, normalize_answer
+from src.services.grader import _grade_single_question, _get_correct_answer
 
 
 @pytest.fixture
@@ -140,7 +140,4 @@ def test_get_correct_answer_all_types():
     assert _get_correct_answer({"type": "unknown"}) is None
 
 
-def test_normalize_answer():
-    assert normalize_answer("  Hello ") == "hello"
-    assert normalize_answer(None) == ""
-    assert normalize_answer(42) == "42"
+

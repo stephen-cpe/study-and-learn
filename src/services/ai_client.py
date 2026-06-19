@@ -14,7 +14,6 @@ import time, so tests can safely use ``monkeypatch.setenv`` before invoking
 """
 import logging
 import os
-import time
 
 import requests
 
@@ -105,30 +104,4 @@ def call_ollama(prompt: str, model: str = None, force_local: bool = False) -> st
     return _call_ollama_local(prompt, model)
 
 
-def call_ollama_with_retry(prompt: str, model: str = None,
-                           force_local: bool = False,
-                           max_retries: int = 2) -> str:
-    """Call Ollama with automatic retry for transient connection failures.
 
-    Retries only on AIModelUnavailableError (Ollama not running, connection
-    refused). Does NOT retry timeouts or HTTP errors — those indicate
-    non-transient issues.
-    """
-    last_error = None
-    for attempt in range(max_retries + 1):
-        try:
-            return call_ollama(prompt, model=model, force_local=force_local)
-        except AIModelUnavailableError as e:
-            last_error = e
-            if attempt < max_retries:
-                delay = 2 ** attempt
-                logger.warning(
-                    "AI unavailable (attempt %d/%d), retrying in %ds: %s",
-                    attempt + 1, max_retries + 1, delay, str(e),
-                )
-                time.sleep(delay)
-        except (AITimeoutError, AICloudAPIError, AIServiceError):
-            raise
-
-    assert last_error is not None
-    raise last_error

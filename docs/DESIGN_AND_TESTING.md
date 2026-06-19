@@ -226,10 +226,18 @@ Core workflow:
 ### ADR-023: Edge-TTS for Opt-In Audio Narration
 
 **Decision:** Use the `edge-tts` Python library (Microsoft Edge Neural voices) for
-opt-in TTS narration. Generate one MP3 per slide (intro: slide_index=-1, content slides:
-0..N-1, outro: slide_index=N) at lesson-generation time. Store under
+opt-in TTS narration. Generate one MP3 per deck slot defined by `build_deck_layout()`
+(content slides, inline checkpoints, Final Quiz, Results), plus an intro MP3 at
+`slide_index=-1`, at lesson-generation time. The Results slot (last `deck_index`)
+narration doubles as the module outro — there is no separate outro MP3 at
+`slide_index=N`. The `slide_index` of each narration entry matches the corresponding
+`deck_index` in `lesson['lesson']['deck_layout']`, which is the single source of truth
+for slot ordering shared by the template's `data-deck-index`, the JS deck engine's
+advance target, and the TTS manifest. Store under
 data/tts/<path_id>/<module_index>/. Serve via authenticated Flask routes. Delete on
-StudyPath cancel/complete/delete.
+StudyPath cancel/complete/delete. (The legacy `intro=-1, content 0..N-1, outro=N`
+contract is a fallback only, used when `deck_layout=None`, and is not exercised in
+production.)
 
 **Reason:** edge-tts is zero-cost, requires no API key, produces high-quality Neural voices
 (Ava/Emma/Ryan/Andrew), and runs as a pure Python async library. Pre-generating audio at
@@ -276,6 +284,39 @@ save-position call is fire-and-forget (silent failure) so it never blocks naviga
 **Tradeoffs:** ✅ No schema change, no migration, no new dependencies, auto-saves silently
 ✦ ❌ content_data blob grows by one small int per lesson per save event (negligible).
 
+### ADR-026: Atomic DB Column as Generation-Completion Redirect Signal (Replaces Cache `mark_done()`)
+
+**Decision:** Replaced the cache-based `progress_tracker.mark_done()` redirect signal with
+the atomic `StudyPath.generation_completed_at` DateTime column. The TTS background worker
+(a `threading.Thread` daemon spawned by `spawn_tts_background_task()` in
+`src/services/tts_worker.py`) runs TTS generation idempotently (skips modules whose
+`manifest.json` already exists), isolates per-module failures (a single failed module sets
+`tts_audio_status='failed'` and `tts_enabled=False` on that lesson dict and continues to the
+next), and sets `generation_completed_at` in its `finally` block so every terminal state
+(ready, n/a, failed) triggers the redirect. The request handler sets the same column in its
+`else` branch when TTS is disabled (or if the worker thread cannot spawn). The JS results
+page (`src/static/js/progress.js`) runs two parallel polls on a single 2-second ticker:
+(A) `/progress?task_id=<id>` for cosmetic-only mascot/progress-bar updates (never triggers a
+redirect, ignores the legacy `data.done` / `data.stage >= 4` signals); and
+(B) `/lessons/generation-status?path_id=<id>&task_id=<id>` for the sole redirect decision
+(redirects iff `generation_completed === true`, which is sourced from the
+`StudyPath.generation_completed_at` column). A 2-hour hard timeout stops both polls without
+redirecting. Alembic migration `d4e5f6a7b8c9` adds the column; `init_db.sql` includes it for
+fresh installs.
+
+**Reason:** The previous cache-based `mark_done()` signal was subject to a race condition
+when the TTS worker and the request handler shared the same `progress_tracker` key: the TTS
+worker's `TTS_STAGES` (max stage 3) overwrote the request handler's `GENERATE_STAGES` (max
+stage 4), so the JS redirect condition (`data.stage >= 4`) never fired — or, under other
+timing, fired prematurely because the cache write was not atomic with the lesson-dict
+persistence. A database column is atomic and ACID, unaffected by shared-cache races, and is
+the canonical "navigate now" signal regardless of which component finishes last.
+
+**Tradeoffs:** ✅ Atomic, race-free redirect signal; one source of truth for both TTS-enabled
+and TTS-disabled paths; failure of any single TTS module cannot strand the user on the
+results page ✦ ❌ Requires an Alembic migration + `init_db.sql` update; the 2-hour hard
+timeout is a safety net only (the user must navigate manually if the column is never set).
+
 ---
 
 ## 4. Software & Architectural Patterns
@@ -290,11 +331,11 @@ The single `main` blueprint is split across five route modules. URL paths do not
 
 | File | Owns |
 |---|---|
-| `auth.py` | `/signup`, `/login`, `/logout`, `/reset-password`, `/reset` (token consumption), `/settings` |
+| `auth.py` | `/signup`, `/login`, `/logout`, `/reset-password`, `/settings` |
 | `processing.py` | `/` (unified form), `/process` (POST upload+goal), `/results`, `/progress` (long-running progress polling) |
 | `lessons.py` | `/generate-lessons` (POST), `/lessons` (module grid), `/lessons/<i>` (deck), `/lessons/<i>/grade` (POST), `/lessons/<i>/retake` (POST), `/lessons/<i>/save-position` (POST), `/lessons/<i>/audio/<idx>` (GET), `/lessons/generation-status` (GET), `/lessons/<i>/audio/manifest` (GET) |
 | `dashboard.py` | `/dashboard`, `/study-path/<id>/complete` (POST), `/study-path/<id>/cancel` (POST), `/study-path/<id>/delete` (POST), `/lessons/<i>/export` (GET, PDF), `/reset` |
-| `admin.py` | `/admin`, `/admin/toggle/<user_id>`, `/admin/reset-password/<user_id>` (POST), `/seed-demo` |
+| `admin.py` | `/admin`, `/admin/toggle/<user_id>`, `/admin/reset-password/<user_id>` (POST) |
 
 ---
 
@@ -341,10 +382,13 @@ Integration tests cover routes and workflow behavior:
 - mocked generate-lessons flow: session data → lesson + quiz generation → redirect,
 - lesson deck route with pre-populated session lessons returns 200.
 
-Current test suite: 367 tests passing (Sprint 8 active — suite rebuilt from Tasks 1–11).
+Current test suite: 381 tests passing (Sprint 8 active — suite rebuilt from Tasks 1–11).
 Sprint 7 test additions cover: TTS service (5), narration script (4), cloze_dropdown grading
 (3), checkpoint variety (3), humor/difficulty prompt injection (5), route-level TTS flags (3),
 save-position (2), audio routes (2), difficulty snapshotting (1), extracted_texts cleanup (1).
+Sprint 8 additions: TTS 404 regression (path_id re-resolved after first save), two-poll
+parallel-endpoint assertion, hard-timeout-no-redirect, static-cache disabled, audio-route
+path_id fallback (5+ tests).
 
 ### Smoke Tests
 

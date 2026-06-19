@@ -197,36 +197,70 @@ Candidate deployment platforms:
 study-and-learn/
 ├── src/
 │   ├── __init__.py
-│   ├── routes/
 │   ├── models.py
+│   ├── utils.py
+│   ├── routes/
+│   │   ├── __init__.py
+│   │   ├── _helpers.py
+│   │   ├── auth.py
+│   │   ├── admin.py
+│   │   ├── processing.py
+│   │   ├── lessons.py
+│   │   └── dashboard.py
+│   ├── repositories/
+│   │   └── lesson_repo.py
 │   ├── services/
-│   │   ├── document_parser.py
 │   │   ├── ai_client.py
-│   │   ├── summarizer.py
+│   │   ├── ai_client_cloud.py
+│   │   ├── chunker.py
+│   │   ├── curriculum_generator.py
+│   │   ├── document_parser.py
+│   │   ├── exceptions.py
+│   │   ├── grader.py
+│   │   ├── lesson_generator.py
+│   │   ├── lesson_orchestrator.py
+│   │   ├── progress_tracker.py
+│   │   ├── quiz_generator.py
+│   │   ├── rag_retriever.py
 │   │   ├── relevance_checker.py
-│   │   └── curriculum_generator.py
+│   │   ├── settings_service.py
+│   │   ├── summarizer.py
+│   │   ├── tts_service.py
+│   │   ├── tts_worker.py
+│   │   ├── vector_store.py
+│   │   └── vision_parser.py
 │   ├── templates/
 │   └── static/
+│       ├── js/   (mascot, progress, upload, deck-engine, deck-page, results, settings)
+│       ├── css/
+│       ├── fonts/
+│       └── img/
 ├── tests/
 ├── docs/
 │   ├── SRS.md
 │   ├── TODO.md
+│   ├── STATUS.md
+│   ├── AI_AGENT_PROTOCOL.md
 │   └── DESIGN_AND_TESTING.md
+├── migrations/
+│   └── versions/
 ├── .github/
 │   └── workflows/
 │       └── tests.yml
 ├── requirements.txt
-├── README.md
-└── app.py
+├── init_db.sql
+├── config.py
+├── app.py
+└── README.md
 ```
 ### 4.4 AI Model Configuration
 
 | Parameter | Description | Notes |
 |---|---|---|
 | Serving framework | Ollama (default) | Local-first via Ollama; cloud API via `ai_client_cloud.py` import toggle or `AI_BACKEND=cloud` env var |
-| Chat model | Configured via `OLLAMA_MODEL` env var | Default: `qwen3:0.6b` (placeholder). Recommended: `qwen3:8b`, `gemma3:4b`, `gemma3:12b-cloud`, or any Ollama-compatible model. Cloud models generally yield higher quality. |
+| Chat model | Configured via `OLLAMA_MODEL` env var | Default when `AI_BACKEND=local`: `qwen3:0.6b` (in `ai_client.py`, suitable for 6GB VRAM). Default when `AI_BACKEND=cloud`: `gemma3:27b-cloud` (in `ai_client_cloud.py` and `config.py`). Local dev without a GPU should keep `OLLAMA_MODEL=qwen3:0.6b` in `.env`; cloud dev should set `OLLAMA_MODEL=gemma3:27b-cloud`. |
 | Embedding model | Configured via `OLLAMA_EMBEDDING_MODEL` env var | Used exclusively for ChromaDB vector embeddings. Swappable via env var. |
-| Testing mode | `AI_MOCK=true` returns structured JSON stubs | Ensures deterministic CI/CD without GPU or cloud dependency |
+| Testing mode | `AI_MOCK=true` returns a deterministic plain-text stub string (e.g. `Mock response for prompt: <first 50 chars>...`), NOT structured JSON. Downstream services must parse defensively and fall back to defaults when the mock string is returned. | Ensures deterministic CI/CD without GPU or cloud dependency |
 | OCR model | GLM-OCR (0.9B, local-only) | AI-powered text/table/figure recognition for scanned PDFs and images |
 
 ### 4.5 RAG & Multi-Document Architecture
@@ -322,7 +356,7 @@ study-and-learn/
 | FR-042 | The system shall present lessons via a custom CSS/JS slide-deck engine styled with retro fonts and cyberpunk visuals. | Must |
 | FR-043 | The system shall allow the learner to view source document text excerpts that informed the generated lesson content via a modal overlay in the slide deck. | Must |
 | FR-044 | The system shall allow the learner to export a passed lesson (≥80% score) to PDF containing all slides, checkpoints with answers, quiz questions with answers and explanations, and source materials. | Must |
-| FR-045 | The system shall support opt-in TTS audio narration for lessons using Edge-TTS Neural voices (Ava/Emma/Ryan/Andrew). Audio is generated at lesson-creation time, stored per-slide, and played synchronized to deck navigation. TTS is snapshotted at generation time; disabling TTS after generation does not affect already-generated lessons. | Must — Implemented |
+| FR-045 | The system shall support opt-in TTS audio narration for lessons using Edge-TTS Neural voices (Ava/Emma/Ryan/Andrew). Audio is generated at lesson-creation time, stored per deck slot (content slides, inline checkpoints, Final Quiz, Results) keyed by `deck_index`, plus an intro MP3 at `slide_index=-1`; the Results slot narration doubles as the module outro. `lesson['lesson']['deck_layout']` (built by `build_deck_layout()`) is the single source of truth for slot ordering and TTS `slide_index` keys. TTS is snapshotted at generation time; disabling TTS after generation does not affect already-generated lessons. | Must — Implemented |
 | FR-046 | The system shall save the learner's current slide position automatically (debounced 500ms) and restore it on revisit, with an explicit "Exit & Save" button and a "Start Over" option. | Must — Implemented |
 
 ### 5.9 Admin / Editing Features
@@ -463,7 +497,7 @@ study-and-learn/
 - Server-side session storage (Flask-Session + cachelib).
 - Custom CSS/JS slide-deck engine (retro-themed).
 - Content-addressable global deduplication (SHA-256 + ContentRegistry).
-- pytest test suite (367 tests).
+- pytest test suite (381 tests).
 - GitHub Actions test workflow.
 - Static public task board.
 - Design and testing document.
@@ -504,7 +538,7 @@ Ranked from easier to harder. Items above the line are implemented; items below 
 2. Learner dashboard with progress tracking — done (DB-backed lesson repository, StudyPath/LessonProgress models, progress bars)
 3. Max 3 active lessons gating — done (active_lesson_count, cap warning banner, blocked generation)
 4. Admin access control for lesson generation — done (is_admin flag, can_generate_lessons toggle, /admin/toggle route)
-5. Bob/Alice demo account seeding — done (/seed-demo route, can_generate_lessons=True)
+5. Bob/Alice demo account seeding — removed (superseded by init_db.sql seed; see README.md)
 6. Static mascot image with progress-aware speech bubble — done (mascot-robot.png, click-to-talk, progress bar)
 7. Retro theme improvements — done (Retrograde Bold, BoldPixels fonts, cyberpunk theme)
 8. Better prompt templates — done
@@ -523,7 +557,7 @@ Ranked from easier to harder. Items above the line are implemented; items below 
 21. Codebase refactoring (orchestrator/grader/repo seams) — done
 22. AI_BACKEND env var indirection — done
 
-23. Admin panel with user management — done (admin.html, per-user toggle, password reset, seed-demo)
+23. Admin panel with user management — done (admin.html, per-user toggle, password reset)
 24. Access-denied page for unprivileged users — done (3-tier access model on index.html)
 25. Custom error handlers (400/403/404/500) — done (error.html with retro theme)
 26. Password reset (self-service + admin-initiated) — done (/reset-password, /admin/reset-password)
@@ -536,7 +570,7 @@ Ranked from easier to harder. Items above the line are implemented; items below 
 33. Dashboard with Active/Completed/Cancelled tabs — done (tab pills, Mark Complete, Delete with irreversibility warning, My Lessons navbar link)
 34. Per-lesson PDF export — done (fpdf2, passed lessons only, includes slides/checkpoints/quiz/sources)
 
-### Sprint 7 (Planned)
+### Sprint 7 (Completed)
 31. Mascot animation frames (idle/busy/happy) — done (idle 14f@250ms, busy 16f@140ms, happy 14f@220ms, error 14f@220ms)
 32. Text-to-speech narration — done (Edge-TTS opt-in, AI narration scripts, per-slide MP3, deck player)
 33. PDF export for completed lessons — done (fpdf2, per-lesson, slides/checkpoints/quiz/sources)

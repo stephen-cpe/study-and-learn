@@ -1,5 +1,5 @@
 """
-Admin routes — user management and demo account seeding.
+Admin routes — user management.
 """
 from flask import abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
@@ -58,26 +58,4 @@ def admin_reset_password(user_id):
     return redirect(url_for('main.admin'))
 
 
-@bp.route('/seed-demo')
-@login_required
-def seed_demo():
-    if not current_user.is_admin:
-        abort(403)
 
-    created = []
-    for username, password in [('alice', 'demo123'), ('bob', 'demo123')]:
-        existing = User.query.filter_by(username=username).first()
-        if not existing:
-            user = User(username=username, email=f'{username}@example.com',
-                        can_generate_lessons=True)
-            user.set_password(password)
-            db.session.add(user)
-            created.append(username)
-
-    if created:
-        db.session.commit()
-        flash(f'Demo accounts seeded: {", ".join(created)}.', 'success')
-    else:
-        flash('Demo accounts already exist.', 'info')
-
-    return redirect(url_for('main.admin'))

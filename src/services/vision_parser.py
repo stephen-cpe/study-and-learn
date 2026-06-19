@@ -160,23 +160,6 @@ def _get_poppler_path() -> Optional[str]:
     return None
 
 
-def render_pdf_page(file_path: str, page_number: int, output_dir: str) -> str:
-    poppler_path = _get_poppler_path()
-    kwargs = {}
-    if poppler_path:
-        kwargs["poppler_path"] = poppler_path
-
-    from pdf2image import convert_from_path
-    images = convert_from_path(file_path, first_page=page_number + 1,
-                               last_page=page_number + 1, dpi=200, **kwargs)
-    if not images:
-        raise RuntimeError(f"Failed to render page {page_number + 1} of {file_path}")
-
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, f"page_{page_number + 1}.png")
-    images[0].save(output_path, "PNG")
-    return output_path
-
 
 def render_pdf_pages(file_path: str, output_dir: str) -> List[str]:
     poppler_path = _get_poppler_path()

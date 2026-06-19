@@ -95,41 +95,6 @@ def get_progress(task_id):
     return data
 
 
-def complete_task(task_id):
-    stage_list = _cache.get(task_id + ':stages') or STAGES
-    if _cache.has(task_id):
-        entry = dict(stage_list[-1])
-        entry['done'] = True
-        _cache.set(task_id, entry)
-        logger.info(f"[progress] complete: {task_id} → stage {len(stage_list) - 1} (done)")
-
-
-def mark_done(task_id):
-    """Mark a task as fully complete, independent of the stage value.
-
-    The ``done`` flag is the canonical "navigate now" signal for the JS
-    client. It is set by whichever component finishes last (either the
-    request handler for a non-TTS generation, or the TTS worker for a
-    TTS-enabled generation). The redirect logic in
-    ``static/js/progress.js`` reads ``data.done`` rather than relying on
-    a specific stage number, so the two components can use different
-    stage lists without clobbering each other's progress.
-
-    The current stage label/mascot are preserved; only ``done`` is
-    flipped to True. This means the bubble can still display a
-    "Polishing..." or "All done!" message while the redirect fires.
-
-    A no-op when the task_id is unknown (e.g. already cleaned up).
-    """
-    if not _cache.has(task_id):
-        logger.info(f"[progress] mark_done skipped — task {task_id} not found")
-        return
-    data = _cache.get(task_id) or {}
-    data['done'] = True
-    _cache.set(task_id, data)
-    logger.info(f"[progress] mark_done: {task_id} → done=True")
-
-
 def cleanup_task(task_id):
     _cache.delete(task_id)
     logger.info(f"[progress] cleanup: {task_id} deleted")

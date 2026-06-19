@@ -151,44 +151,4 @@ def test_non_admin_cannot_toggle(client):
     assert rv.status_code == 403
 
 
-def test_seed_demo_creates_bob_and_alice(client):
-    admin = User(username='admin_seed', email='admin_seed@example.com', is_admin=True)
-    admin.set_password('pass')
-    db.session.add(admin)
-    db.session.commit()
 
-    _login_as(client, 'admin_seed')
-    rv = client.get('/seed-demo', follow_redirects=True)
-    assert rv.status_code == 200
-    assert b'seeded' in rv.data.lower()
-
-    bob = User.query.filter_by(username='bob').first()
-    alice = User.query.filter_by(username='alice').first()
-    assert bob is not None
-    assert alice is not None
-    assert bob.can_generate_lessons is True
-    assert alice.can_generate_lessons is True
-    assert bob.check_password('demo123')
-    assert alice.check_password('demo123')
-
-
-def test_seed_demo_idempotent(client):
-    admin = User(username='admin_idem', email='admin_idem@example.com', is_admin=True)
-    admin.set_password('pass')
-    db.session.add(admin)
-    bob = User(username='bob', email='bob@example.com',
-               can_generate_lessons=True)
-    bob.set_password('demo123')
-    alice = User(username='alice', email='alice@example.com',
-                 can_generate_lessons=True)
-    alice.set_password('demo123')
-    db.session.add_all([bob, alice])
-    db.session.commit()
-
-    _login_as(client, 'admin_idem')
-    rv = client.get('/seed-demo', follow_redirects=True)
-    assert rv.status_code == 200
-    assert b'already exist' in rv.data.lower()
-
-    count = User.query.filter_by(username='bob').count()
-    assert count == 1

@@ -1,8 +1,8 @@
 # STATUS.md
-Last Updated: 2026-06-17
+Last Updated: 2026-06-18
 Sprint: 8 (ACTIVE)
-Last Task Completed: Fix the 10-minute hard-timeout redirect in progress.js (the actual root cause of the user's reported "premature redirect" bug); extend to 30 minutes and convert to a non-redirecting "still working" message; disable Flask's static-file cache so future code changes are immediately picked up by the browser
-Commit Message Suggestion: fix(redirect): 10-min hard timeout caused premature /lessons redirect; now stops polling with a message; disable static-file cache
+Last Task Completed: Removed seed-demo route, template button, and 2 tests per analysis — feature redundant (init_db.sql handles seeding); docs updated
+Commit Message Suggestion: chore: remove seed-demo feature (redundant, init_db.sql handles seeding)
 Known Issues:
   - AI output consistency: qwen3:0.6b is placeholder-only; use cloud models (gemma3:27b-cloud)
     for production quality

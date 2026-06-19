@@ -237,7 +237,7 @@ Build the smallest working version first, then iterate:
 
 ---
 
-### Sprint 7: Polish, Mascot Animation, TTS & PDF Export 🔄 IN PROGRESS
+### Sprint 7: Polish, Mascot Animation, TTS & PDF Export ✅ COMPLETE (remaining polish deferred to Sprint 8)
 
 **Goal:** Add mascot animation frames, TTS narration, PDF export, session cleanup, source citations, difficulty selector, and sample demo document set.
 
@@ -417,7 +417,7 @@ badge system) are deferred to Sprint 8 as lower-priority polish tasks.
 - [x] OCR/Vision integration with content deduplication (Sprint 6)
 - [x] Mascot animation frames (Sprint 7)
 - [ ] Proprietary demo document set (Sprint 7 — deferred to Sprint 8)
-- [x] Difficulty/age-level selector (Easy/Moderate/Hard) (Sprint 7)
+- [x] Difficulty/age-level selector (Easy/Normal/Hard) (Sprint 7)
 - [x] TTS narration (opt-in) (Sprint 7)
 - [x] Session cleanup (Sprint 7)
 - [x] Source document citations in lessons (Sprint 7)
@@ -480,7 +480,8 @@ badge system) are deferred to Sprint 8 as lower-priority polish tasks.
 - [x] User model tests (Sprint 5)
 - [x] Dashboard route and access control tests (Sprint 5)
 - [x] Lesson repository unit and integration tests (Sprint 5)
-- [x] Admin role and seed-demo endpoint tests (Sprint 5)
+- [x] Admin role tests (Sprint 5)
+- [~] seed-demo endpoint — removed (redundant; init_db.sql handles seeding)
 - [x] OCR/vision parser tests (Sprint 6 — 20 tests)
 - [x] Parser expansion tests (Sprint 6 — 5 tests for pptx, image, dedup)
 - [x] RAG service expansion tests (Sprint 6 — 4 tests for multi-collection, metadata)
