@@ -140,6 +140,8 @@ def process():
                 extracted_texts.append(text)
                 filenames.append(filename)
             except ValueError as e:
+                if is_ajax and task_id:
+                    progress_tracker.mark_error(task_id, mascot_msg='Couldn\'t read a file')
                 if is_ajax:
                     progress_tracker.cleanup_task(task_id)
                     return jsonify({'error': f'Error extracting {filename}: {str(e)}'}), 400
@@ -172,6 +174,8 @@ def process():
             extracted_texts.append(text)
             filenames.append(filename)
         except ValueError as e:
+            if is_ajax and task_id:
+                progress_tracker.mark_error(task_id, mascot_msg='Couldn\'t read a file')
             if is_ajax:
                 progress_tracker.cleanup_task(task_id)
                 return jsonify({'error': f'Error extracting {filename}: {str(e)}'}), 400
@@ -244,6 +248,8 @@ def process():
 
     except StudyAndLearnError as e:
         logger.error("Processing failed: %s", str(e))
+        if is_ajax and task_id:
+            progress_tracker.mark_error(task_id, mascot_msg='Processing failed — please retry')
         if is_ajax:
             progress_tracker.cleanup_task(task_id)
             return jsonify({'error': str(e)}), 500
@@ -251,6 +257,8 @@ def process():
         return redirect(url_for('main.index'))
     except Exception as e:
         logger.error("Unexpected processing error", exc_info=True)
+        if is_ajax and task_id:
+            progress_tracker.mark_error(task_id, mascot_msg='Unexpected error — please retry')
         if is_ajax:
             progress_tracker.cleanup_task(task_id)
             return jsonify({'error': 'An unexpected error occurred. Please try again.'}), 500

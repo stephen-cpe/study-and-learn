@@ -1,14 +1,18 @@
 """
-Ollama Cloud client. Drop-in replacement for ai_client.py.
+Ollama Cloud client. Called by ai_client.py when AI_BACKEND=cloud.
 
-Usage
------
-In `ai_client.py`, uncomment this import at the bottom of the file:
+Integration
+-----------
+``ai_client.py::call_ollama`` reads the ``AI_BACKEND`` env var at *call time*.
+When ``AI_BACKEND=cloud`` (and ``AI_MOCK`` is not set, and ``force_local`` is
+False), it lazy-imports this module and delegates::
 
-    from .ai_client_cloud import call_ollama  # noqa: E402
+    from .ai_client_cloud import call_ollama as cloud_call
+    return cloud_call(prompt, model)
 
-That's all. Every module that imports ``call_ollama`` from ``ai_client``
-will now route through this cloud client instead of local Ollama.
+There is no "uncomment an import" step — backend selection is exclusively
+env-var-driven. See ADR-007 (SRS.md §4.4) and AI_AGENT_PROTOCOL.md for the
+``AI_BACKEND`` / ``AI_MOCK`` / ``force_local`` rules.
 
 Environment variables
 ---------------------

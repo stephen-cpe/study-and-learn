@@ -69,45 +69,56 @@ def generate_lessons():
 
     progress_tracker.update_progress(task_id, 1)
 
-    for i, module in enumerate(modules):
-        progress_tracker.update_progress(task_id, 2)
-        artifacts = build_module_artifacts(
-            module,
-            learning_goal,
-            retriever,
-            difficulty=difficulty,
-            tts_enabled=tts_enabled,
-            username=username,
-            tts_speaker=tts_speaker,
-            next_module_title=modules[i+1]['title'] if i+1 < len(modules) else None,
-            is_last_module=(i == len(modules) - 1),
-            path_id=path_id_val,
-            module_index=i,
-        )
-        progress_tracker.update_progress(task_id, 3)
+    try:
+        for i, module in enumerate(modules):
+            progress_tracker.update_progress(task_id, 2)
+            artifacts = build_module_artifacts(
+                module,
+                learning_goal,
+                retriever,
+                difficulty=difficulty,
+                tts_enabled=tts_enabled,
+                username=username,
+                tts_speaker=tts_speaker,
+                next_module_title=modules[i+1]['title'] if i+1 < len(modules) else None,
+                is_last_module=(i == len(modules) - 1),
+                path_id=path_id_val,
+                module_index=i,
+            )
+            progress_tracker.update_progress(task_id, 3)
 
-        lessons.append({
-            'index': i,
-            'module_title': module['title'],
-            'estimated_effort': module.get('estimated_effort', 'N/A'),
-            'lesson': artifacts['lesson'],
-            'quiz': artifacts['quiz'],
-            'checkpoints': artifacts['checkpoints'],
-            'sources': artifacts.get('sources', []),
-            'difficulty': difficulty,
-            'tts_enabled': tts_enabled,
-            'tts_speaker': tts_speaker if tts_enabled else None,
-            # tts_audio_status is the per-module generation state used by
-            # the lessons page UI to show "Generating narration..." badges
-            # and by the audio route to return 202 when pending. The
-            # background worker updates this field as it runs.
-            'tts_audio_status': 'pending' if tts_enabled else 'n/a',
-            'completed': False,
-            'score': None,
-            'passed': False
-        })
+            lessons.append({
+                'index': i,
+                'module_title': module['title'],
+                'estimated_effort': module.get('estimated_effort', 'N/A'),
+                'lesson': artifacts['lesson'],
+                'quiz': artifacts['quiz'],
+                'checkpoints': artifacts['checkpoints'],
+                'sources': artifacts.get('sources', []),
+                'difficulty': difficulty,
+                'tts_enabled': tts_enabled,
+                'tts_speaker': tts_speaker if tts_enabled else None,
+                # tts_audio_status is the per-module generation state used by
+                # the lessons page UI to show "Generating narration..." badges
+                # and by the audio route to return 202 when pending. The
+                # background worker updates this field as it runs.
+                'tts_audio_status': 'pending' if tts_enabled else 'n/a',
+                'completed': False,
+                'score': None,
+                'passed': False
+            })
 
-    progress_tracker.update_progress(task_id, 4)
+        progress_tracker.update_progress(task_id, 4)
+    except Exception as e:
+        # Surface the failure to the user via mascot-error.gif so they
+        # see the robot in an error state instead of a frozen "busy".
+        # The JS sticky-error window keeps the error GIF visible for
+        # ~8s even if a later poll arrives. Do NOT swallow the error —
+        # re-raise after publishing the cosmetic so Flask's default 500
+        # handler still logs the traceback.
+        logger.error("Lesson generation failed: %s", str(e), exc_info=True)
+        progress_tracker.mark_error(task_id, mascot_msg='AI generation failed — retry')
+        raise
 
     save_lessons(lessons, current_user,
                  title=study_path.get('title', learning_goal[:50]),
@@ -161,6 +172,7 @@ def generate_lessons():
             # started, set the completion column here so the user
             # is not stuck on the results page forever.
             logger.warning("TTS background thread failed to spawn: %s", str(e))
+            progress_tracker.mark_error(task_id, mascot_msg='Audio failed — lessons still work')
             _set_generation_completed(path_id_val, current_user.id)
     else:
         # No TTS worker spawned — this handler is the only producer
@@ -469,18 +481,25 @@ def retake_lesson(module_index):
 
     if tts_enabled:
         from src.services.tts_service import delete_module_audio, generate_lesson_audio
-        delete_module_audio(path_id, module_index)
-        narration = artifacts['lesson'].get('narration', [])
-        if narration:
-            try:
-                generate_lesson_audio(
-                    path_id=path_id,
-                    module_index=module_index,
-                    narration_script=narration,
-                    speaker=tts_speaker,
-                )
-            except Exception as e:
-                logger.warning("TTS retake audio failed for module %d: %s", module_index, str(e))
+        try:
+            delete_module_audio(path_id, module_index)
+            narration = artifacts['lesson'].get('narration', [])
+            if narration:
+                try:
+                    generate_lesson_audio(
+                        path_id=path_id,
+                        module_index=module_index,
+                        narration_script=narration,
+                        speaker=tts_speaker,
+                    )
+                except Exception as e:
+                    logger.warning("TTS retake audio failed for module %d: %s", module_index, str(e))
+        except Exception as e:
+            # TTS cleanup/regeneration failed (e.g. path_id was None).
+            # The lesson content was already regenerated and saved above,
+            # so we return success with a warning rather than a 500 —
+            # the user can still take the lesson without audio.
+            logger.warning("TTS retake cleanup failed for module %d: %s", module_index, str(e))
 
     # Return a redirect URL so the client navigates the user to the deck for
     # this module with the regenerated content, instead of blind-reloading

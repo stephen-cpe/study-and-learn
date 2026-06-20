@@ -58,8 +58,9 @@ def update_progress(task_id, stage):
 
 
 def update_cosmetic(task_id, **fields):
-    """Merge cosmetic fields (label/mascot/pct/mascot_state) into the
-    existing task entry without changing its stage number or stage list.
+    """Merge cosmetic fields (label/mascot/pct/mascot_state/error) into
+    the existing task entry without changing its stage number or stage
+    list.
 
     Used by background components (e.g. the TTS worker) that need to
     publish UI progress against the same task_id the request handler
@@ -67,13 +68,13 @@ def update_cosmetic(task_id, **fields):
     ``done`` flag is preserved; ``stage`` and any other non-cosmetic
     fields are preserved.
 
-    Accepted keyword arguments: label, mascot, pct, mascot_state. Any
-    other keys are ignored.
+    Accepted keyword arguments: label, mascot, pct, mascot_state,
+    error. Any other keys are ignored.
 
     A no-op when the task_id is unknown (e.g. already cleaned up by the
     request handler) or when no cosmetic fields are provided.
     """
-    cosmetic_keys = {'label', 'mascot', 'pct', 'mascot_state'}
+    cosmetic_keys = {'label', 'mascot', 'pct', 'mascot_state', 'error'}
     payload = {k: v for k, v in fields.items() if k in cosmetic_keys}
     if not payload:
         return
@@ -84,6 +85,47 @@ def update_cosmetic(task_id, **fields):
     data.update(payload)
     _cache.set(task_id, data)
     logger.info(f"[progress] update_cosmetic: {task_id} → {payload}")
+
+
+def mark_error(task_id, mascot_msg=None, pct=None, label=None):
+    """Publish a sticky error state for a task.
+
+    Sets ``mascot_state='error'`` (which drives the mascot-error.gif
+    on the client), the provided mascot bubble message, and an
+    ``error=True`` flag that the JS client uses to keep the error
+    mascot visible for a short window even if subsequent ``busy``
+    cosmetic polls arrive (e.g. from a background TTS worker that is
+    still processing other modules).
+
+    This is the canonical helper for surfacing failures to the user
+    via the mascot without crashing the request. Call it in an
+    ``except`` block RIGHT BEFORE returning the error response, so
+    no later ``update_progress`` call clobbers the ``error`` flag.
+
+    A no-op when the task_id is unknown (e.g. already cleaned up) —
+    never raises. This is critical because error handlers must not
+    themselves error.
+
+    Args:
+        task_id: The progress_tracker task id.
+        mascot_msg: Short message for the CRT speech bubble
+            (e.g. "Couldn't reach the AI model"). If None, a default
+            is used.
+        pct: Optional progress percentage to freeze the bar at.
+        label: Optional internal label (not shown to the user; the
+            mascot bubble uses ``mascot_msg``).
+    """
+    payload = {
+        'mascot_state': 'error',
+        'mascot': mascot_msg or 'Something went wrong.',
+        'error': True,
+    }
+    if pct is not None:
+        payload['pct'] = pct
+    if label is not None:
+        payload['label'] = label
+    update_cosmetic(task_id, **payload)
+    logger.info(f"[progress] mark_error: {task_id} → {mascot_msg!r}")
 
 
 def get_progress(task_id):

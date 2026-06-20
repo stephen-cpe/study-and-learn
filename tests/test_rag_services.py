@@ -204,3 +204,188 @@ def test_build_rag_context_from_hashes_no_valid_collections(
 
     assert result == ""
     mock_retrieve_multi.assert_not_called()
+
+
+# ── Chroma Cloud backend toggle (CHROMA_DB) tests ──────────────────────
+
+
+class TestChromaBackendSelection:
+    """Tests for the CHROMA_DB=cloud toggle in get_chroma_client()."""
+
+    def test_ci_forces_ephemeral_regardless_of_chroma_db(self, monkeypatch):
+        """CI=true must always win, even if CHROMA_DB=cloud is set."""
+        from src.services import vector_store
+
+        monkeypatch.setenv("CI", "true")
+        monkeypatch.setenv("CHROMA_DB", "cloud")
+        monkeypatch.setenv("CHROMA_CLOUD_API_KEY", "fake-key")
+        monkeypatch.setenv("CHROMA_CLOUD_CONNECTION_STRING", "fake-tenant")
+        monkeypatch.setenv("CHROMA_COLLECTION_NAME", "fake-db")
+
+        with patch("chromadb.CloudClient") as mock_cloud, \
+             patch("chromadb.EphemeralClient") as mock_eph, \
+             patch("chromadb.PersistentClient") as mock_persist:
+            mock_eph.return_value = MagicMock(name="ephemeral")
+            vector_store.get_chroma_client()
+
+        mock_cloud.assert_not_called()
+        mock_persist.assert_not_called()
+        mock_eph.assert_called_once()
+
+    def test_cloud_creds_missing_reverts_to_local(self, monkeypatch):
+        """CHROMA_DB=cloud with empty creds must fall back to local."""
+        from src.services import vector_store
+
+        monkeypatch.delenv("CI", raising=False)
+        monkeypatch.setenv("CHROMA_DB", "cloud")
+        monkeypatch.delenv("CHROMA_CLOUD_API_KEY", raising=False)
+        monkeypatch.delenv("CHROMA_CLOUD_CONNECTION_STRING", raising=False)
+
+        with patch("chromadb.CloudClient") as mock_cloud, \
+             patch.object(vector_store, "_get_local_client") as mock_local:
+            mock_local.return_value = MagicMock(name="local")
+            result = vector_store.get_chroma_client()
+
+        mock_cloud.assert_not_called()
+        mock_local.assert_called_once()
+        assert result is mock_local.return_value
+
+    def test_cloud_connection_string_empty_reverts_to_local(self, monkeypatch):
+        """CHROMA_DB=cloud with empty connection string must fall back."""
+        from src.services import vector_store
+
+        monkeypatch.delenv("CI", raising=False)
+        monkeypatch.setenv("CHROMA_DB", "cloud")
+        monkeypatch.setenv("CHROMA_CLOUD_API_KEY", "fake-key")
+        monkeypatch.delenv("CHROMA_CLOUD_CONNECTION_STRING", raising=False)
+
+        with patch("chromadb.CloudClient") as mock_cloud, \
+             patch.object(vector_store, "_get_local_client") as mock_local:
+            mock_local.return_value = MagicMock(name="local")
+            vector_store.get_chroma_client()
+
+        mock_cloud.assert_not_called()
+        mock_local.assert_called_once()
+
+    def test_cloud_collection_name_empty_reverts_to_local(self, monkeypatch):
+        """CHROMA_DB=cloud with empty collection name must fall back."""
+        from src.services import vector_store
+
+        monkeypatch.delenv("CI", raising=False)
+        monkeypatch.setenv("CHROMA_DB", "cloud")
+        monkeypatch.setenv("CHROMA_CLOUD_API_KEY", "fake-key")
+        monkeypatch.setenv("CHROMA_CLOUD_CONNECTION_STRING", "fake-tenant")
+        monkeypatch.setenv("CHROMA_COLLECTION_NAME", "")
+
+        with patch("chromadb.CloudClient") as mock_cloud, \
+             patch.object(vector_store, "_get_local_client") as mock_local:
+            mock_local.return_value = MagicMock(name="local")
+            vector_store.get_chroma_client()
+
+        mock_cloud.assert_not_called()
+        mock_local.assert_called_once()
+
+    def test_cloud_client_construction_fails_reverts_to_local(self, monkeypatch):
+        """If CloudClient() raises, fall back to local."""
+        from src.services import vector_store
+
+        monkeypatch.delenv("CI", raising=False)
+        monkeypatch.setenv("CHROMA_DB", "cloud")
+        monkeypatch.setenv("CHROMA_CLOUD_API_KEY", "bad-key")
+        monkeypatch.setenv("CHROMA_CLOUD_CONNECTION_STRING", "bad-tenant")
+        monkeypatch.setenv("CHROMA_COLLECTION_NAME", "bad-db")
+
+        with patch("chromadb.CloudClient") as mock_cloud, \
+             patch.object(vector_store, "_get_local_client") as mock_local:
+            mock_cloud.side_effect = RuntimeError("auth failed")
+            mock_local.return_value = MagicMock(name="local")
+            result = vector_store.get_chroma_client()
+
+        mock_cloud.assert_called_once()
+        mock_local.assert_called_once()
+        assert result is mock_local.return_value
+
+    def test_cloud_heartbeat_fails_reverts_to_local(self, monkeypatch):
+        """If heartbeat() (connectivity probe) fails, fall back to local."""
+        from src.services import vector_store
+
+        monkeypatch.delenv("CI", raising=False)
+        monkeypatch.setenv("CHROMA_DB", "cloud")
+        monkeypatch.setenv("CHROMA_CLOUD_API_KEY", "stale-key")
+        monkeypatch.setenv("CHROMA_CLOUD_CONNECTION_STRING", "stale-tenant")
+        monkeypatch.setenv("CHROMA_COLLECTION_NAME", "stale-db")
+
+        mock_cloud_instance = MagicMock()
+        mock_cloud_instance.heartbeat.side_effect = RuntimeError(
+            "connection refused"
+        )
+
+        with patch("chromadb.CloudClient") as mock_cloud, \
+             patch.object(vector_store, "_get_local_client") as mock_local:
+            mock_cloud.return_value = mock_cloud_instance
+            mock_local.return_value = MagicMock(name="local")
+            result = vector_store.get_chroma_client()
+
+        mock_cloud.assert_called_once()
+        mock_cloud_instance.heartbeat.assert_called_once()
+        mock_local.assert_called_once()
+        assert result is mock_local.return_value
+
+    def test_cloud_valid_returns_cloud_client(self, monkeypatch):
+        """Valid creds + successful heartbeat -> CloudClient with correct args."""
+        from src.services import vector_store
+
+        monkeypatch.delenv("CI", raising=False)
+        monkeypatch.setenv("CHROMA_DB", "cloud")
+        monkeypatch.setenv("CHROMA_CLOUD_API_KEY", "valid-key")
+        monkeypatch.setenv("CHROMA_CLOUD_CONNECTION_STRING", "valid-tenant")
+        monkeypatch.setenv("CHROMA_COLLECTION_NAME", "valid-db")
+
+        mock_cloud_instance = MagicMock()
+        mock_cloud_instance.heartbeat.return_value = 12345
+
+        with patch("chromadb.CloudClient") as mock_cloud, \
+             patch.object(vector_store, "_get_local_client") as mock_local:
+            mock_cloud.return_value = mock_cloud_instance
+            result = vector_store.get_chroma_client()
+
+        mock_cloud.assert_called_once_with(
+            tenant="valid-tenant",
+            database="valid-db",
+            api_key="valid-key",
+        )
+        mock_cloud_instance.heartbeat.assert_called_once()
+        mock_local.assert_not_called()
+        assert result is mock_cloud_instance
+
+    def test_local_default_when_chroma_db_unset(self, monkeypatch):
+        """No CHROMA_DB -> local PersistentClient (the existing default)."""
+        from src.services import vector_store
+
+        monkeypatch.delenv("CI", raising=False)
+        monkeypatch.delenv("CHROMA_DB", raising=False)
+
+        with patch("chromadb.CloudClient") as mock_cloud, \
+             patch.object(vector_store, "_get_local_client") as mock_local:
+            mock_local.return_value = MagicMock(name="local")
+            result = vector_store.get_chroma_client()
+
+        mock_cloud.assert_not_called()
+        mock_local.assert_called_once()
+        assert result is mock_local.return_value
+
+    def test_local_explicit_uses_local(self, monkeypatch):
+        """CHROMA_DB=local -> local PersistentClient, no cloud attempt."""
+        from src.services import vector_store
+
+        monkeypatch.delenv("CI", raising=False)
+        monkeypatch.setenv("CHROMA_DB", "local")
+
+        with patch("chromadb.CloudClient") as mock_cloud, \
+             patch.object(vector_store, "_get_local_client") as mock_local:
+            mock_local.return_value = MagicMock(name="local")
+            result = vector_store.get_chroma_client()
+
+        mock_cloud.assert_not_called()
+        mock_local.assert_called_once()
+        assert result is mock_local.return_value

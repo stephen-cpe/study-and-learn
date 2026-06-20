@@ -6,7 +6,7 @@
 **Capstone track:** Software system / AI system  
 **Repository name:** `study-and-learn`  
 **Primary development approach:** Spec-Driven Development with AI tooling support  
-**Last updated:** June 14, 2026
+**Last updated:** June 19, 2026
 
 ---
 
@@ -143,12 +143,9 @@ Preferred deployment target:
 - 8 GB RAM,
 - 4 CPU VM or lower if possible.
 
-Candidate deployment platforms:
-- Render,
-- Railway,
-- PythonAnywhere,
-- DigitalOcean,
-- AWS EC2.
+Deployment platform (decided):
+- DigitalOcean (primary),
+- AWS EC2 (secondary, if time permits).
 
 ### 3.3 Project Constraints
 
@@ -265,7 +262,7 @@ study-and-learn/
 
 ### 4.5 RAG & Multi-Document Architecture
 - **Chunking**: `RecursiveCharacterTextSplitter` (LangChain) with hardcoded `chunk_size=1000`, `chunk_overlap=200` (no env vars or config settings expose these — see `src/services/chunker.py:20-25`)
-- **Vector Storage**: Persistent ChromaDB (`./data/chroma_db`) for dev; in-memory fallback for CI
+- **Vector Storage**: Persistent ChromaDB (`./data/chroma_db`) for dev (default); optional Chroma Cloud via `CHROMA_DB=cloud` (see ADR-027); in-memory fallback for CI
 - **Multi-Upload**: Route accepts `request.files.getlist('files')` with max 5 files per submission
 - **Retrieval**: Top-k similarity search against goal-aligned chunks before AI prompt injection
 - **Context Flow**: Goal → Upload → Parse → Chunk → Embed → Store → Retrieve → Generate AI Outputs
@@ -469,6 +466,49 @@ study-and-learn/
 | US-021 | As a learner, I want the quality of generated lessons and quizzes to be acceptable for high-school to college-level material. | Prompt engineering refined; model research conducted for optimal quality/speed tradeoff on target hardware |
 | US-022 | As a learner, I want a difficulty toggle so content matches my age and skill level. | Easy (10–11), Normal (12–13), Hard (14–15) difficulty options; prompt adjusted accordingly; difficulty snapshotted at generation time |
 
+### Epic 7: User Accounts & Admin (Sprint 5)
+
+| Story ID | User Story | Acceptance Criteria |
+|---|---|---|
+| US-023 | As a learner, I want to register and log in so my study paths are saved across sessions. | Registration, login, logout work via Flask-Login; passwords hashed; session cleared on login to prevent leakage |
+| US-024 | As an admin, I want to toggle lesson-generation access per user so I can control who can create study paths. | Admin panel at `/admin` lists users with per-user toggle and password reset; new signups default to denied |
+| US-025 | As a learner, I want a dashboard showing my active, completed, and cancelled study paths so I can manage my learning history. | Dashboard with Active/Completed/Cancelled tab pills; Mark Complete action (only when all modules passed); Delete action (completed/cancelled only, irreversibility warning) |
+| US-026 | As a learner, I want to maintain up to 3 concurrent study paths so I can study multiple subjects simultaneously. | Each learning goal creates an independent StudyPath; max 3 active paths enforced; cap warning banner shown when at limit |
+| US-027 | As an admin, I want self-service and admin-initiated password reset so users can recover access without my intervention. | `/reset-password` for self-service; `/admin/reset-password/<user_id>` for admin-initiated; retro-themed error pages (400/403/404/500) |
+| US-028 | As a learner, I want my study paths to persist across server restarts so I don't lose progress. | Lesson content, extracted texts, and per-module progress stored in PostgreSQL (StudyPath + LessonProgress); DB-backed repository seam |
+| US-029 | As a learner, I want access control to clearly tell me when I lack privileges so I'm not confused by missing features. | 3-tier access model: unauthenticated → login form; privileged → full form; unprivileged → access-denied message |
+| US-030 | As a developer, I want seeded demo accounts so I can test the app without manual setup. | init_db.sql seeds admin/bob/alice with documented passwords; all seeded users have can_generate_lessons=True |
+| US-031 | As a developer, I want PostgreSQL-only storage so the schema is portable to production. | All SQLite references purged; DATABASE_URL validated to begin with `postgresql://`; migrations and tests aligned |
+
+### Epic 8: OCR/Vision & Content Deduplication (Sprint 6)
+
+| Story ID | User Story | Acceptance Criteria |
+|---|---|---|
+| US-032 | As a learner, I want to upload scanned PDFs and images so the app can extract text from visual content. | GLM-OCR (local, 0.9B) runs text/table/figure recognition; pdf2image renders PDF pages via Poppler; DOCX embedded images and PPTX files extracted; 8 file types supported |
+| US-033 | As a developer, I want content-addressable deduplication so identical files uploaded by different users aren't re-processed. | SHA-256 ContentRegistry model; ChromaDB collections named by file hash (doc_<hash>); shared globally across users |
+| US-034 | As a learner, I want support for `.docx`, `.pptx`, `.png`, `.jpg`, `.jpeg` files so I can study from varied sources. | Allowed extensions include all 8 types; unsupported types rejected with clear message |
+| US-035 | As a developer, I want multi-collection retrieval so context is merged across all uploaded documents. | retrieve_from_multiple_collections merges results across per-file collections with score-based merging; chunk metadata (source_hash, content_type) preserved |
+
+### Epic 9: Mascot Animation, TTS & PDF Export (Sprint 7)
+
+| Story ID | User Story | Acceptance Criteria |
+|---|---|---|
+| US-036 | As a learner, I want an animated mascot with idle/busy/happy/error states so the UI feels alive during long operations. | idle 14f@250ms, busy 16f@140ms, happy 14f@220ms, error 14f@220ms; transparent backgrounds; state-driven switching via polling |
+| US-037 | As a learner, I want opt-in TTS audio narration so I can listen to lessons instead of reading. | Edge-TTS Neural voices (Ava/Emma/Ryan/Andrew); AI-generated narration scripts; per-slide MP3 keyed by deck_index; audio generated at lesson-creation time; toggle in settings; graceful failure on network error |
+| US-038 | As a learner, I want to export a passed lesson to PDF so I can review it offline. | fpdf2 per-lesson PDF (slides, checkpoints with answers, quiz with answers/explanations, source materials); available for any passed lesson regardless of parent path status; _clean() sanitizer for Latin-1 compatibility |
+| US-039 | As a learner, I want to see which source document a slide references so I can verify the AI's grounding. | Chunk-level provenance preserved through retrieval pipeline; "View Sources" button in slide deck controls opens modal overlay with document excerpts; parallel file_names JSON column on StudyPath |
+| US-040 | As a learner, I want my lesson session to be cleaned up after generation so the server doesn't accumulate stale data. | extracted_texts nullified after generate_lessons completes; session bloat prevented |
+| US-041 | As a learner, I want to save my slide position and resume where I left off so I don't lose my place. | deck_position auto-saved to content_data JSON on every slide advance (debounced 500ms); restored on revisit; "Start Over" button resets to 0; "Exit & Save" button explicit |
+
+### Epic 10: Final Deployment & Capstone Submission (Sprint 8)
+
+| Story ID | User Story | Acceptance Criteria |
+|---|---|---|
+| US-042 | As a reviewer, I want a deployed web app link so I can evaluate the capstone without local setup. | Deployed to DigitalOcean (or AWS EC2) cloud VPS; all routes and features functional in production; demo link in README |
+| US-043 | As a developer, I want production environment variables configured so the deployed app runs the correct AI and DB backends. | AI_BACKEND, DATABASE_URL, SECRET_KEY, OLLAMA_MODEL set in production; AI_MOCK=true documented as demo fallback |
+| US-044 | As a reviewer, I want a recorded 15–20 minute demo so I can evaluate the full workflow. | Demo script covers goal → upload → results → lessons → quiz → grade → retake; recording submission-ready |
+| US-045 | As a developer, I want all documentation finalized and CI passing so the capstone submission is complete. | DESIGN_AND_TESTING.md, AI_AGENT_PROTOCOL.md, task board all reflect final Sprint 8 state; CI pipeline green; grader GitHub access confirmed |
+
 ---
 
 ## 8. MVP Scope
@@ -497,7 +537,7 @@ study-and-learn/
 - Server-side session storage (Flask-Session + cachelib).
 - Custom CSS/JS slide-deck engine (retro-themed).
 - Content-addressable global deduplication (SHA-256 + ContentRegistry).
-- pytest test suite (381 tests).
+- pytest test suite (406 tests).
 - GitHub Actions test workflow.
 - Static public task board.
 - Design and testing document.
@@ -512,16 +552,14 @@ study-and-learn/
 - Non-blocking background progress indicator during document processing.
 - Upload status messages.
 - Generated output formatting and markdown rendering.
-- Demo seed files.
+- Demo seed files — done (Sprint 8; proprietary demo document set kept privately outside the repo for the live demo).
 - Error handling for AI/model unavailable.
 
 ### 8.3 Deferred / Stretch
 
 - YouTube integration.
 - Export to PPTX or SCORM.
-- Short-answer (free-text) AI grading.
 - Adaptive difficulty based on learner performance.
-- Spaced repetition and review scheduling.
 - Rich companion behavior and interactive mascot.
 - Admin content management workflow.
 - Social features (friends, chat, share lessons).
@@ -544,7 +582,7 @@ Ranked from easier to harder. Items above the line are implemented; items below 
 8. Better prompt templates — done
 9. Simple quiz generation — done (4 question types: mcq, true_false, multi_select, cloze_dropdown)
 10. Slide-style lesson pages — done (custom CSS/JS deck engine with inline checkpoints)
-11. Cloud model toggle — done (ai_client_cloud.py with import-override pattern)
+11. Cloud model toggle — done (env-var-driven backend dispatch via `AI_BACKEND=cloud` in `ai_client.py::call_ollama`; the old uncomment-an-import pattern has been removed)
 12. JS refactored into domain modules (mascot, progress, upload, deck-engine, deck-page, results) — done
 13. Gated module progression with pass/fail — done (80% threshold)
 14. Retake with regenerated questions — done
@@ -571,32 +609,30 @@ Ranked from easier to harder. Items above the line are implemented; items below 
 34. Per-lesson PDF export — done (fpdf2, passed lessons only, includes slides/checkpoints/quiz/sources)
 
 ### Sprint 7 (Completed)
-31. Mascot animation frames (idle/busy/happy) — done (idle 14f@250ms, busy 16f@140ms, happy 14f@220ms, error 14f@220ms)
-32. Text-to-speech narration — done (Edge-TTS opt-in, AI narration scripts, per-slide MP3, deck player)
-33. PDF export for completed lessons — done (fpdf2, per-lesson, slides/checkpoints/quiz/sources)
-34. Session cleanup (extracted_texts) — done (nullified after generate_lessons completes)
-35. Badges/trophies for completed lessons — NOT done (deferred to Sprint 8 stretch)
-36. Source document referencing — done (citation modal in deck)
-37. Cloud ChromaDB and cloud AI provider testing — NOT done (deferred)
-38. Difficulty level selector — done (Easy/Normal/Hard, prompt injection, badges)
-39. Session save/resume with Exit & Save — done (deck position auto-saved)
-40. Checkpoint question variety — done (mcq/true_false/cloze_dropdown)
-41. cloze_dropdown replaces fill_blank — done (legacy compat preserved)
-42. Humor injection in quiz distractors — done (HUMOR_INSTRUCTIONS in quiz prompt)
+35. Mascot animation frames (idle/busy/happy) — done (idle 14f@250ms, busy 16f@140ms, happy 14f@220ms, error 14f@220ms)
+36. Text-to-speech narration — done (Edge-TTS opt-in, AI narration scripts, per-slide MP3, deck player)
+37. PDF export for completed lessons — done (fpdf2, per-lesson, slides/checkpoints/quiz/sources)
+38. Session cleanup (extracted_texts) — done (nullified after generate_lessons completes)
+39. Badges/trophies for completed lessons — NOT done (moved out of the capstone timeline to Post-Capstone; see Post-Capstone / Stretch below)
+40. Source document referencing — done (citation modal in deck)
+41. Cloud ChromaDB and cloud AI provider testing — DONE (CHROMA_DB=cloud toggle added, verified against Chroma Cloud; AI_BACKEND=cloud verified against cloud Ollama)
+42. Difficulty level selector — done (Easy/Normal/Hard, prompt injection, badges)
+43. Session save/resume with Exit & Save — done (deck position auto-saved)
+44. Checkpoint question variety — done (mcq/true_false/cloze_dropdown)
+45. cloze_dropdown replaces fill_blank — done (legacy compat preserved)
+46. Humor injection in quiz distractors — done (HUMOR_INSTRUCTIONS in quiz prompt)
 
-### Sprint 8 (Planned)
-43. Deployment to free-tier host (Render or Railway)
-44. Final documentation and demo recording
-45. Capstone submission
+### Sprint 8 (Active)
+47. Deployment to a cloud VPS (DigitalOcean or AWS EC2)
+48. Final documentation and demo recording
+49. Capstone submission
 
 ### Post-Capstone / Stretch
-- Badge/trophy system for completed modules (deferred from Sprint 7)
+- Badge/trophy system for completed modules (moved out of the capstone timeline; nice-to-have, not planned for Sprint 8)
 - Matching question type for quizzes (future quiz variety expansion)
 - Speaker change without retake (pre-generate all 4 speakers at lesson time)
 - Extended file type support (.docx, .html, .odt) — limited practical benefit for demo
 - YouTube or external resource integration
-- Short-answer (free-text) AI grading
-- Spaced repetition and review scheduling
 - Full adaptive study planner
 - Social features (friends, chat, share lessons)
 - Full offline mode (C/C++ rewrite without Ollama)
@@ -668,7 +704,7 @@ Later additions:
 4. ~~Should OCR be postponed until after the main workflow works?~~ → **Implemented in Sprint 6** (GLM-OCR local + Qwen3.5 cloud, content-addressable dedup)
 5. ~~Should generated outputs be stored as JSON, Markdown, or database records?~~ → **JSON in Flask session (server-side via cachelib)**
 6. ~~Should the companion be purely visual or tied to progress?~~ → Visual feedback with click-to-talk implemented; animated GIF states (idle/busy/happy) with progress-driven switching implemented
-7. ~~Which deployment platform is easiest for the final capstone demo?~~ → Render or Railway free tier TBD in Sprint 8
+7. ~~Which deployment platform is easiest for the final capstone demo?~~ → **DigitalOcean** (cloud VPS, ~4 vCPU / 8 GB RAM / 160 GB disk); AWS EC2 is a secondary option if time permits. Free-tier PaaS hosts (Render/Railway) were evaluated and rejected — the stack (PostgreSQL + ChromaDB + Ollama + Poppler + GLM-OCR) does not fit a 512 MB–1 GB container.
 8. ~~What is the optimal model for lesson/quiz generation quality vs speed on 6GB VRAM?~~ → qwen3:0.6b chosen as placeholder; upgrade guidance documented (Sprint 4 prompt tuning ongoing)
 9. ~~Should loading UI use full-screen overlay or background processing with stage indicator?~~ → Background processing with progress bar + mascot speech bubble (implemented Sprint 4)
 10. ~~How many mascot animation frames are needed for adequate visual feedback?~~ → idle 14f@250ms, busy 16f@140ms, happy 14f@220ms, error 14f@220ms (all implemented)

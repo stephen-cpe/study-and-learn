@@ -87,6 +87,25 @@ class Config:
     # CI=true forces EphemeralClient (in-memory) for test isolation.
     CI = _bool(os.environ.get("CI"))
 
+    # ChromaDB backend selector: "local" (default, PersistentClient) or
+    # "cloud" (CloudClient). Read at call time in vector_store.py
+    # (mirrors the AI_BACKEND pattern) — do not read this from
+    # current_app.config. If "cloud" is requested but credentials are
+    # missing/invalid, get_chroma_client() logs and falls back to local.
+    CHROMA_DB = os.environ.get("CHROMA_DB", "local").strip().lower() or "local"
+
+    # Chroma Cloud credentials (only used when CHROMA_DB=cloud).
+    # CHROMA_CLOUD_CONNECTION_STRING is the Chroma tenant ID.
+    # CHROMA_COLLECTION_NAME becomes the Chroma Cloud database name
+    # (per-file collections doc_<hash> live inside it).
+    CHROMA_CLOUD_API_KEY = os.environ.get("CHROMA_CLOUD_API_KEY", "")
+    CHROMA_CLOUD_CONNECTION_STRING = os.environ.get(
+        "CHROMA_CLOUD_CONNECTION_STRING", ""
+    )
+    CHROMA_COLLECTION_NAME = os.environ.get(
+        "CHROMA_COLLECTION_NAME", "study-and-learn-chromadb"
+    )
+
     # ── AI client mode ──────────────────────────────────────────────────
     # AI_MOCK=true returns canned responses without hitting any backend.
     AI_MOCK = _bool(os.environ.get("AI_MOCK"))
@@ -101,5 +120,6 @@ class Config:
             f"ai_key={'set' if cls.OLLAMA_CLOUD_API_KEY else 'MISSING'}, "
             f"model={cls.OLLAMA_MODEL!r}, "
             f"poppler={'override' if cls.POPPLER_PATH else 'auto-detect'}, "
+            f"chroma={cls.CHROMA_DB!r}, "
             f"mock={cls.AI_MOCK})"
         )

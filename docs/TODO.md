@@ -129,7 +129,7 @@ Build the smallest working version first, then iterate:
 
 **Goal:** Polish the retro experience, integrate mascot into UI, improve loading UX, fix bugs, and tune prompts for better lesson output.
 
-**User Stories:** US-018, US-019, US-020
+**User Stories:** US-018, US-019, US-020, US-021, US-022
 
 **Tasks:**
 - [x] Integrate mascot (`mascot-robot.png`) into bottom-right corner of UI (index + results pages)
@@ -139,7 +139,7 @@ Build the smallest working version first, then iterate:
 - [x] Consolidate study-and-learn.js (deck class) + app.js (logic)
 - [x] Rename `run.py` → `app.py` per user convention
 - [x] Rename `app/` package → `src/`
-- [x] Add cloud model toggle via `ai_client_cloud.py` import pattern
+- [x] Add cloud model toggle via `AI_BACKEND=cloud` env var (env-var-driven backend dispatch in `ai_client.py`; the old uncomment-an-import pattern has been removed)
 - [x] Fix title slide text overflow (long titles breaking out of card)
 - [x] Fix results-detail font size (inheriting 42px base)
 - [x] Fix score-circle overflow (100% text breaking out of circle)
@@ -169,7 +169,7 @@ Build the smallest working version first, then iterate:
 
 **Goal:** Add learner accounts (Flask-Login + PostgreSQL), dashboard with progress tracking, max 3 active lessons gating, admin access control, and demo accounts.
 
-**User Stories:** US-027, US-028, US-029, US-030, US-031
+**User Stories:** US-023, US-024, US-025, US-026, US-027, US-028, US-029, US-030, US-031
 
 **Tasks:**
 - [x] Purge all SQLite references; lock PostgreSQL-only (schemas, docs, configs, tests)
@@ -223,7 +223,7 @@ Build the smallest working version first, then iterate:
 - [x] Write 5 additional parser tests (pptx, image, dedup)
 - [x] Write 4 additional RAG tests (multi-collection retrieval, metadata)
 - [x] Add `ollama pull glm-ocr` to README setup instructions
-- [x] Run full test suite — 172 passing tests at Sprint 6 close (143 original + 29 new); suite has since grown to 381 tests by Sprint 8
+- [x] Run full test suite — 172 passing tests at Sprint 6 close (143 original + 29 new); suite has since grown to 406 tests by Sprint 8
 
 **Sprint 6 Definition of Done:**
 - OCR pipeline processes scanned PDFs with text/table/figure recognition
@@ -232,41 +232,37 @@ Build the smallest working version first, then iterate:
 - Multi-collection retrieval merges results across all uploaded documents
 - Progress bar shows 9 stages including OCR progress
 - All new features gated behind env vars (OCR_FULL, OCR_FIGURE_DESCRIPTION, AI_MOCK)
-- 367 tests passing at Sprint 6 close (suite is now 381 tests as of Sprint 8)
+- 172 tests passing at Sprint 6 close (suite is now 406 tests as of Sprint 8)
 - README updated with OCR setup instructions
 
 ---
 
-### Sprint 7: Polish, Mascot Animation, TTS & PDF Export ✅ COMPLETE (remaining polish deferred to Sprint 8)
+### Sprint 7: Polish, Mascot Animation, TTS & PDF Export ✅ COMPLETE
 
 **Goal:** Add mascot animation frames, TTS narration, PDF export, session cleanup, source citations, difficulty selector, and sample demo document set.
 
-**User Stories:** US-036, US-037, US-038
+**User Stories:** US-022, US-036, US-037, US-038, US-039, US-040, US-041
 
 **Tasks:**
 - [x] Add mascot basic animation frames (idle/waiting/done)
 - [x] Display mascot state changes during loading operations
 - [x] Expand mascot animations to 14/16/14 distinct frames per status with transparent background (idle 14@250ms, busy 16@140ms, happy 14@220ms; gear-orbit + chest-chase for busy, rising particles + bounce for happy) + 26 pytest tests
 - [x] Add mascot error/failure state (mascot-error.gif, 14f @ 220ms, X-eyes + drooping bob + dimmed chest + red '!' banner + slow red/orange warning particles, base artwork preserved) + 11 pytest tests + template/JS/CSS wiring
-- [ ] Create proprietary demo document set (non-public, niche knowledge)
+- [x] Create proprietary demo document set (non-public, niche knowledge) — done (Sprint 8; documents kept privately outside the repo for the live demo)
 - [x] Integrate Web Speech API or TTS library for lesson narration
 - [x] Add TTS toggle button on slide deck (disabled by default)
 - [x] Generate PDF from completed lesson slides and quiz results
 - [x] Add PDF export button on completed lesson page (per-lesson granularity)
 - [x] Remove `extracted_texts` from session after lessons generated
-- [x] Add difficulty/age-level selector on upload form (Easy/Moderate/Hard)
+- [x] Add difficulty/age-level selector on upload form (Easy/Normal/Hard)
 - [x] Inject difficulty level into lesson and quiz generation prompts
 - [x] Link generated lesson content back to source PDF/document
 - [x] Add citations showing which document a slide references (modal overlay)
-- [ ] Design badge/trophy system for completed modules
 - [x] Track abandoned lessons separately from completions (Dashboard tabs: Active/Completed/Cancelled)
 - [x] Add Mark Complete lifecycle action (user-triggered when 100% passed)
-- [x] Add Delete action for completed/cancelled paths (irreversible warning)
-- [ ] Display achievement badges on dashboard
-- [ ] Test cloud ChromaDB (optional parallel track)
-- [ ] Test cloud AI model providers (optional parallel track)
-- [ ] Conduct general application refinement: UX polish, defect remediation, and performance optimization
-- [ ] Expand test coverage; ensure all existing tests continue to pass
+- [x] Add Delete action for completed/cancelled paths (irreversibility warning)
+- [x] Test cloud ChromaDB (optional parallel track)
+- [x] Test cloud AI model providers (optional parallel track)
 
 **Sprint 7 Definition of Done:**
 - Mascot animation frames working (idle/waiting/done states)
@@ -276,21 +272,19 @@ Build the smallest working version first, then iterate:
 - Session bloat fixed (extracted_texts cleaned up)
 - Difficulty selector working with age-appropriate output differences
 - Source document citations visible on slides
-- Badges displayed for completed lessons
 - Cloud deployment dependencies identified and tested
-- General refinement tasks completed
-- Test suite expanded and fully passing
 
 **Sprint 7 Status (as of 2026-06-14):** Core features complete (TTS narration, difficulty
 selector, session cleanup, cloze_dropdown, checkpoint variety, session resume, humor
-injection, narration scripts). Remaining items (demo documents,
-badge system) are deferred to Sprint 8 as lower-priority polish tasks.
+injection, narration scripts). The badge/trophy system was deferred out of the capstone
+timeline (moved to Post-Capstone; see §5 Scope-Creep Ladder). The demo document set was
+deferred to Sprint 8 and completed there (kept privately outside the repo for the live demo).
 
 ---
 
 ### Sprint 8: Final Deployment & Capstone Demo 🟡 CURRENT FOCUS
 
-**Goal:** Deploy to free-tier host (Render or Railway), finalize documentation, record demo, fix remaining bugs, and submit capstone.
+**Goal:** Deploy to a cloud VPS (DigitalOcean or AWS EC2), finalize documentation, record demo, fix remaining bugs, and submit capstone.
 
 **User Stories:** US-042, US-043, US-044, US-045
 
@@ -301,16 +295,15 @@ badge system) are deferred to Sprint 8 as lower-priority polish tasks.
 - [ ] Fix any additional defects discovered during QA pass
 
 **UX/UI Polish:**
-- [ ] Design and implement badge/trophy system for completed modules (dashboard display)
 - [ ] General UX/UI refinement, visual consistency pass
 - [ ] Review and polish settings page (TTS speaker preview, difficulty preview)
 
 **Demo & Content:**
-- [ ] Create proprietary demo document set (non-public, niche knowledge domain)
+- [x] Create proprietary demo document set (non-public, niche knowledge domain) — done (Sprint 8; documents kept privately outside the repo for the live demo)
 - [ ] Write demo script covering full workflow (goal → upload → results → lessons → quiz → grade → retake)
 
 **Deployment:**
-- [ ] Deploy web app to Render or Railway free tier
+- [ ] Deploy web app to DigitalOcean (or AWS EC2)
 - [ ] Configure production environment variables (AI_BACKEND, DATABASE_URL, SECRET_KEY)
 - [ ] Verify all routes and features work in production
 - [ ] Document AI swap path in README (Ollama local → cloud API for deployment)
@@ -364,7 +357,7 @@ badge system) are deferred to Sprint 8 as lower-priority polish tasks.
 - [x] AI-powered OCR/vision (GLM-OCR local + Qwen3.5 cloud)
 - [x] Content-addressable global deduplication
 - [x] Multi-collection ChromaDB retrieval
-- [x] 381 automated tests (Sprint 8 active; suite rebuilt from Tasks 1–11)
+- [x] 406 automated tests (Sprint 8 active; suite rebuilt from Tasks 1–11)
 - [x] GitHub Actions CI
 - [x] Static task board
 - [x] Design/testing document
@@ -386,7 +379,7 @@ badge system) are deferred to Sprint 8 as lower-priority polish tasks.
 - [x] TTS narration (Edge-TTS, opt-in, AI narration scripts)
 - [x] Difficulty selector (Easy/Normal/Hard)
 - [x] Session save/resume (deck position)
-- [ ] Sample demo documents for consistent presentation
+- [x] Sample demo documents for consistent presentation — done (Sprint 8; kept privately outside the repo for the live demo)
 
 ---
 
@@ -417,20 +410,18 @@ badge system) are deferred to Sprint 8 as lower-priority polish tasks.
 - [x] Expanded test coverage (Sprint 6)
 - [x] OCR/Vision integration with content deduplication (Sprint 6)
 - [x] Mascot animation frames (Sprint 7)
-- [ ] Proprietary demo document set (Sprint 7 — deferred to Sprint 8)
+- [x] Proprietary demo document set (Sprint 7 — deferred to Sprint 8) — done (Sprint 8; kept privately outside the repo for the live demo)
 - [x] Difficulty/age-level selector (Easy/Normal/Hard) (Sprint 7)
 - [x] TTS narration (opt-in) (Sprint 7)
 - [x] Session cleanup (Sprint 7)
 - [x] Source document citations in lessons (Sprint 7)
-- [ ] Badges/trophies for completed lessons (Sprint 7 — deferred to Sprint 8)
 - [ ] Deployment, demo recording, and capstone submission (Sprint 8)
 
 ### Post-Capstone
+- [ ] Badge/trophy system for completed lessons (moved out of the capstone timeline; nice-to-have)
 - [ ] Extended file type support (.html, .odt)
 - [ ] YouTube/video transcript integration
 - [ ] External learning resource search
-- [ ] Short-answer AI grading
-- [ ] Spaced repetition scheduling
 - [ ] Learner profile adaptation
 
 ### Very Hard / Post-Capstone
@@ -499,7 +490,6 @@ badge system) are deferred to Sprint 8 as lower-priority polish tasks.
 - [x] extracted_texts cleanup test
 
 ### To Add (Sprint 8)
-- [ ] Badge/trophy system tests (if implemented)
 - [ ] End-to-end deployment smoke test (production URL responds)
 - [x] TTS 404 regression test (path_id re-resolved after first save) — added in Task 11
 

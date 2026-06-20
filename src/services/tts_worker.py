@@ -270,6 +270,17 @@ def run_tts_generation_for_path(
                 )
                 lesson['tts_audio_status'] = 'failed'
                 lesson['tts_enabled'] = False
+                # Surface the failure to the user via mascot-error.gif.
+                # The JS sticky-error window (~8s) keeps the error GIF
+                # visible even though this worker continues to the next
+                # module and may publish a ``busy`` cosmetic shortly.
+                if task_id:
+                    progress_tracker.update_cosmetic(
+                        task_id,
+                        mascot_state='error',
+                        mascot=f"Audio failed for module {idx + 1}",
+                        error=True,
+                    )
                 results.append({
                     'module_index': idx,
                     'status': 'failed',
@@ -278,7 +289,22 @@ def run_tts_generation_for_path(
                 })
 
         if task_id:
-            progress_tracker.update_cosmetic(task_id, **_tts_cosmetic(3))
+            failed_count = sum(1 for r in results if r['status'] == 'failed')
+            if failed_count > 0:
+                # One or more modules failed TTS. Show a summary error
+                # cosmetic so the user knows audio is incomplete before
+                # the redirect fires. The mascot-error.gif stays
+                # visible via the JS sticky-error window even after
+                # generation_completed_at is set and the redirect to
+                # /lessons happens.
+                progress_tracker.update_cosmetic(
+                    task_id,
+                    mascot_state='error',
+                    mascot=f"{failed_count} module(s) have no audio",
+                    error=True,
+                )
+            else:
+                progress_tracker.update_cosmetic(task_id, **_tts_cosmetic(3))
 
         # Persist any lesson dict changes (tts_audio_status, tts_enabled).
         try:
@@ -353,6 +379,16 @@ def spawn_tts_background_task(
                     "TTS background task %s died with uncaught error: %s",
                     task_id, str(e), exc_info=True,
                 )
+                # Surface the catastrophic failure via mascot-error.gif.
+                # The JS sticky-error window keeps the error GIF visible
+                # even after generation_completed_at is set and the
+                # redirect to /lessons happens.
+                try:
+                    progress_tracker.mark_error(
+                        task_id, mascot_msg='Audio generation crashed'
+                    )
+                except Exception:
+                    pass
                 # Defensive: if the inner function's finally block did
                 # not run for any reason, ensure the JS redirect fires
                 # so the user is not stuck on the results page. We set

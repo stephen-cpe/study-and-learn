@@ -1,8 +1,8 @@
 # STATUS.md
-Last Updated: 2026-06-18
+Last Updated: 2026-06-20
 Sprint: 8 (ACTIVE)
-Last Task Completed: Removed seed-demo route, template button, and 2 tests per analysis — feature redundant (init_db.sql handles seeding); docs updated
-Commit Message Suggestion: chore: remove seed-demo feature (redundant, init_db.sql handles seeding)
+Last Task Completed: Final doc sweep fixes — (1) updated test count from 381 to 406 across SRS.md (§8.1), DESIGN_AND_TESTING.md (§5), and TODO.md (Sprint 6 DoD line, Sprint 6 task line, Core MVP Backlog line) to match actual pytest output (406 passed, verified by running full suite); (2) aligned TODO.md sprint User Story headers to match SRS §7 epic assignments — Sprint 4 now lists US-018..US-022 (was US-018..US-020), Sprint 5 now lists US-023..US-031 (was US-027..US-031), Sprint 7 now lists US-022+US-036..US-041 (was US-036..US-038). All 8 sprint headers verified to match SRS §7 epics exactly.
+Commit Message Suggestion: docs: update test count to 406 and align TODO sprint headers with SRS §7 epics
 Known Issues:
   - AI output consistency: qwen3:0.6b is placeholder-only; use cloud models (gemma3:27b-cloud)
     for production quality
@@ -67,14 +67,25 @@ Known Issues:
          bubble updates (mascot text + progress bar) only. The
          redirect decision lives exclusively on /lessons/generation-
          status and is the only path that can call
-         window.location.href. Two polls, two purposes, no shared
-         state. Tests assert both endpoints are polled AND that
-         the /progress poll never triggers a redirect. — DONE
+          window.location.href. Two polls, two purposes, no shared
+          state. Tests assert both endpoints are polled AND that
+          the /progress poll never triggers a redirect. — DONE
+  - ChromaDB backend is now toggleable via CHROMA_DB env var (local default
+    / cloud opt-in). CHROMA_DB=cloud uses chromadb.CloudClient with three
+    credentials: CHROMA_CLOUD_API_KEY, CHROMA_CLOUD_CONNECTION_STRING
+    (Chroma tenant ID), and CHROMA_COLLECTION_NAME (Chroma Cloud database
+    name — the app's per-file doc_<hash> collections live inside it). On
+    ANY cloud failure (missing/empty/invalid credential, CloudClient
+    constructor error, or heartbeat() connectivity probe failure),
+    get_chroma_client() logs a clear actionable error and reverts to the
+    local PersistentClient. CI=true ALWAYS overrides CHROMA_DB to force
+    in-memory EphemeralClient (tests stay isolated/offline). Verified
+    against live Chroma Cloud (Sprint 8). See ADR-027 for the full
+    decision/tradeoff analysis. NOTE: AI_BACKEND=cloud (cloud Ollama)
+    was also verified separately — these are independent toggles.
 Pending Decisions:
-  - Deployment target: Confirm Render vs Railway for final submission (Sprint 8)
-  - Badge/trophy design: deferred to Sprint 8 (lower priority than deployment)
-  - Demo document set: content and domain TBD
+   - none (deployment target locked: DigitalOcean primary, AWS EC2 secondary)
 Next 3 Tasks (Sprint 8):
-  1. General QA pass: manual smoke test of all user flows; log defects
-  2. Deploy to Render or Railway free tier with AI_MOCK=true fallback
-  3. Final documentation review, demo recording, and capstone submission
+   1. General QA pass: manual smoke test of all user flows; log defects
+   2. Deploy to DigitalOcean (or AWS EC2) cloud VPS
+   3. Final documentation review, demo recording, and capstone submission

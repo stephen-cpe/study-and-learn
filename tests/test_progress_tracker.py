@@ -1,7 +1,7 @@
 import pytest
 from src.services.progress_tracker import (
     STAGES, GENERATE_STAGES, PROCESS_STAGES,
-    create_task, update_progress, update_cosmetic, get_progress,
+    create_task, update_progress, update_cosmetic, mark_error, get_progress,
     cleanup_task,
 )
 
@@ -230,3 +230,80 @@ def test_update_cosmetic_with_no_known_keys_is_noop():
     assert current['stage'] == original['stage']
     assert current['label'] == original['label']
     assert current['mascot'] == original['mascot']
+
+
+# ── mark_error ──────────────────────────────────────────────────────
+# mark_error is the canonical helper for surfacing failures to the
+# user via the mascot (mascot-error.gif) without crashing the request.
+# It sets mascot_state='error', a bubble message, and a sticky
+# ``error=True`` flag the JS client uses to keep the error GIF visible
+# for a short window even if subsequent busy polls arrive.
+
+def test_mark_error_sets_mascot_state_error():
+    task_id = create_task()
+    mark_error(task_id, mascot_msg='AI unreachable')
+    progress = get_progress(task_id)
+    assert progress['mascot_state'] == 'error'
+    assert progress['mascot'] == 'AI unreachable'
+    assert progress['error'] is True
+
+
+def test_mark_error_preserves_stage_and_done():
+    """mark_error must not change the stage number or done flag —
+    it only merges cosmetic fields."""
+    task_id = create_task()
+    update_progress(task_id, 3)
+    mark_error(task_id, mascot_msg='fail')
+    progress = get_progress(task_id)
+    assert progress['stage'] == 3
+    assert progress['done'] is False
+
+
+def test_mark_error_uses_default_message_when_none():
+    task_id = create_task()
+    mark_error(task_id)
+    progress = get_progress(task_id)
+    assert progress['mascot_state'] == 'error'
+    assert isinstance(progress['mascot'], str)
+    assert len(progress['mascot']) > 0
+
+
+def test_mark_error_sets_optional_pct_and_label():
+    task_id = create_task()
+    mark_error(task_id, mascot_msg='DB locked', pct=42, label='Error')
+    progress = get_progress(task_id)
+    assert progress['pct'] == 42
+    assert progress['label'] == 'Error'
+
+
+def test_mark_error_on_unknown_task_is_noop():
+    """mark_error must never raise — error handlers cannot themselves
+    error. A missing task_id (e.g. already cleaned up) is a no-op."""
+    mark_error('does-not-exist', mascot_msg='fail')
+
+
+def test_mark_error_error_flag_survives_subsequent_busy_cosmetic():
+    """The ``error=True`` flag must persist across a subsequent
+    update_cosmetic(busy) call — the JS client reads it to keep the
+    error GIF sticky. update_cosmetic only overwrites fields it is
+    given; if it does not pass ``error``, the flag must remain True."""
+    task_id = create_task()
+    mark_error(task_id, mascot_msg='AI down')
+    # Simulate a background worker publishing a busy cosmetic on the
+    # same task_id (e.g. TTS still processing the next module).
+    update_cosmetic(task_id, mascot='Encoding audio...', mascot_state='busy', pct=75)
+    progress = get_progress(task_id)
+    assert progress['error'] is True, (
+        "error=True flag was clobbered by a subsequent busy cosmetic — "
+        "the JS sticky-error window would break."
+    )
+
+
+def test_update_cosmetic_accepts_error_key():
+    """update_cosmetic must accept 'error' as a recognized cosmetic key
+    so mark_error can set it via the same merge path."""
+    task_id = create_task()
+    update_cosmetic(task_id, error=True, mascot_state='error', mascot='fail')
+    progress = get_progress(task_id)
+    assert progress['error'] is True
+    assert progress['mascot_state'] == 'error'

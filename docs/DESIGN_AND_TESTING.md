@@ -1,9 +1,9 @@
 # Design and Testing Document
 # Study-and-Learn
 
-**Version:** 0.7
+**Version:** 1.0
 **Status:** Living document
-**Last updated:** June 14, 2026
+**Last updated:** June 19, 2026
 
 ---
 
@@ -317,6 +317,48 @@ and TTS-disabled paths; failure of any single TTS module cannot strand the user 
 results page ✦ ❌ Requires an Alembic migration + `init_db.sql` update; the 2-hour hard
 timeout is a safety net only (the user must navigate manually if the column is never set).
 
+### ADR-027: ChromaDB Cloud Backend Toggle (CHROMA_DB)
+
+**Decision:** Added a `CHROMA_DB` environment variable that selects the ChromaDB backend:
+`local` (default, `chromadb.PersistentClient` at `./data/chroma_db`) or `cloud`
+(`chromadb.CloudClient`). The variable is read at call time inside
+`vector_store.py::get_chroma_client()` (mirroring the `AI_BACKEND` pattern) — it is NOT
+read from `current_app.config`, so there is no `Config.CHROMA_DB` attribute used by routes.
+When `CHROMA_DB=cloud` is requested, three credentials are required:
+`CHROMA_CLOUD_API_KEY`, `CHROMA_CLOUD_CONNECTION_STRING` (the Chroma tenant ID), and
+`CHROMA_COLLECTION_NAME` (becomes the Chroma Cloud database name — the app's per-file
+`doc_<hash>` collections live inside it as ordinary Chroma collections). The cloud path
+runs in `_try_cloud_client()`: it validates all three credentials are non-empty, constructs
+`chromadb.CloudClient(tenant=..., database=..., api_key=...)`, and probes connectivity
+with `client.heartbeat()`. On ANY failure (missing/empty credential, constructor raising,
+or heartbeat raising — e.g. bad API key, unreachable host, expired token), it logs a clear
+actionable error naming the missing/failed variable and returns `None`; the caller then
+transparently falls back to the local PersistentClient. The cloud client exposes the same
+`get_or_create_collection(name=...)` / `query()` / `delete_collection()` API as the local
+client, so `store_chunks`, `retrieve_with_scores`, and `rag_retriever.py` required NO
+changes — the abstraction boundary held. `CI=true` always wins over `CHROMA_DB=cloud`:
+tests force `EphemeralClient` to stay deterministic, offline, and free of network races.
+
+**Reason:** The project's RAG pipeline was hardcoded to local PersistentClient. For
+deployment to a cloud VPS (DigitalOcean/AWS EC2) and for shared, persistent vector storage
+across redeployments, a cloud backend was needed. Adding a single env-var toggle (rather
+than a parallel code path or a separate service) keeps the change minimal and consistent
+with the existing `AI_BACKEND` selector pattern (ADR-007). The graceful-fallback design is
+critical: a misconfigured cloud backend must never strand the app in production — it logs
+and reverts to local, exactly as `AI_BACKEND` falls back when cloud creds are absent. The
+decision to map `CHROMA_COLLECTION_NAME` to the Cloud *database* (not a single shared
+collection) preserves the existing per-file `doc_<hash>` collection model: cloud and local
+use identical collection-naming logic, so no `rag_retriever.py` or `get_collection_name()`
+changes were required. Verified against live Chroma Cloud by the developer (Sprint 8).
+
+**Tradeoffs:** ✅ Zero changes to retrieval/collection code (abstraction held); opt-in with
+safe default; fails safe to local with logging; consistent with `AI_BACKEND` pattern;
+enables cloud deployment of the vector store ✦ ❌ Adds three new credential env vars to
+manage; cloud introduces network latency and a third-party dependency (Chroma Cloud);
+the `heartbeat()` probe adds one extra round-trip per client construction (amortized — the
+client is constructed once per `get_chroma_client()` call, which callers already cache
+implicitly via the existing per-call pattern).
+
 ---
 
 ## 4. Software & Architectural Patterns
@@ -352,7 +394,7 @@ The single `main` blueprint is split across five route modules. URL paths do not
     - AI client mock mode and live mode,
     - LangChain text splitter output validation,
     - ChromaDB collection creation & persistence checks,
-    - ChromaDB uses EphemeralClient when CI=true, PersistentClient otherwise,
+    - ChromaDB uses EphemeralClient when CI=true (always wins, regardless of CHROMA_DB), CloudClient when CHROMA_DB=cloud with valid credentials (falls back to local on any failure), PersistentClient otherwise,
     - Similarity search context builder accuracy,
     - Multi-file upload session & cookie size limits,
     - AI calls mocked via AI_MOCK=true,
@@ -382,7 +424,7 @@ Integration tests cover routes and workflow behavior:
 - mocked generate-lessons flow: session data → lesson + quiz generation → redirect,
 - lesson deck route with pre-populated session lessons returns 200.
 
-Current test suite: 381 tests passing (Sprint 8 active — suite rebuilt from Tasks 1–11).
+Current test suite: 406 tests passing (Sprint 8 active — suite rebuilt from Tasks 1–11).
 Sprint 7 test additions cover: TTS service (5), narration script (4), cloze_dropdown grading
 (3), checkpoint variety (3), humor/difficulty prompt injection (5), route-level TTS flags (3),
 save-position (2), audio routes (2), difficulty snapshotting (1), extracted_texts cleanup (1).
@@ -439,12 +481,12 @@ All AI-generated code must be reviewed before commit. Important project behavior
 
 ## 8. Deployment Notes
 
-Deployment target is undecided. Candidate platforms:
-- Render,
-- Railway,
-- PythonAnywhere,
-- DigitalOcean,
-- AWS EC2.
+Deployment target (decided): a cloud VPS sized to fit the full stack (PostgreSQL +
+ChromaDB + Ollama + Poppler + GLM-OCR). Primary platform:
+- DigitalOcean (Basic, Regular, 4 vCPU / 8 GB RAM / 160 GB disk, slug `s-4vcpu-8gb`),
+- AWS EC2 (secondary, comparable spec, if time permits).
+
+Free-tier PaaS hosts (Render, Railway, PythonAnywhere) were evaluated and rejected — the stack does not fit a 512 MB–1 GB container.
 
 The deployed version should be stable enough for capstone demonstration and accessible from the final submission link.
 
@@ -455,16 +497,15 @@ The deployed version should be stable enough for capstone demonstration and acce
   - Host: Developer laptop running Ollama + Flask
   - Cost: $0 (uses existing hardware)
   - Tradeoff: Not publicly accessible; suitable for sprint demos & local dev
-- Option B: Free-Tier Cloud (Recommended for Submission)
-  - Host: Render or Railway (Flask web service)
-  - Cost: $0/month (free tier supports 512MB–1GB RAM, sufficient for Flask + static assets)
-  - AI Strategy: Swap Ollama for cloud API (OpenRouter/Groq) or keep `AI_MOCK=true` for demo
-  - Vector DB: ChromaDB runs in-memory or uses persistent volume (~50MB free tier storage)
-  - Tradeoff: Requires API key or mocked AI; free tier sleeps after inactivity but wakes on request
-- Option C: VPS (DigitalOcean/AWS)
-  - Cost: ~$6–12/month (4GB RAM droplet)
-  - Tradeoff: Overkill for capstone; adds operational overhead
-Recommendation: Deploy to Render/Railway free tier with `AI_MOCK=true` for grading, document swap path to production API in README.
+- Option B: Cloud VPS (Selected for Submission)
+  - Host: DigitalOcean droplet (Basic, Regular, 4 vCPU / 8 GB RAM / 160 GB disk) — AWS EC2 equivalent as a secondary option
+  - Cost: ~$24–48/month (or free trial credits); sized to run the full stack (PostgreSQL + ChromaDB + Ollama + Poppler + GLM-OCR) on one VM
+  - AI Strategy: Run Ollama on the VM (gemma3:27b-cloud or qwen3:0.6b per `OLLAMA_MODEL`), or swap to a cloud API via `AI_BACKEND=cloud`; `AI_MOCK=true` remains the deterministic-demo fallback
+  - Vector DB: Persistent ChromaDB on an attached volume, or Chroma Cloud (`CHROMA_DB=cloud` — see ADR-027)
+  - Tradeoff: No inactivity sleep (always-on); operator manages OS/Postgres/Poppler/Ollama
+- Option C: Free-Tier PaaS (Render/Railway) — Rejected
+  - Cost: $0/month, but 512 MB–1 GB RAM is insufficient for the full stack (Ollama alone needs ~6 GB VRAM + RAM); rejected after evaluation
+Recommendation: Deploy to a DigitalOcean cloud VPS (4 vCPU / 8 GB RAM) sized for the full stack; keep `AI_MOCK=true` as the deterministic-demo fallback and document the cloud-API swap path in README.
 
 ---
 
@@ -475,7 +516,7 @@ Recommendation: Deploy to Render/Railway free tier with `AI_MOCK=true` for gradi
 | AI model too slow locally or inconsistent output quality | Demo delay or poor pedagogical value | Use small documents and cached/demo responses; support cloud model fallback via `AI_BACKEND=cloud` |
 | File parsing issues | Failed workflow | Start with fewer file types and add more gradually |
 | Scope creep | Missed MVP | Keep optional features outside official sprint goals |
-| Deployment resource limits | App unavailable | Test deployment early; maintain `AI_MOCK=true` path for free-tier hosting without GPU |
+| Deployment resource limits | App unavailable | Test deployment early; the selected cloud VPS (4 vCPU / 8 GB RAM) is sized for the full stack; `AI_MOCK=true` remains the deterministic-demo fallback |
 | AI output inconsistency | Poor demo | Use controlled sample documents and structured prompts |
 | PostgreSQL privilege issues on live DB | Blocked migrations | Document `init_db.sql` workaround (includes DROP IF EXISTS + full schema + seed accounts) and `GRANT CREATE` procedure |
 | Session leakage between users | User A sees User B's data after logout/login swap | Fixed in Sprint 5 bug-fix rounds: clear session-scoped keys on login via `session.pop()` |

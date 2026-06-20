@@ -15,20 +15,115 @@ def get_collection_name(file_hash: str) -> str:
     return f"{COLLECTION_PREFIX}{file_hash[:MAX_HASH_LENGTH]}"
 
 
+def _get_local_client():
+    """Build the default local PersistentClient.
+
+    Centralized so the cloud fallback path can reuse it without
+    duplicating the path-resolution logic.
+    """
+    import chromadb
+    data_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+        'data', 'chroma_db'
+    )
+    os.makedirs(data_dir, exist_ok=True)
+    return chromadb.PersistentClient(path=data_dir)
+
+
+def _try_cloud_client():
+    """Attempt to build a Chroma Cloud client from env credentials.
+
+    Returns a chromadb CloudClient on success, or None on any failure
+    (missing/empty credentials, client construction error, heartbeat
+    probe failure). Every failure path logs a clear, actionable message
+    so developers can diagnose misconfiguration.
+
+    The caller is responsible for falling back to the local client.
+    """
+    import chromadb
+
+    api_key = os.environ.get("CHROMA_CLOUD_API_KEY", "").strip()
+    connection_string = os.environ.get(
+        "CHROMA_CLOUD_CONNECTION_STRING", ""
+    ).strip()
+    database = os.environ.get(
+        "CHROMA_COLLECTION_NAME", "study-and-learn-chromadb"
+    ).strip()
+
+    # ── Validate required credentials ────────────────────────────────
+    missing = []
+    if not api_key:
+        missing.append("CHROMA_CLOUD_API_KEY")
+    if not connection_string:
+        missing.append("CHROMA_CLOUD_CONNECTION_STRING")
+    if not database:
+        missing.append("CHROMA_COLLECTION_NAME")
+    if missing:
+        logger.error(
+            "CHROMA_DB=cloud requested but required credential(s) are "
+            "empty/unset: %s. Reverting to local PersistentClient. "
+            "Set these in your .env to use Chroma Cloud.",
+            ", ".join(missing),
+        )
+        return None
+
+    # ── Attempt client construction + connectivity probe ──────────────
+    try:
+        logger.info(
+            "Connecting to Chroma Cloud (tenant=%s, database=%s)",
+            connection_string[:8] + "...", database,
+        )
+        client = chromadb.CloudClient(
+            tenant=connection_string,
+            database=database,
+            api_key=api_key,
+        )
+        # Lightweight connectivity/auth probe. heartbeat() hits the
+        # server and raises on bad credentials or unreachable host.
+        client.heartbeat()
+        logger.info("Chroma Cloud connection established.")
+        return client
+    except Exception as e:
+        logger.error(
+            "Chroma Cloud connection failed (CHROMA_DB=cloud): %s. "
+            "Reverting to local PersistentClient. Verify "
+            "CHROMA_CLOUD_API_KEY, CHROMA_CLOUD_CONNECTION_STRING, "
+            "and CHROMA_COLLECTION_NAME are valid.",
+            str(e),
+        )
+        return None
+
+
 def get_chroma_client():
     """Get ChromaDB client based on environment.
-    
+
+    Precedence (highest first):
+      1. CI=true           -> EphemeralClient (in-memory, never network)
+      2. CHROMA_DB=cloud    -> CloudClient (validates creds + heartbeat;
+                                falls back to local on any failure)
+      3. otherwise / fallback -> PersistentClient (local disk, the default)
+
     Returns:
-        Chroma client (Persistent or Ephemeral)
+        Chroma client (Ephemeral, Cloud, or Persistent).
     """
+    # ── 1. CI always wins: keep tests isolated and offline ──────────
     if os.environ.get('CI', '').lower() == 'true':
         import chromadb
         return chromadb.EphemeralClient()
-    else:
-        import chromadb
-        data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'data', 'chroma_db')
-        os.makedirs(data_dir, exist_ok=True)
-        return chromadb.PersistentClient(path=data_dir)
+
+    # ── 2. Cloud backend (opt-in, with graceful fallback) ───────────
+    chroma_db = os.environ.get('CHROMA_DB', 'local').strip().lower()
+    if chroma_db == 'cloud':
+        cloud_client = _try_cloud_client()
+        if cloud_client is not None:
+            return cloud_client
+        # Fall through to local on any cloud failure.
+        logger.warning(
+            "Chroma Cloud unavailable; using local PersistentClient."
+        )
+
+    # ── 3. Default: local persistent client ─────────────────────────
+    return _get_local_client()
 
 
 def store_chunks(chunks: List[str], collection_name: str,

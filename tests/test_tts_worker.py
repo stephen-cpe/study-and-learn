@@ -880,3 +880,164 @@ def test_worker_uses_update_cosmetic_not_update_progress(
         ).first()
         assert path_after is not None
         assert path_after.generation_completed_at is not None
+
+
+# ── TTS worker error cosmetic (mascot-error.gif) ───────────────────
+# When a module's TTS generation fails, the worker must publish a
+# cosmetic update with mascot_state='error' so the mascot-error.gif
+# is shown to the user. The ``error=True`` flag must be set so the
+# JS sticky-error window keeps the error GIF visible even if a
+# subsequent busy cosmetic arrives for the next module.
+
+def test_worker_publishes_error_cosmetic_on_module_failure(
+    worker_client, monkeypatch, tmp_path,
+):
+    """When a module's TTS generation fails, the worker must call
+    update_cosmetic with mascot_state='error' and error=True so the
+    mascot-error.gif is shown to the user.
+    """
+    app, user = worker_client
+    real_path_id = _seed_path(app, user, num_modules=2)
+    _patch_tts_dir(monkeypatch, tmp_path)
+
+    task_id = 'error-cosmetic-task-1'
+    pt_create_task(task_id=task_id, stages=GENERATE_STAGES)
+    progress_tracker.update_progress(task_id, 4)
+
+    async def mock_gen_fail(text, voice, out_path):
+        raise RuntimeError('Simulated TTS failure')
+
+    import src.services.tts_service as tts_service_module
+    monkeypatch.setattr(tts_service_module, '_generate_mp3', mock_gen_fail)
+
+    with app.app_context():
+        run_tts_generation_for_path(
+            user_id=user.id, path_id=real_path_id, task_id=task_id,
+        )
+
+    entry = pt_get_progress(task_id)
+    # The worker must have set mascot_state='error' and error=True
+    # so the JS shows mascot-error.gif and keeps it sticky.
+    assert entry['mascot_state'] == 'error', (
+        f"Worker did not publish error cosmetic on failure; "
+        f"mascot_state={entry.get('mascot_state')!r}"
+    )
+    assert entry.get('error') is True, (
+        f"Worker did not set error=True flag on failure; "
+        f"the JS sticky-error window would not engage."
+    )
+
+
+def test_worker_publishes_error_cosmetic_on_partial_failure(
+    worker_client, monkeypatch, tmp_path,
+):
+    """When some modules fail and others succeed, the worker must
+    still publish an error cosmetic (mascot_state='error') at the
+    end so the user knows audio is incomplete.
+
+    The final cosmetic should reflect the failure summary, not the
+    'All done!' happy state.
+    """
+    app, user = worker_client
+    real_path_id = _seed_path(app, user, num_modules=3)
+    _patch_tts_dir(monkeypatch, tmp_path)
+
+    task_id = 'error-cosmetic-task-2'
+    pt_create_task(task_id=task_id, stages=GENERATE_STAGES)
+    progress_tracker.update_progress(task_id, 4)
+
+    async def mock_gen_fail_first(text, voice, out_path):
+        module_part = out_path.parent.name
+        if module_part == '0':
+            raise RuntimeError('Simulated TTS failure for module 0')
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text('ok')
+
+    import src.services.tts_service as tts_service_module
+    monkeypatch.setattr(tts_service_module, '_generate_mp3', mock_gen_fail_first)
+
+    with app.app_context():
+        run_tts_generation_for_path(
+            user_id=user.id, path_id=real_path_id, task_id=task_id,
+        )
+
+    entry = pt_get_progress(task_id)
+    # Even though modules 1 and 2 succeeded, the final cosmetic must
+    # be 'error' because module 0 failed.
+    assert entry['mascot_state'] == 'error', (
+        f"Worker did not publish error cosmetic on partial failure; "
+        f"mascot_state={entry.get('mascot_state')!r}"
+    )
+    assert entry.get('error') is True
+
+
+def test_worker_publishes_happy_cosmetic_when_all_succeed(
+    worker_client, monkeypatch, tmp_path,
+):
+    """When all modules succeed, the worker must publish the happy
+    cosmetic (mascot_state='happy') — NOT error. This guards against
+    the error-cosmetic logic over-firing.
+    """
+    app, user = worker_client
+    real_path_id = _seed_path(app, user, num_modules=2)
+    _patch_tts_dir(monkeypatch, tmp_path)
+
+    task_id = 'happy-cosmetic-task-1'
+    pt_create_task(task_id=task_id, stages=GENERATE_STAGES)
+    progress_tracker.update_progress(task_id, 4)
+
+    async def mock_gen(text, voice, out_path):
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text('ok')
+
+    import src.services.tts_service as tts_service_module
+    monkeypatch.setattr(tts_service_module, '_generate_mp3', mock_gen)
+
+    with app.app_context():
+        run_tts_generation_for_path(
+            user_id=user.id, path_id=real_path_id, task_id=task_id,
+        )
+
+    entry = pt_get_progress(task_id)
+    assert entry['mascot_state'] != 'error', (
+        f"Worker published error cosmetic on success; "
+        f"mascot_state={entry.get('mascot_state')!r}"
+    )
+    assert entry.get('error') is not True
+
+
+def test_spawn_wrapper_publishes_error_on_catastrophic_failure(
+    worker_client, monkeypatch, tmp_path,
+):
+    """If the TTS background thread dies with an uncaught error (e.g.
+    app context push failure), the spawn wrapper must call mark_error
+    so the mascot-error.gif is shown.
+    """
+    app, user = worker_client
+    real_path_id = _seed_path(app, user, num_modules=1)
+    _patch_tts_dir(monkeypatch, tmp_path)
+
+    task_id = 'catastrophic-task-1'
+    pt_create_task(task_id=task_id, stages=GENERATE_STAGES)
+    progress_tracker.update_progress(task_id, 4)
+
+    # Patch run_tts_generation_for_path to raise, simulating a
+    # catastrophic thread failure.
+    import src.services.tts_worker as worker_module
+    def boom(*args, **kwargs):
+        raise RuntimeError('Catastrophic thread death')
+    monkeypatch.setattr(worker_module, 'run_tts_generation_for_path', boom)
+
+    from src.services.tts_worker import spawn_tts_background_task
+    thread = spawn_tts_background_task(
+        flask_app=app, user_id=user.id, path_id=real_path_id, task_id=task_id,
+    )
+    thread.join(timeout=5.0)
+
+    entry = pt_get_progress(task_id)
+    assert entry is not None
+    assert entry['mascot_state'] == 'error', (
+        f"Spawn wrapper did not publish error cosmetic on catastrophic "
+        f"failure; mascot_state={entry.get('mascot_state')!r}"
+    )
+    assert entry.get('error') is True

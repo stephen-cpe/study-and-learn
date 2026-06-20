@@ -11,6 +11,14 @@
   var _progressTimedOut = false;
   var _receivedValidProgress = false;
   var _processPollInterval = null;
+  // Sticky-error window: when an ``error`` mascot_state arrives, we
+  // ignore subsequent non-error cosmetic polls for this many ms so the
+  // mascot-error.gif stays visible long enough for the user to read the
+  // bubble message. Without this, a background worker (e.g. TTS) could
+  // clobber the error state with a ``busy`` update on the very next
+  // 2-second tick, making the error GIF flash and vanish instantly.
+  var ERROR_STICKY_MS = 8000;
+  var _errorShownAt = 0;
 
   window.generateTaskId = function () {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -60,6 +68,8 @@
     window.stopProcessProgressPoll();
     var startTime = Date.now();
     var STALE_TIMEOUT_MS = 120000;
+    var processErrorShownAt = 0;
+    var PROCESS_ERROR_STICKY_MS = 8000;
 
     _processPollInterval = setInterval(function () {
       var elapsed = Date.now() - startTime;
@@ -73,6 +83,21 @@
         .then(function (r) { return r.json(); })
         .then(function (data) {
           if (data.stage === undefined || data.stage < 0) return;
+          // Sticky-error for the process poll (upload/parse flow),
+          // mirroring the generate-lessons poll. Prevents a
+          // background task from clobbering mascot-error.gif.
+          if (processErrorShownAt > 0) {
+            var sinceError = Date.now() - processErrorShownAt;
+            if (sinceError < PROCESS_ERROR_STICKY_MS && data.mascot_state !== 'error') {
+              return;
+            }
+            if (data.mascot_state !== 'error') {
+              processErrorShownAt = 0;
+            }
+          }
+          if (data.mascot_state === 'error') {
+            processErrorShownAt = Date.now();
+          }
           window.setBubblePersistent(data.mascot || 'Processing your materials...');
           window.showBubbleBar(data.pct);
           window.setMascotState(data.mascot_state || 'busy');
@@ -190,6 +215,28 @@
           if (!data) return;
           if (data.stage === undefined || data.stage < 0) return;
           _receivedValidProgress = true;
+          // Sticky-error: if we showed an error recently, ignore
+          // non-error cosmetic updates until the sticky window
+          // expires. This prevents a background worker (e.g. TTS
+          // processing the next module) from immediately overwriting
+          // the mascot-error.gif with a busy update, which would make
+          // the error flash and vanish before the user can read it.
+          if (_errorShownAt > 0) {
+            var sinceError = Date.now() - _errorShownAt;
+            if (sinceError < ERROR_STICKY_MS && data.mascot_state !== 'error') {
+              // Still inside the sticky window and this is a non-error
+              // update — skip the mascot swap but keep polling.
+              return;
+            }
+            // Window expired or a new error arrived — reset so future
+            // busy/happy updates are honored normally.
+            if (data.mascot_state !== 'error') {
+              _errorShownAt = 0;
+            }
+          }
+          if (data.mascot_state === 'error') {
+            _errorShownAt = Date.now();
+          }
           window.setBubblePersistent(data.mascot || 'Working on your lesson...');
           window.showBubbleBar(data.pct || 0);
           if (data.mascot_state) {
