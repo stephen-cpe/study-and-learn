@@ -237,10 +237,17 @@ def _set_generation_completed(path_id: str, user_id: str) -> None:
 @login_required
 def lessons():
     path_id = _resolve_path_id()
+    # No path_id means the user hit the bare nav URL — the dashboard is
+    # the canonical "list of my lessons" page (grouped by Active /
+    # Completed / Cancelled with View Lessons buttons per path).
+    # Redirect there instead of silently grabbing the most recent active
+    # path, which stranded users whose most recent path was completed.
+    if not path_id:
+        return redirect(url_for('main.dashboard'))
     lessons_data = get_lessons(current_user, path_id=path_id)
     if not lessons_data:
-        flash('No lessons generated yet. Generate lessons from your results first.', 'info')
-        return redirect(url_for('main.results'))
+        flash('No lessons found for this study path.', 'info')
+        return redirect(url_for('main.dashboard'))
 
     for i, lesson in enumerate(lessons_data):
         lesson['unlocked'] = True
@@ -249,10 +256,28 @@ def lessons():
             if not prev.get('passed', False):
                 lesson['unlocked'] = False
 
+    # Resolve the parent StudyPath's status so the template can show the
+    # correct path-level action buttons (Mark Complete / Cancel / Back to
+    # Completed tab) instead of the legacy "Back to Results" / "Start Over"
+    # pair that bounced users through an empty session to /index.
+    from src.models import StudyPath
+    path_status = 'active'
+    all_passed = bool(lessons_data) and all(
+        l.get('passed', False) for l in lessons_data
+    )
+    if path_id:
+        sp = StudyPath.query.filter_by(
+            id=path_id, user_id=current_user.id
+        ).first()
+        if sp:
+            path_status = sp.status
+
     return render_template('lessons.html',
                            lessons=lessons_data,
                            pass_threshold=PASS_THRESHOLD,
-                           path_id=path_id)
+                           path_id=path_id,
+                           path_status=path_status,
+                           all_passed=all_passed)
 
 
 @bp.route('/lessons/generation-status')

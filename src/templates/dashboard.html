@@ -80,12 +80,20 @@
                     </form>
                     {% endif %}
                     <form method="POST" action="{{ url_for('main.cancel_study_path', path_id=path.id) }}" style="display:inline;"
-                          onsubmit="return confirm('Cancel &quot;{{ path.title }}&quot;? This cannot be undone.')">
+                          data-confirm="true"
+                          data-confirm-title="Cancel &quot;{{ path.title }}&quot;?"
+                          data-confirm-body="This cannot be undone."
+                          data-confirm-action="Cancel / Abandon"
+                          data-confirm-variant="danger">
                         <button type="submit" class="btn btn-danger-cancel btn-sm">Cancel / Abandon</button>
                     </form>
                 {% elif is_completed or is_cancelled %}
                     <form method="POST" action="{{ url_for('main.delete_study_path', path_id=path.id) }}" style="display:inline;"
-                          onsubmit="return confirm('PERMANENTLY DELETE &quot;{{ path.title }}&quot;?\\n\\nThis action CANNOT be undone. All lesson data, quiz results, and progress will be lost forever.')">
+                          data-confirm="true"
+                          data-confirm-title="Permanently delete &quot;{{ path.title }}&quot;?"
+                          data-confirm-body="This action CANNOT be undone. All lesson data, quiz results, and progress will be lost forever."
+                          data-confirm-action="Delete Forever"
+                          data-confirm-variant="danger">
                         <button type="submit" class="btn btn-delete btn-sm">Delete</button>
                     </form>
                 {% endif %}

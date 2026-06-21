@@ -21,7 +21,6 @@
             {% if current_user.is_authenticated %}
             <div class="d-flex align-items-center gap-3">
                 <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-primary btn-sm nav-dashboard-btn">Dashboard</a>
-                <a href="{{ url_for('main.lessons') }}" class="btn btn-outline-primary btn-sm nav-dashboard-btn">My Lessons</a>
                 <div class="dropdown">
                     <a href="#" class="user-avatar-toggle d-flex align-items-center" data-bs-toggle="dropdown" aria-expanded="false">
                         <img src="{{ url_for('static', filename='images/avatars/' ~ current_user.avatar) }}" alt="User Avatar" class="user-avatar">
@@ -61,7 +60,84 @@
 
     {% block extra_footer %}{% endblock %}
 
+    {% if current_user.is_authenticated %}
+    <!-- Shared retro confirm modal — gates destructive form submissions.
+         Any <form data-confirm="true" data-confirm-title="..." data-confirm-body="..."
+         data-confirm-variant="danger|warning"> will open this modal instead of
+         using the browser's native window.confirm() dialog. The form is only
+         submitted if the user clicks the Confirm button. -->
+    <div class="modal fade retro-confirm-modal" id="confirm-modal" tabindex="-1"
+         aria-labelledby="confirm-modal-title" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirm-modal-title">Are you sure?</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="confirm-modal-body"></div>
+                <div class="modal-footer">
+                    <button type="button" class="retro-confirm-btn-cancel" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="retro-confirm-btn-confirm btn-danger"
+                            id="confirm-modal-confirm">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      (function () {
+        document.addEventListener('DOMContentLoaded', function () {
+          var modalEl = document.getElementById('confirm-modal');
+          if (!modalEl) return;
+          var bsModal = null;
+          try { bsModal = new bootstrap.Modal(modalEl); } catch (e) { return; }
+          var titleEl = modalEl.querySelector('#confirm-modal-title');
+          var bodyEl = modalEl.querySelector('#confirm-modal-body');
+          var confirmBtn = modalEl.querySelector('#confirm-modal-confirm');
+          var pendingForm = null;
+
+          // Wire every form flagged with data-confirm="true".
+          document.querySelectorAll('form[data-confirm="true"]').forEach(function (form) {
+            form.addEventListener('submit', function (event) {
+              if (form.dataset.confirmed === 'true') {
+                form.dataset.confirmed = '';
+                return; // allow the submit to proceed
+              }
+              event.preventDefault();
+              pendingForm = form;
+              if (titleEl && form.dataset.confirmTitle) {
+                titleEl.textContent = form.dataset.confirmTitle;
+              }
+              if (bodyEl && form.dataset.confirmBody) {
+                // white-space: pre-line in CSS honors \n sequences.
+                bodyEl.textContent = form.dataset.confirmBody;
+              }
+              var variant = form.dataset.confirmVariant || 'danger';
+              confirmBtn.className = 'retro-confirm-btn-confirm btn-' + variant;
+              confirmBtn.textContent = form.dataset.confirmAction || 'Confirm';
+              bsModal.show();
+            });
+          });
+
+          confirmBtn.addEventListener('click', function () {
+            if (pendingForm) {
+              pendingForm.dataset.confirmed = 'true';
+              pendingForm.requestSubmit ? pendingForm.requestSubmit()
+                                        : pendingForm.submit();
+              pendingForm = null;
+            }
+            bsModal.hide();
+          });
+
+          // Reset pending form if the user dismisses the modal any other way.
+          modalEl.addEventListener('hidden.bs.modal', function () {
+            pendingForm = null;
+          });
+        });
+      })();
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

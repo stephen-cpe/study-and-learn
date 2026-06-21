@@ -115,8 +115,26 @@
 </div>
 
 <div class="action-buttons mb-4">
-    <a href="{{ url_for('main.results') }}" class="btn btn-outline-primary">Back to Results</a>
-    <a href="{{ url_for('main.index') }}" class="btn btn-primary">Start Over</a>
+    <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-primary">Back to Dashboard</a>
+    {% if path_status == 'active' %}
+        {% if all_passed %}
+        <form method="POST" action="{{ url_for('main.complete_study_path', path_id=path_id) }}" style="display:inline;">
+            <button type="submit" class="btn btn-complete">Mark Complete</button>
+        </form>
+        {% else %}
+        <form method="POST" action="{{ url_for('main.cancel_study_path', path_id=path_id) }}" style="display:inline;"
+              data-confirm="true"
+              data-confirm-title="Cancel this study path?"
+              data-confirm-body="This cannot be undone."
+              data-confirm-action="Cancel / Abandon"
+              data-confirm-variant="danger">
+            <button type="submit" class="btn btn-danger-cancel">Cancel / Abandon</button>
+        </form>
+        <a href="{{ url_for('main.index') }}" class="btn btn-primary">Start New Lesson</a>
+        {% endif %}
+    {% elif path_status in ('completed', 'cancelled') %}
+    <a href="{{ url_for('main.dashboard', tab=path_status) }}" class="btn btn-outline-primary">Back to {{ path_status|capitalize }} Tab</a>
+    {% endif %}
 </div>
 
 {% if any_audio_pending %}

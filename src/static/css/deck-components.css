@@ -205,11 +205,13 @@
 .checkpoint-select option {
     background: var(--deck-bg);
     color: var(--deck-text);
-    font-family: "Segoe UI", system-ui, sans-serif;
-    /* Match the select's 0.45em scale so the closed and open states look
-       consistent; rem is used here because <option> rendering is OS-driven
-       and rem gives the browser a predictable root-relative size. */
-    font-size: 0.75rem;
+    /* Inherit font-family and font-size from the parent <select> so the
+       closed placeholder and the opened option list render in the same
+       BoldPixels face at the same scale. Previously these were hardcoded
+       to "Segoe UI" / 0.75rem, which produced a visible font + size jump
+       the moment the dropdown opened (UX consistency defect). */
+    font-family: inherit;
+    font-size: inherit;
     padding: 0.3em;
 }
 

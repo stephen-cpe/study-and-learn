@@ -91,6 +91,79 @@ def _make_sample_lessons():
     ]
 
 
+def test_get_lessons_returns_completed_path_lessons(app):
+    """Regression: get_lessons(path_id=...) must return lessons for a
+    COMPLETED (or cancelled) path, not just active ones. Previously the
+    repo hard-coded status='active' in its query, so the dashboard's
+    "View Lessons" button on the Completed/Cancelled tabs dead-ended
+    with a flash error and a redirect to /results → /index.
+    """
+    with app.app_context():
+        user_id = _make_user(app)
+        user = db.session.get(User, user_id)
+
+        path = StudyPath(
+            user_id=user.id, title='Completed Path',
+            learning_goal='Learn', status='completed',
+        )
+        db.session.add(path)
+        db.session.commit()
+
+        lessons = _make_sample_lessons()
+        save_lessons(lessons, user, path_id=path.id)
+
+        loaded = get_lessons(user, path_id=path.id)
+        assert len(loaded) == 2
+        assert loaded[0]['module_title'] == 'Intro to ML'
+
+
+def test_get_lessons_returns_cancelled_path_lessons(app):
+    with app.app_context():
+        user_id = _make_user(app)
+        user = db.session.get(User, user_id)
+
+        path = StudyPath(
+            user_id=user.id, title='Cancelled Path',
+            learning_goal='Learn', status='cancelled',
+        )
+        db.session.add(path)
+        db.session.commit()
+
+        lessons = _make_sample_lessons()
+        save_lessons(lessons, user, path_id=path.id)
+
+        loaded = get_lessons(user, path_id=path.id)
+        assert len(loaded) == 2
+
+
+def test_get_lessons_no_path_id_falls_back_to_active(app):
+    """When no path_id is given, the legacy fallback to the most recent
+    ACTIVE path must be preserved (grade/save-position/audio routes rely
+    on this and don't always carry a path_id).
+    """
+    with app.app_context():
+        user_id = _make_user(app)
+        user = db.session.get(User, user_id)
+
+        active = StudyPath(
+            user_id=user.id, title='Active', learning_goal='g', status='active'
+        )
+        completed = StudyPath(
+            user_id=user.id, title='Done', learning_goal='g', status='completed'
+        )
+        db.session.add_all([active, completed])
+        db.session.commit()
+
+        save_lessons(_make_sample_lessons(), user, path_id=active.id)
+        save_lessons(_make_sample_lessons(), user, path_id=completed.id)
+
+        loaded = get_lessons(user)
+        assert len(loaded) == 2
+        assert loaded[0]['module_title'] == 'Intro to ML'
+        refreshed = StudyPath.query.filter_by(id=active.id).first()
+        assert refreshed.status == 'active'
+
+
 def test_get_lessons_returns_empty_for_unauthenticated(app):
     with app.app_context():
         result = get_lessons()

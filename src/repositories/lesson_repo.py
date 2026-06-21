@@ -17,10 +17,18 @@ def get_lessons(user=None, path_id: str = None) -> List[Dict[str, Any]]:
     if not user or not user.is_authenticated:
         return []
 
-    query = StudyPath.query.filter_by(user_id=user.id, status='active')
+    # When an explicit path_id is given, return that path's lessons
+    # regardless of status (active/completed/cancelled) — this lets the
+    # dashboard's "View Lessons" buttons work for completed and cancelled
+    # paths. When no path_id is given, fall back to the user's most
+    # recent ACTIVE path (preserves the legacy behavior relied on by
+    # grade/save-position/audio routes that don't always carry a path_id).
     if path_id:
-        query = query.filter(StudyPath.id == path_id)
-    path = query.first()
+        path = StudyPath.query.filter_by(id=path_id, user_id=user.id).first()
+    else:
+        path = StudyPath.query.filter_by(
+            user_id=user.id, status='active'
+        ).order_by(StudyPath.created_at.desc()).first()
     if not path or not path.content_data:
         return []
 

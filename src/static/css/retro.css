@@ -1514,3 +1514,88 @@ h2, .section-title {
     justify-content: center;
     flex-wrap: wrap;
 }
+
+/* ===== RETRO CONFIRM MODAL (overrides Bootstrap modal) ===== */
+/* A single shared modal (#confirm-modal) gates destructive actions
+   (Cancel / Abandon, Delete). Bootstrap 5 provides the show/hide,
+   focus-trap, ESC, and click-outside behavior; this block restyles
+   the dialog to echo the mascot CRT speech-bubble look: pure black
+   screen, green terminal text for the title, silver body text. */
+.retro-confirm-modal .modal-content {
+    background: #000000;
+    border: 2px solid #33ff66;
+    border-radius: 14px;
+    box-shadow:
+        0 0 20px rgba(51, 255, 102, 0.45),
+        0 12px 40px rgba(0, 0, 0, 0.8);
+    color: var(--az-silver);
+}
+
+.retro-confirm-modal .modal-header {
+    border-bottom: 1px solid rgba(51, 255, 102, 0.35);
+    padding: 1.1rem 1.4rem 0.85rem;
+}
+
+.retro-confirm-modal .modal-title {
+    /* Echo the mascot speech-bubble CRT terminal look: pure black
+       background, phosphor-green text, PressStart2P pixel font, soft
+       green glow. Body text below stays silver for readability. */
+    color: #33ff66;
+    font-family: "PressStart2P", "Courier New", monospace;
+    font-size: 0.82rem;
+    letter-spacing: 0.4px;
+    line-height: 1.5;
+    text-shadow: 0 0 8px rgba(51, 255, 102, 0.45);
+}
+
+.retro-confirm-modal .modal-body {
+    padding: 1.1rem 1.4rem;
+    color: var(--az-silver);
+    font-size: 0.95rem;
+    line-height: 1.55;
+    white-space: pre-line;
+}
+
+.retro-confirm-modal .modal-footer {
+    border-top: 1px solid rgba(51, 255, 102, 0.35);
+    padding: 0.85rem 1.4rem 1.1rem;
+    gap: 0.6rem;
+}
+
+.retro-confirm-modal .btn-close {
+    filter: invert(1) sepia(1) saturate(8) hue-rotate(60deg) brightness(1.4);
+    opacity: 0.9;
+}
+
+.retro-confirm-modal .btn-close:hover { opacity: 1; }
+
+/* Confirm button tinted by variant (danger / warning) */
+.retro-confirm-btn-confirm.btn-danger {
+    background: var(--az-danger);
+    border: 1px solid var(--az-danger);
+    color: var(--az-dark);
+    font-weight: 700;
+    border-radius: 8px;
+    font-family: "BoldPixels", sans-serif;
+    font-size: 0.8em;
+}
+
+.retro-confirm-btn-confirm.btn-danger:hover {
+    box-shadow: 0 0 14px rgba(255, 107, 107, 0.5);
+    filter: brightness(1.08);
+}
+
+.retro-confirm-btn-cancel {
+    background: transparent;
+    border: 1px solid var(--az-border);
+    color: var(--az-cyan-light);
+    border-radius: 8px;
+    font-family: "BoldPixels", sans-serif;
+    font-size: 0.8em;
+    padding: 0.45rem 0.9rem;
+}
+
+.retro-confirm-btn-cancel:hover {
+    border-color: var(--az-cyan);
+    box-shadow: 0 0 8px var(--az-glow);
+}
