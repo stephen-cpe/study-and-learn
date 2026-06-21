@@ -3,7 +3,7 @@
 
 ## Project Brief (Read First)
 - **App:** Study-and-Learn — a Flask web app where a learner uploads study documents and gets an AI-generated summary, relevance check (with weak-match gating: blocks study path + lesson generation), study path, interactive slide-based lessons with TTS narration (Edge-TTS, opt-in), mixed-type quizzes (mcq, true_false, multi_select, cloze_dropdown), inline comprehension checkpoints (mcq/true_false/cloze_dropdown variety), per-module grading with gated progression, difficulty-aware content generation (Easy/Normal/Hard), session save/resume (deck position auto-saved), source citation system (ChromaDB metadata → deck modal), per-lesson PDF export (fpdf2), and dashboard with Active/Completed/Cancelled tabs (Mark Complete, Delete).
-- **Stack:** Python 3.13, Flask, Flask-Session (cachelib), Bootstrap 5, PostgreSQL, pytest, LangChain, ChromaDB, Ollama (configurable chat + embedding models), fpdf2 (PDF export), pdf2image + Poppler (PDF rendering), Pillow (image handling), python-pptx (PPTX extraction), GLM-OCR (local OCR, 0.9B), Qwen3.5:397b-cloud (cloud figure descriptions, migrated from deprecated Qwen3-VL:235b-cloud), edge-tts (TTS narration, Microsoft Neural voices), GitHub Actions (CI)
+- **Stack:** Python 3.13, Flask, Flask-Session (cachelib), Bootstrap 5, PostgreSQL, pytest, LangChain, ChromaDB, Ollama (configurable chat + embedding models), fpdf2 (PDF export), pdf2image + Poppler (PDF rendering), Pillow (image handling), python-pptx (PPTX extraction), GLM-OCR (local OCR, 0.9B), Qwen3.5:397b-cloud (cloud figure descriptions, gated by OCR_FIGURE_DESCRIPTION=true, falls back silently if the model tag is unreachable, migrated from deprecated Qwen3-VL:235b-cloud), edge-tts (TTS narration, Microsoft Neural voices), GitHub Actions (CI)
 - **Structure:** See SRS.md for requirements. See TODO.md for sprint tasks. See DESIGN_AND_TESTING.md for ADRs and architecture. See docs/STATUS.md for current state.
 - **Repo root:** study-and-learn/
 - **Key rules:** No chat UI. Forms and result pages only. Custom CSS/JS slide deck (no reveal.js). Retro cyberpunk theme with Retrograde Bold and BoldPixels fonts. PostgreSQL-only database. Flask-Session (cachelib FileSystemCache) for transient form data; DB-backed lesson repository (PostgreSQL StudyPath + LessonProgress + extracted_texts + file_names) for lesson/progress persistence. Dashboard tabs (Active/Completed/Cancelled) with lifecycle: active → (complete | cancel) → delete. Source citations via retriever metadata propagation → modal overlay in slide deck. Per-lesson PDF export via GET /lessons/<i>/export available for any passed lesson regardless of parent path status.
@@ -36,7 +36,7 @@ You follow Spec-Driven Development strictly.
    - If you need to touch more than 10 files, ask first
    - Always read AI model from `OLLAMA_MODEL` env var. Note `config.py` ships `gemma3:27b-cloud` as the package default (used only by `Config.summary()` diagnostics); `ai_client.py` falls back to `qwen3:0.6b` when `AI_BACKEND=local` and `OLLAMA_MODEL` is unset at call time. Never hardcode model names
     - Always use `OLLAMA_EMBEDDING_MODEL` env var for vector_store embeddings; never hardcode
-    - Use `AI_BACKEND` env var to control local vs cloud AI provider. `AI_BACKEND` is read at call time in `ai_client.py::call_ollama` (line 99), NOT from `config.py` — there is no `Config.AI_BACKEND` attribute; do not read it from `current_app.config`
+    - Use `AI_BACKEND` env var to control local vs cloud AI provider. `AI_BACKEND` is read at call time in `ai_client.py::call_ollama` (line 98), NOT from `config.py` — there is no `Config.AI_BACKEND` attribute; do not read it from `current_app.config`
     - Never hardcode Ollama endpoints
     - `call_ollama(prompt, model, force_local=False)` has a `force_local` parameter (`ai_client.py:84`). OCR/vision calls always pass `force_local=True` because GLM-OCR has no cloud variant and must run on local Ollama regardless of `AI_BACKEND`. Never route OCR calls through `AI_BACKEND=cloud` — the cloud endpoint has no GLM-OCR model and will fail silently
     - OCR behavior is dual-gated. Pulling `glm-ocr` is necessary but NOT sufficient: OCR is also gated by `OCR_FULL=true` (default `false`, `config.py:77`, `vision_parser.py:316`) which switches from text-only extraction to text+table+figure OCR per page. `OCR_FIGURE_DESCRIPTION=true` (default `false`, `config.py:79`, `vision_parser.py:332`) additionally enables cloud Qwen3.5 figure descriptions. With `OCR_FULL=false` the app does traditional text-layer extraction even if `glm-ocr` is installed
@@ -70,13 +70,16 @@ You follow Spec-Driven Development strictly.
       single failed module sets `tts_audio_status='failed'` and
       `tts_enabled=False` on that lesson dict and continues to the next module).
       The worker runs inside a Flask app context so it can read/write the DB.
-      There is NO retry — a failed module is terminal for that module; the user
-      must retake the lesson to regenerate audio for it. Do not add retry loops
+      There is NO retry within a generation run — a failed module is terminal
+      for that module. To regenerate audio the user must retake the lesson:
+      **retake runs `generate_lesson_audio` synchronously in the request thread**
+      (NOT via the background worker), so a TTS-enabled retake blocks until
+      audio for that single module is done. Do not add retry loops
       that would delay `generation_completed_at` or strand the user on the
       results page.
     - The canonical "navigate now" redirect signal is the
       `StudyPath.generation_completed_at` DB column (atomic, ACID), NOT the
-      cache-based `progress_tracker.mark_done()`. It is set by the request
+      cache-based signal (the `progress_tracker` cache is for cosmetic updates only; no cache key drives the redirect). It is set by the request
       handler's else branch (TTS disabled), the TTS worker's finally block
       (TTS enabled), and the spawn wrapper's defensive catch. The JS results
       page runs two parallel polls on one 2-second ticker: (A)
@@ -88,6 +91,21 @@ You follow Spec-Driven Development strictly.
       is 2 hours and MUST stop polling without redirecting. Do not reintroduce a
       single-poll design that uses cache `done`/`stage>=4` to redirect — that
       was the race-condition root cause (see ADR-026).
+    - Both polls implement an 8-second "sticky-error" window
+      (`ERROR_STICKY_MS` / `PROCESS_ERROR_STICKY_MS` in progress.js):
+      after `mascot_state='error'` is received, subsequent non-error
+      cosmetic updates are suppressed for 8s so the mascot-error.gif
+      stays visible long enough for the user to read the bubble
+      message. Without this, a background worker (e.g. TTS) would
+      clobber the error state with a `busy` update on the very next
+      2-second tick. Do not remove or shorten this window.
+    - `_set_generation_completed()` in `lessons.py:197` is the canonical
+      setter for `StudyPath.generation_completed_at`. It is called by the
+      route handler for TTS-disabled paths and as a defensive fallback when
+      the TTS worker thread fails to spawn. The TTS worker sets the column
+      directly in its own `finally` block. Never remove or bypass this
+      helper — it is the only path that sets the column for non-TTS
+      generations.
     - Custom SSML is NOT supported by edge-tts >= 5.0.0. Always pass plain text to
       edge_tts.Communicate(). Never attempt to construct SSML strings.
     - Quiz question types are: mcq, true_false, multi_select, cloze_dropdown.
@@ -125,7 +143,11 @@ You follow Spec-Driven Development strictly.
       but manifest missing OR file missing on disk — JS retries in ~2s), 404 (TTS disabled,
       module_index out of range, OR manifest present but slide_index has no entry — JS
       stops retrying). Do not collapse 202 into 404 or vice versa; the retry-vs-stop
-      decision in deck-page.js keys off this distinction. See `lessons.py:518-553`.
+      decision in deck-page.js keys off this distinction. See `lessons.py:553-597`.
+    - The audio and manifest routes use `get_most_recent_active_path_id()`
+      (`lessons.py:611`) as a fallback when `path_id` is missing from
+      the URL (e.g. page refresh, deep link). Do not remove this
+      fallback — it prevents audio breakage on reload.
     - Dev server forces `SEND_FILE_MAX_AGE_DEFAULT=0` (`src/__init__.py:84`) to prevent
       stale JS/CSS caching. Never remove or increase this in development — the browser
       will cache old client code and produce phantom bugs (e.g. the premature 10-minute

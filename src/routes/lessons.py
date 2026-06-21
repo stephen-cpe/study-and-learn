@@ -296,8 +296,8 @@ def generation_status():
     the ``StudyPath.generation_completed_at`` column (set by the
     request handler for TTS-disabled generations, or by the TTS
     background worker's finally block for TTS-enabled generations).
-    This replaces the previous cache-based ``progress_tracker.mark_done()``
-    signal, which had a race condition.
+    This replaces the previous cache-based signal (JS checking ``data.done`` / ``data.stage >= 4``),
+    which had a race condition.
 
     Response shape::
 

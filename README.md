@@ -99,7 +99,7 @@ The default models are placeholders. For better results, use larger models such 
 
 Note: `config.py` ships `OLLAMA_MODEL=gemma3:27b-cloud` as the package default — to run locally without a `.env`, set `AI_BACKEND=local` and `OLLAMA_MODEL=qwen3:0.6b` in your `.env` (see `.env.example`).
 
-`glm-ocr` (0.9B) is the local OCR model. Pulling it alone does NOT enable OCR — OCR is additionally gated by `OCR_FULL=true` (default `false`). With `OCR_FULL=false` the app uses traditional text-layer extraction even if `glm-ocr` is installed; set `OCR_FULL=true` to run AI-powered OCR on PDFs and images. Set `OCR_FIGURE_DESCRIPTION=true` to additionally generate cloud Qwen3.5 figure descriptions.
+`glm-ocr` (0.9B) is the local OCR model. Pulling it alone does NOT enable OCR — OCR is additionally gated by `OCR_FULL=true` (default `false`). With `OCR_FULL=false` the app uses traditional text-layer extraction even if `glm-ocr` is installed; set `OCR_FULL=true` to run AI-powered OCR on PDFs and images. Set `OCR_FIGURE_DESCRIPTION=true` to additionally generate cloud figure descriptions. Note: figure descriptions use `OLLAMA_VISION_MODEL` (default `qwen3.5:397b-cloud`) and require `AI_BACKEND=cloud` with valid `OLLAMA_CLOUD_API_KEY` — they do not run on a purely local setup.
 
 ### 7. Create .env file
 

@@ -223,7 +223,7 @@ Build the smallest working version first, then iterate:
 - [x] Write 5 additional parser tests (pptx, image, dedup)
 - [x] Write 4 additional RAG tests (multi-collection retrieval, metadata)
 - [x] Add `ollama pull glm-ocr` to README setup instructions
-- [x] Run full test suite — 172 passing tests at Sprint 6 close (143 original + 29 new); suite has since grown to 406 tests by Sprint 8
+- [x] Run full test suite — 172 passing tests at Sprint 6 close (143 original + 29 new); suite has since grown to 421 tests by Sprint 8
 
 **Sprint 6 Definition of Done:**
 - OCR pipeline processes scanned PDFs with text/table/figure recognition
@@ -232,7 +232,7 @@ Build the smallest working version first, then iterate:
 - Multi-collection retrieval merges results across all uploaded documents
 - Progress bar shows 9 stages including OCR progress
 - All new features gated behind env vars (OCR_FULL, OCR_FIGURE_DESCRIPTION, AI_MOCK)
-- 172 tests passing at Sprint 6 close (suite is now 406 tests as of Sprint 8)
+- 172 tests passing at Sprint 6 close (suite is now 421 tests as of Sprint 8)
 - README updated with OCR setup instructions
 
 ---
@@ -357,7 +357,7 @@ deferred to Sprint 8 and completed there (kept privately outside the repo for th
 - [x] AI-powered OCR/vision (GLM-OCR local + Qwen3.5 cloud)
 - [x] Content-addressable global deduplication
 - [x] Multi-collection ChromaDB retrieval
-- [x] 406 automated tests (Sprint 8 active; suite rebuilt from Tasks 1–11)
+- [x] 421 automated tests (Sprint 8 active; suite rebuilt from Tasks 1–11)
 - [x] GitHub Actions CI
 - [x] Static task board
 - [x] Design/testing document
@@ -398,7 +398,7 @@ deferred to Sprint 8 and completed there (kept privately outside the repo for th
 - [x] One-word fill-in-the-blank inputs with per-blank grading
 - [x] Background progress reporting via mascot speech bubble
 
-### Completed (Sprint 4–8)
+### Completed (Sprint 4–7)
 - [x] Non-blocking progress on `/process` route (Sprint 4)
 - [x] Lesson/quiz prompt engineering refinement (Sprint 4)
 - [x] User accounts (Flask-Login + PostgreSQL) (Sprint 5)
@@ -415,6 +415,8 @@ deferred to Sprint 8 and completed there (kept privately outside the repo for th
 - [x] TTS narration (opt-in) (Sprint 7)
 - [x] Session cleanup (Sprint 7)
 - [x] Source document citations in lessons (Sprint 7)
+
+### Sprint 8 (In Progress)
 - [ ] Deployment, demo recording, and capstone submission (Sprint 8)
 
 ### Post-Capstone

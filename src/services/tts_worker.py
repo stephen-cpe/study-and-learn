@@ -51,8 +51,9 @@ logger = logging.getLogger(__name__)
 # handler's stage list and clobber its stage 4 ("Finalizing"). Instead,
 # the worker reads these dicts for their label/mascot/pct/mascot_state
 # fields and calls progress_tracker.update_cosmetic() to merge them
-# into the existing entry. The redirect signal is ``done=True`` set via
-# mark_done() at the end of the run.
+# into the existing entry. The redirect signal is the
+# ``StudyPath.generation_completed_at`` DB column, set in this
+# module's ``run_tts_generation_for_path`` finally block.
 
 TTS_STAGES = [
     {"stage": 0, "label": "Preparing", "pct": 0, "mascot": "Warming up...", "mascot_state": "busy"},
@@ -331,7 +332,7 @@ def run_tts_generation_for_path(
         # ``/lessons/generation-status`` (which reads this column) and
         # redirects when it becomes non-NULL.
         #
-        # Why a DB column instead of ``progress_tracker.mark_done()``:
+        # Why a DB column instead of a cache-based signal:
         # the previous cache-based signal was subject to a race
         # condition when the TTS worker and the request handler shared
         # the same progress_tracker key, causing the JS redirect to

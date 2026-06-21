@@ -1,8 +1,8 @@
 # STATUS.md
 Last Updated: 2026-06-20
 Sprint: 8 (ACTIVE)
-Last Task Completed: Final doc sweep fixes — (1) updated test count from 381 to 406 across SRS.md (§8.1), DESIGN_AND_TESTING.md (§5), and TODO.md (Sprint 6 DoD line, Sprint 6 task line, Core MVP Backlog line) to match actual pytest output (406 passed, verified by running full suite); (2) aligned TODO.md sprint User Story headers to match SRS §7 epic assignments — Sprint 4 now lists US-018..US-022 (was US-018..US-020), Sprint 5 now lists US-023..US-031 (was US-027..US-031), Sprint 7 now lists US-022+US-036..US-041 (was US-036..US-038). All 8 sprint headers verified to match SRS §7 epics exactly.
-Commit Message Suggestion: docs: update test count to 406 and align TODO sprint headers with SRS §7 epics
+Last Task Completed: Final doc sweep fixes — (1) updated test count from 381 to 421 across SRS.md (§8.1), DESIGN_AND_TESTING.md (§5), and TODO.md (Sprint 6 DoD line, Sprint 6 task line, Core MVP Backlog line) to match actual pytest output (421 passed, verified by running full suite); (2) aligned TODO.md sprint User Story headers to match SRS §7 epic assignments — Sprint 4 now lists US-018..US-022 (was US-018..US-020), Sprint 5 now lists US-023..US-031 (was US-027..US-031), Sprint 7 now lists US-022+US-036..US-041 (was US-036..US-038). All 8 sprint headers verified to match SRS §7 epics exactly.
+Commit Message Suggestion: docs: update test count to 421 and align TODO sprint headers with SRS §7 epics
 Known Issues:
   - AI output consistency: qwen3:0.6b is placeholder-only; use cloud models (gemma3:27b-cloud)
     for production quality
@@ -14,6 +14,7 @@ Known Issues:
   - Speaker change in deck UI is cosmetic only — retake required to regenerate audio
     with new speaker. Labeled clearly in UI.
   - TTS bug-fix plan: ALL 5 TASKS COMPLETE + 2 follow-up fixes + 3 race-condition/timeout fixes landed.
+    (Sprint 8 deployment/QA/demo/submission tasks remain — see TODO.md Sprint 8 section, not done.)
       1. path_id transport contract (query string OR body) — DONE
       2. audio-route path_id fallback to most recent active path — DONE
       3. retake redirect UX (server returns redirect URL; client navigates) — DONE
@@ -30,8 +31,8 @@ Known Issues:
          deck after a Quick Check answer. The user is now in full control:
          first Continue click shows feedback, second click (or right-arrow
          key) advances. — DONE
-      8. (race-condition fix, attempt 1) progress_tracker gained mark_done()
-         and update_cosmetic() helpers; the JS poll fired the redirect on
+      8. (race-condition fix, attempt 1) progress_tracker gained update_cosmetic() helper for background-worker cosmetic publishing;
+          the JS poll fired the redirect on
          data.done === true. THIS FIX WAS INCOMPLETE — the redirect
          still fired prematurely under TTS-enabled paths because the
          cache-based signal was subject to timing-dependent races. — DONE

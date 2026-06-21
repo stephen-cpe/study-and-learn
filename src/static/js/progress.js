@@ -161,8 +161,9 @@
     //     "Scanning concepts...", "Generating lesson...", etc.).
     //     Critically, this poll NEVER triggers a redirect — the
     //     legacy ``data.done`` / ``data.stage >= 4`` signals are
-    //     ignored entirely. This eliminates the 10-minute hard-
-    //     timeout redirect bug while preserving the live cosmetic
+    //     ignored entirely. (Historical note: this design replaced the
+    //     removed 10-minute hard-timeout redirect; see ADR-026.) This
+    //     preserves the live cosmetic
     //     feedback the user expects during the 45-90 minute
     //     cloud-AI generation.
     //
@@ -266,7 +267,8 @@
           // canonical, atomic, ACID flag set by whichever component
           // finishes last: request handler for TTS-disabled, TTS
           // worker finally block for TTS-enabled). This replaces the
-          // previous ``progress_tracker.mark_done()`` cache signal,
+          // previous cache-based signal (JS checking ``data.done`` /
+          // ``data.stage >= 4``),
           // which had a race condition that caused the redirect to
           // fire prematurely in some environments.
           if (data.generation_completed === true) {

@@ -537,7 +537,7 @@ study-and-learn/
 - Server-side session storage (Flask-Session + cachelib).
 - Custom CSS/JS slide-deck engine (retro-themed).
 - Content-addressable global deduplication (SHA-256 + ContentRegistry).
-- pytest test suite (406 tests).
+- pytest test suite (421 tests).
 - GitHub Actions test workflow.
 - Static public task board.
 - Design and testing document.
