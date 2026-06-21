@@ -5,7 +5,7 @@ route handlers thin and testable.
 """
 from typing import Callable, Dict, Any, List
 
-from src.services.rag_retriever import build_rag_context, build_rag_context_from_hashes, build_rag_context_from_hashes_with_sources
+from src.services.rag_retriever import build_rag_context, build_rag_context_from_hashes_with_sources
 from src.services.lesson_generator import generate_lesson
 from src.services.quiz_generator import generate_quiz, generate_inline_checkpoint
 

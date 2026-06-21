@@ -18,7 +18,6 @@ import os
 import requests
 
 from src.services.exceptions import (
-    AICloudAPIError,
     AIModelUnavailableError,
     AIServiceError,
     AITimeoutError,

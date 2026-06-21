@@ -26,7 +26,7 @@ import logging
 import requests
 
 from src.services.exceptions import (
-    AIServiceError, AIModelUnavailableError, AICloudAPIError, AITimeoutError,
+    AIModelUnavailableError, AICloudAPIError, AITimeoutError,
 )
 
 logger = logging.getLogger(__name__)

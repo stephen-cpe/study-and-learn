@@ -5,11 +5,7 @@ The ``bp`` blueprint (registered as ``'main'``) is defined here and
 imported by each sub-module to register their routes.  ``url_for``
 references remain ``url_for('main.XXX')`` throughout the application.
 """
-import logging
-
 from flask import Blueprint
-
-logger = logging.getLogger(__name__)
 
 bp = Blueprint('main', __name__)
 

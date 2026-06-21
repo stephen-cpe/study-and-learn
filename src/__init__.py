@@ -41,7 +41,6 @@ def create_app():
         )
 
     # ── Server-side sessions (cachelib-backed) ────────────────────────────
-    # TODO: migrate session storage to DB-backed in Sprint 5 Phase 2
     session_dir = os.path.join(
         os.path.dirname(os.path.dirname(__file__)), 'data', 'flask_session'
     )

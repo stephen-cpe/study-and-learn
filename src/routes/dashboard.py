@@ -2,7 +2,6 @@
 Dashboard routes — user dashboard, path cancellation, and session reset.
 """
 import io
-import json
 import logging
 from datetime import datetime, timezone
 

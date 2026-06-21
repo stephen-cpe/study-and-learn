@@ -15,7 +15,6 @@
 
   // CRT typewriter settings (kept in one place so progress.js can match).
   var TYPEWRITER_CHAR_DELAY_MS = 25;   // "really quickly" feel
-  var TYPEWRITER_CARET_HTML = '<span class="bubble-caret" aria-hidden="true"></span>';
 
   function typewriteInto(el, text) {
     if (!el) return Promise.resolve();

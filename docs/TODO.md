@@ -362,7 +362,7 @@ deferred to Sprint 8 and completed there (kept privately outside the repo for th
 - [x] Static task board
 - [x] Design/testing document
 
-### Should-Have Polish (In Progress / Upcoming)
+### Should-Have Polish (Complete)
 
 - [x] Retro theme with custom pixel fonts
 - [x] Bootstrap 5 layout with cyberpunk styling
@@ -398,7 +398,7 @@ deferred to Sprint 8 and completed there (kept privately outside the repo for th
 - [x] One-word fill-in-the-blank inputs with per-blank grading
 - [x] Background progress reporting via mascot speech bubble
 
-### Upcoming (Sprint 4–8)
+### Completed (Sprint 4–8)
 - [x] Non-blocking progress on `/process` route (Sprint 4)
 - [x] Lesson/quiz prompt engineering refinement (Sprint 4)
 - [x] User accounts (Flask-Login + PostgreSQL) (Sprint 5)
@@ -467,7 +467,7 @@ deferred to Sprint 8 and completed there (kept privately outside the repo for th
 - [x] Progress tracker unit tests (stages, create/update/get/complete/cleanup, bounds)
 - [x] Progress integration tests (endpoint, generate-lessons progress flow)
 
-### To Add (Sprint 5+)
+### Added (Sprint 5–6)
 - [x] Auth route tests (Sprint 5)
 - [x] User model tests (Sprint 5)
 - [x] Dashboard route and access control tests (Sprint 5)

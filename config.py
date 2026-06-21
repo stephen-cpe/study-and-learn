@@ -42,7 +42,7 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # ── Server-side sessions (cachelib-backed filesystem) ───────────────
-    # SESSION_DIR is auto-resolved in src/__init__.py if not set here.
+    # Session directory is hardcoded in src/__init__.py (data/flask_session).
     SESSION_TYPE = "cachelib"
     SESSION_PERMANENT = False
 

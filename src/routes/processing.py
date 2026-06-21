@@ -25,7 +25,7 @@ from src.services.rag_retriever import (
 from src.services.relevance_checker import check_relevance
 from src.services.summarizer import generate_summary
 from src.services.vision_parser import hash_file, is_content_registered
-from src.utils import ALLOWED_EXTENSIONS, allowed_file
+from src.utils import allowed_file
 
 logger = logging.getLogger(__name__)
 

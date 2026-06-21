@@ -1,7 +1,6 @@
 """
 Utility functions for the Study-and-Learn MVP.
 """
-import os
 
 # Allowed file extensions for upload
 ALLOWED_EXTENSIONS = {'txt', 'md', 'pdf', 'docx', 'pptx', 'png', 'jpg', 'jpeg'}
