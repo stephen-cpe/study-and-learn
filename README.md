@@ -2,6 +2,13 @@
 
 A Flask web application that converts uploaded study materials into structured summaries, study paths, interactive lessons, and auto-graded quizzes using AI.
 
+## Links
+
+- [Public Task Board](https://stephen-cpe.github.io/task-board-v1/)
+- [Task Board Repository](https://github.com/stephen-cpe/task-board-v1/)
+- [Deployed App](https://studyandlearn.duckdns.org/)
+- [Design and Testing Document](https://github.com/stephen-cpe/study-and-learn/blob/main/docs/DESIGN_AND_TESTING.md)
+
 ## Prerequisites
 
 1. Install Python 3.13 from https://python.org
@@ -149,11 +156,6 @@ Set `AI_MOCK=true` in your `.env` file to use mock responses. This is useful for
 - DESIGN_AND_TESTING.md - Architecture and testing strategy
 - STATUS.md - Current sprint state and known issues
 - AI_AGENT_PROTOCOL.md - AI agent execution protocol and guardrails
-
-## Links
-- [Public Task Board](https://stephen-cpe.github.io/task-board-v1/)
-- [Task Board Repository](https://github.com/stephen-cpe/task-board-v1/)
-- [Deployed App](#) *(coming soon — Sprint 8)*
 
 ## License
 

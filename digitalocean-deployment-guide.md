@@ -23,7 +23,7 @@ This guide walks you through deploying the Study-and-Learn Flask application to 
 > **Why gthread (1 worker, 8 threads) instead of multi-worker?**  
 > The app uses `cachelib.FileSystemCache` for Flask sessions (`data/flask_session/`) and progress tracking (`data/progress_cache/`). These are per-process filesystem caches. Multiple Gunicorn workers would split the cache and break session/progress consistency. A single worker with 8 threads keeps all caching in one process and trivially handles 3 concurrent users.
 
-> **Droplet sizing note:** The 4 vCPU / 8 GB RAM / 160 GB SSD tier ($48/month) is sufficient because heavy AI inference runs on Ollama Cloud (`AI_BACKEND=cloud`) and vector storage on Chroma Cloud (`CHROMA_DB=cloud`). The droplet only runs Flask/Gunicorn, Nginx, and PostgreSQL. If you later run local Ollama models, upgrade to the 8 vCPU / 16 GB RAM / 320 GB SSD tier ($96/month).
+> **Droplet sizing note:** The 4 vCPU / 8 GB RAM / 160 GB SSD tier ($48/month) is sufficient because heavy AI inference runs on Ollama Cloud (`AI_BACKEND=cloud`) and vector storage on Chroma Cloud (`CHROMA_DB=cloud`). The droplet only runs Flask/Gunicorn, Nginx, and PostgreSQL.
 
 ---
 
@@ -69,7 +69,7 @@ This guide walks you through deploying the Study-and-Learn Flask application to 
 6. Note your **DuckDNS Token** (click "token" link) - you'll need this later
 
 **Keep this page open** or save:
-- Domain: `study-and-learn.duckdns.org`
+- Domain: `studyandlearn.duckdns.org`
 - Token: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
 - IP: `134.209.11.38` (example)
 
@@ -392,7 +392,7 @@ sudo cp /home/study-and-learn/deploy/nginx.conf /etc/nginx/sites-available/study
 server {
     listen 80;
     listen [::]:80;
-    server_name study-and-learn.duckdns.org;  # Replace with your DuckDNS domain or droplet IP
+    server_name studyandlearn.duckdns.org;  # Replace with your DuckDNS domain or droplet IP
 
     # Upload size limit — must be >= your max PDF upload size
     # The app caps at 5 files per upload; set this generously
@@ -425,10 +425,12 @@ server {
 }
 ```
 
-> If your DuckDNS domain differs from `study-and-learn.duckdns.org`, edit the `server_name` line:
+> If your DuckDNS domain differs from `studyandlearn.duckdns.org`, edit the `server_name` line:
 > ```bash
 > sudo nano /etc/nginx/sites-available/study-and-learn
 > ```
+
+> **⚠️ WARNING: This repo config is HTTP-only (port 80).** It does NOT contain SSL directives — those are added by Certbot in Step 8.4. If you ever re-copy this file to `/etc/nginx/sites-available/` (e.g., after a config change), you **MUST re-run the Certbot commands in Step 8.4** afterward to restore the SSL block (`listen 443 ssl`, certificate paths, and HTTP→HTTPS redirect). Otherwise HTTPS will break. This is a one-time manual step — CI/CD does NOT touch the live Nginx config.
 
 ### Step 8.2: Enable Site
 
@@ -455,7 +457,7 @@ nginx: configuration file /etc/nginx/nginx.conf test is successful
 
 ### Step 8.3: Test Without SSL First
 
-Open your browser and go to: `http://study-and-learn.duckdns.org`
+Open your browser and go to: `http://studyandlearn.duckdns.org`
 
 **You should see the Study-and-Learn login page!**
 
@@ -471,10 +473,10 @@ sudo tail -20 /var/log/nginx/study-and-learn-error.log
 
 ```bash
 # First run WITHOUT --redirect (obtains the certificate)
-sudo certbot --nginx -d study-and-learn.duckdns.org --email your-email@example.com --agree-tos
+sudo certbot --nginx -d studyandlearn.duckdns.org --email your-email@example.com --agree-tos
 
 # Then run WITH --redirect (forces all HTTP → HTTPS)
-sudo certbot --nginx -d study-and-learn.duckdns.org --email your-email@example.com --agree-tos --redirect
+sudo certbot --nginx -d studyandlearn.duckdns.org --email your-email@example.com --agree-tos --redirect
 ```
 
 **Replace `your-email@example.com`** with your actual email.
@@ -498,7 +500,7 @@ sudo ufw enable
 
 ### Step 8.6: Verify HTTPS
 
-Open browser and go to: `https://study-and-learn.duckdns.org`
+Open browser and go to: `https://studyandlearn.duckdns.org`
 
 **You should see the login page with the padlock icon!**
 
@@ -658,7 +660,7 @@ Your workflow (`.github/workflows/ci-cd.yml`) has **3 jobs** that run sequential
 |-----|--------------|-----------|
 | **test** | `pytest` with `AI_MOCK=true`, `CI=true`, `DATABASE_URL` + `poppler-utils` | Every push/PR to `main` |
 | **deploy** | SSH to droplet, `git reset --hard origin/main`, recreate venv, `pip install`, `systemctl restart` | Only on `main` push, if test passes |
-| **smoke-test** | `curl https://study-and-learn.duckdns.org/health`, assert HTTP 200 | Only on `main` push, if deploy succeeds |
+| **smoke-test** | `curl https://studyandlearn.duckdns.org/health`, assert HTTP 200 | Only on `main` push, if deploy succeeds |
 
 > **What the deploy job does NOT do:** It does NOT run `init_db.sql` (one-time manual setup), does NOT touch `.env` (stays on the droplet), and does NOT run model training (AI is via Ollama Cloud). It only deploys code and restarts the service.
 
@@ -697,7 +699,7 @@ CI/CD Pipeline
 
 **Test the smoke-test endpoint from your browser:**
 ```
-https://study-and-learn.duckdns.org/health
+https://studyandlearn.duckdns.org/health
 ```
 
 **Expected response:**
@@ -826,7 +828,7 @@ Since this is a temporary 3-4 week deployment:
 **Error:** Certbot fails to verify domain
 
 **Fix:**
-1. Verify DuckDNS is pointing to your droplet: `ping study-and-learn.duckdns.org`
+1. Verify DuckDNS is pointing to your droplet: `ping studyandlearn.duckdns.org`
 2. Verify Nginx is running and port 80 is open: `sudo ufw status`
 3. Wait 5 minutes for DNS propagation, then retry certbot
 

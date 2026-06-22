@@ -284,7 +284,7 @@ deferred to Sprint 8 and completed there (kept privately outside the repo for th
 
 ### Sprint 8: Final Deployment & Capstone Demo 🟡 CURRENT FOCUS
 
-**Goal:** Deploy to a cloud VPS (DigitalOcean or AWS EC2), finalize documentation, record demo, fix remaining bugs, and submit capstone.
+**Goal:** Deploy to a cloud VPS (DigitalOcean), finalize documentation, record demo, fix remaining bugs, and submit capstone.
 
 **User Stories:** US-042, US-043, US-044, US-045
 
@@ -303,10 +303,15 @@ deferred to Sprint 8 and completed there (kept privately outside the repo for th
 - [ ] Write demo script covering full workflow (goal → upload → results → lessons → quiz → grade → retake)
 
 **Deployment:**
-- [ ] Deploy web app to DigitalOcean (or AWS EC2)
-- [ ] Configure production environment variables (AI_BACKEND, DATABASE_URL, SECRET_KEY)
+- [x] Deploy web app to DigitalOcean (4 vCPU / 8 GB RAM / 160 GB disk, $48/month)
+- [x] Configure production environment variables (AI_BACKEND=cloud, CHROMA_DB=cloud, DATABASE_URL, SECRET_KEY)
+- [x] Gunicorn (gthread, 1 worker, 8 threads) + Nginx reverse proxy + systemd + Let's Encrypt SSL + DuckDNS
+- [x] CI/CD pipeline (test → deploy → smoke-test) via GitHub Actions
+- [x] GET /health endpoint for smoke-test
+- [x] Versioned deployment configs in deploy/ directory (nginx.conf, study-and-learn.service, gunicorn.conf.py)
+- [x] DigitalOcean deployment guide (digitalocean-deployment-guide.md)
 - [ ] Verify all routes and features work in production
-- [ ] Document AI swap path in README (Ollama local → cloud API for deployment)
+- [x] Document AI swap path in README (Ollama local → cloud API for deployment)
 
 **Documentation & Submission:**
 - [ ] Complete DESIGN_AND_TESTING.md final review for capstone rubric alignment

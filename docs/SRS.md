@@ -144,8 +144,7 @@ Preferred deployment target:
 - 4 CPU VM or lower if possible.
 
 Deployment platform (decided):
-- DigitalOcean (primary),
-- AWS EC2 (secondary, if time permits).
+- DigitalOcean (4 vCPU / 8 GB RAM / 160 GB disk, $48/month).
 
 ### 3.3 Project Constraints
 
@@ -504,7 +503,7 @@ study-and-learn/
 
 | Story ID | User Story | Acceptance Criteria |
 |---|---|---|
-| US-042 | As a reviewer, I want a deployed web app link so I can evaluate the capstone without local setup. | Deployed to DigitalOcean (or AWS EC2) cloud VPS; all routes and features functional in production; demo link in README |
+| US-042 | As a reviewer, I want a deployed web app link so I can evaluate the capstone without local setup. | Deployed to DigitalOcean cloud VPS; all routes and features functional in production; demo link in README |
 | US-043 | As a developer, I want production environment variables configured so the deployed app runs the correct AI and DB backends. | AI_BACKEND, DATABASE_URL, SECRET_KEY, OLLAMA_MODEL set in production; AI_MOCK=true documented as demo fallback |
 | US-044 | As a reviewer, I want a recorded 15–20 minute demo so I can evaluate the full workflow. | Demo script covers goal → upload → results → lessons → quiz → grade → retake; recording submission-ready |
 | US-045 | As a developer, I want all documentation finalized and CI passing so the capstone submission is complete. | DESIGN_AND_TESTING.md, AI_AGENT_PROTOCOL.md, task board all reflect final Sprint 8 state; CI pipeline green; grader GitHub access confirmed |
@@ -623,7 +622,7 @@ Ranked from easier to harder. Items above the line are implemented; items below 
 46. Humor injection in quiz distractors — done (HUMOR_INSTRUCTIONS in quiz prompt)
 
 ### Sprint 8 (Active)
-47. Deployment to a cloud VPS (DigitalOcean or AWS EC2)
+47. Deployment to a cloud VPS (DigitalOcean)
 48. Final documentation and demo recording
 49. Capstone submission
 
@@ -704,7 +703,7 @@ Later additions:
 4. ~~Should OCR be postponed until after the main workflow works?~~ → **Implemented in Sprint 6** (GLM-OCR local + Qwen3.5 cloud, content-addressable dedup)
 5. ~~Should generated outputs be stored as JSON, Markdown, or database records?~~ → **JSON in Flask session (server-side via cachelib)**
 6. ~~Should the companion be purely visual or tied to progress?~~ → Visual feedback with click-to-talk implemented; animated GIF states (idle/busy/happy) with progress-driven switching implemented
-7. ~~Which deployment platform is easiest for the final capstone demo?~~ → **DigitalOcean** (cloud VPS, ~4 vCPU / 8 GB RAM / 160 GB disk); AWS EC2 is a secondary option if time permits. Free-tier PaaS hosts (Render/Railway) were evaluated and rejected — the stack (PostgreSQL + ChromaDB + Ollama + Poppler + GLM-OCR) does not fit a 512 MB–1 GB container.
+7. ~~Which deployment platform is easiest for the final capstone demo?~~ → **DigitalOcean** (cloud VPS, 4 vCPU / 8 GB RAM / 160 GB disk, $48/month). The 8 vCPU / 16 GB RAM / 320 GB SSD tier ($96/month) was rejected — DigitalOcean requires a $50 prepayment to unlock it, which is not practical for a temporary capstone deployment. The 4 vCPU / 8 GB tier is sufficient because AI inference is offloaded to Ollama Cloud (`AI_BACKEND=cloud`) and vector storage to Chroma Cloud (`CHROMA_DB=cloud`). Free-tier PaaS hosts (Render/Railway) were evaluated and rejected — the stack (PostgreSQL + ChromaDB + Ollama + Poppler + GLM-OCR) does not fit a 512 MB–1 GB container.
 8. ~~What is the optimal model for lesson/quiz generation quality vs speed on 6GB VRAM?~~ → qwen3:0.6b chosen as placeholder; upgrade guidance documented (Sprint 4 prompt tuning ongoing)
 9. ~~Should loading UI use full-screen overlay or background processing with stage indicator?~~ → Background processing with progress bar + mascot speech bubble (implemented Sprint 4)
 10. ~~How many mascot animation frames are needed for adequate visual feedback?~~ → idle 14f@250ms, busy 16f@140ms, happy 14f@220ms, error 14f@220ms (all implemented)

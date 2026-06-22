@@ -341,7 +341,7 @@ changes — the abstraction boundary held. `CI=true` always wins over `CHROMA_DB
 tests force `EphemeralClient` to stay deterministic, offline, and free of network races.
 
 **Reason:** The project's RAG pipeline was hardcoded to local PersistentClient. For
-deployment to a cloud VPS (DigitalOcean/AWS EC2) and for shared, persistent vector storage
+deployment to a cloud VPS (DigitalOcean) and for shared, persistent vector storage
 across redeployments, a cloud backend was needed. Adding a single env-var toggle (rather
 than a parallel code path or a separate service) keeps the change minimal and consistent
 with the existing `AI_BACKEND` selector pattern (ADR-007). The graceful-fallback design is
@@ -484,8 +484,9 @@ All AI-generated code must be reviewed before commit. Important project behavior
 
 Deployment target (decided): a cloud VPS sized to fit the full stack (PostgreSQL +
 ChromaDB + Ollama + Poppler + GLM-OCR). Primary platform:
-- DigitalOcean (Basic, Regular, 4 vCPU / 8 GB RAM / 160 GB disk, slug `s-4vcpu-8gb`),
-- AWS EC2 (secondary, comparable spec, if time permits).
+- DigitalOcean (Basic, Regular, 4 vCPU / 8 GB RAM / 160 GB disk, slug `s-4vcpu-8gb`, $48/month).
+
+The 8 vCPU / 16 GB RAM / 320 GB SSD tier ($96/month) was evaluated but rejected — DigitalOcean requires a $50 prepayment to unlock it, which is not practical for a temporary 3-4 week capstone deployment. The 4 vCPU / 8 GB tier is sufficient because AI inference is offloaded to Ollama Cloud (`AI_BACKEND=cloud`) and vector storage to Chroma Cloud (`CHROMA_DB=cloud`).
 
 Free-tier PaaS hosts (Render, Railway, PythonAnywhere) were evaluated and rejected — the stack does not fit a 512 MB–1 GB container.
 
@@ -499,14 +500,14 @@ The deployed version should be stable enough for capstone demonstration and acce
   - Cost: $0 (uses existing hardware)
   - Tradeoff: Not publicly accessible; suitable for sprint demos & local dev
 - Option B: Cloud VPS (Selected for Submission)
-  - Host: DigitalOcean droplet (Basic, Regular, 4 vCPU / 8 GB RAM / 160 GB disk) — AWS EC2 equivalent as a secondary option
-  - Cost: ~$24–48/month (or free trial credits); sized to run the full stack (PostgreSQL + ChromaDB + Ollama + Poppler + GLM-OCR) on one VM
-  - AI Strategy: Run Ollama on the VM (gemma3:27b-cloud or qwen3:0.6b per `OLLAMA_MODEL`), or swap to a cloud API via `AI_BACKEND=cloud`; `AI_MOCK=true` remains the deterministic-demo fallback
-  - Vector DB: Persistent ChromaDB on an attached volume, or Chroma Cloud (`CHROMA_DB=cloud` — see ADR-027)
-  - Tradeoff: No inactivity sleep (always-on); operator manages OS/Postgres/Poppler/Ollama
+  - Host: DigitalOcean droplet (Basic, Regular, 4 vCPU / 8 GB RAM / 160 GB disk, $48/month)
+  - Cost: $48/month (temporary 3-4 week deployment); the 8 vCPU / 16 GB RAM / 320 GB SSD tier ($96/month) was rejected because DigitalOcean requires a $50 prepayment to unlock it
+  - AI Strategy: All AI inference offloaded to Ollama Cloud via `AI_BACKEND=cloud` (`OLLAMA_MODEL=gemma3:27b-cloud`); `AI_MOCK=true` remains the deterministic-demo fallback
+  - Vector DB: Chroma Cloud (`CHROMA_DB=cloud` — see ADR-027); local PersistentClient as automatic fallback
+  - Tradeoff: No inactivity sleep (always-on); operator manages OS/Postgres/Poppler; Gunicorn (gthread, 1 worker, 8 threads) + Nginx reverse proxy + systemd + Let's Encrypt SSL + DuckDNS
 - Option C: Free-Tier PaaS (Render/Railway) — Rejected
   - Cost: $0/month, but 512 MB–1 GB RAM is insufficient for the full stack (Ollama alone needs ~6 GB VRAM + RAM); rejected after evaluation
-Recommendation: Deploy to a DigitalOcean cloud VPS (4 vCPU / 8 GB RAM) sized for the full stack; keep `AI_MOCK=true` as the deterministic-demo fallback and document the cloud-API swap path in README.
+Recommendation: Deploy to a DigitalOcean cloud VPS (4 vCPU / 8 GB RAM, $48/month) with AI inference offloaded to Ollama Cloud and vector storage to Chroma Cloud; keep `AI_MOCK=true` as the deterministic-demo fallback and document the cloud-API swap path in README.
 
 ---
 
@@ -517,7 +518,7 @@ Recommendation: Deploy to a DigitalOcean cloud VPS (4 vCPU / 8 GB RAM) sized for
 | AI model too slow locally or inconsistent output quality | Demo delay or poor pedagogical value | Use small documents and cached/demo responses; support cloud model fallback via `AI_BACKEND=cloud` |
 | File parsing issues | Failed workflow | Start with fewer file types and add more gradually |
 | Scope creep | Missed MVP | Keep optional features outside official sprint goals |
-| Deployment resource limits | App unavailable | Test deployment early; the selected cloud VPS (4 vCPU / 8 GB RAM) is sized for the full stack; `AI_MOCK=true` remains the deterministic-demo fallback |
+| Deployment resource limits | App unavailable | Test deployment early; the selected cloud VPS (4 vCPU / 8 GB RAM, $48/month) runs Flask/Gunicorn/Nginx/PostgreSQL with AI offloaded to Ollama Cloud; `AI_MOCK=true` remains the deterministic-demo fallback |
 | AI output inconsistency | Poor demo | Use controlled sample documents and structured prompts |
 | PostgreSQL privilege issues on live DB | Blocked migrations | Document `init_db.sql` workaround (includes DROP IF EXISTS + full schema + seed accounts) and `GRANT CREATE` procedure |
 | Session leakage between users | User A sees User B's data after logout/login swap | Fixed in Sprint 5 bug-fix rounds: clear session-scoped keys on login via `session.pop()` |

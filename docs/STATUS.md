@@ -85,8 +85,8 @@ Known Issues:
     decision/tradeoff analysis. NOTE: AI_BACKEND=cloud (cloud Ollama)
     was also verified separately — these are independent toggles.
 Pending Decisions:
-   - none (deployment target locked: DigitalOcean primary, AWS EC2 secondary)
+   - none (deployment target locked: DigitalOcean, 4 vCPU / 8 GB RAM / 160 GB disk, $48/month; the 8 vCPU / 16 GB RAM / 320 GB SSD tier was rejected — DigitalOcean requires a $50 prepayment to unlock it)
 Next 3 Tasks (Sprint 8):
    1. General QA pass: manual smoke test of all user flows; log defects
-   2. Deploy to DigitalOcean (or AWS EC2) cloud VPS
+   2. General QA pass: verify all routes and features work in production
    3. Final documentation review, demo recording, and capstone submission
