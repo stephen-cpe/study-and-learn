@@ -17,5 +17,14 @@ RestartSec=10
 NoNewPrivileges=true
 PrivateTmp=true
 
+# Raise the file descriptor limit from the Linux default (1024) to 65536.
+# The default 1024 is too low for a Gunicorn gthread worker doing async I/O:
+# the two-poll JS design opens 2 HTTP connections per 2s tick, TTS generation
+# opens WebSocket+SSL sockets to Microsoft Edge-TTS (1 per slide), and
+# FileSystemCache + PostgreSQL hold FDs open. Without this, the worker
+# crashes with OSError: [Errno 24] Too many open files during long
+# TTS-enabled lesson generations.
+LimitNOFILE=65536
+
 [Install]
 WantedBy=multi-user.target

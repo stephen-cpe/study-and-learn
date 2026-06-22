@@ -72,6 +72,11 @@ def generate_lesson_audio(
             loop.run_until_complete(_generate_mp3(text, voice, out_path))
             manifest['slides'][str(si)] = str(out_path.relative_to(TTS_DIR))
     finally:
+        # Drain lingering async generators (aiohttp SSL sockets) before
+        # closing the loop. Without this, file descriptors leak on each
+        # module's TTS generation, eventually causing
+        # OSError: [Errno 24] Too many open files in production.
+        loop.run_until_complete(loop.shutdown_asyncgens())
         loop.close()
     manifest_path = module_dir / 'manifest.json'
     manifest_path.write_text(json.dumps(manifest, indent=2))

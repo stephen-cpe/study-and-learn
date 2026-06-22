@@ -60,6 +60,41 @@ def test_generate_lesson_audio_creates_manifest(monkeypatch, tmp_path):
     assert (tmp_path / 'path123' / '0' / 'slide_2.mp3').exists()
 
 
+def test_generate_lesson_audio_drains_asyncgens_before_loop_close(monkeypatch, tmp_path):
+    """The event loop must call shutdown_asyncgens() before close() to
+    release lingering aiohttp SSL sockets. Without this, file descriptors
+    leak on each module's TTS generation, eventually causing
+    OSError: [Errno 24] Too many open files in production."""
+    import asyncio
+    from asyncio.base_events import BaseEventLoop
+    from src.services import tts_service as tts_module
+
+    monkeypatch.setattr(tts_module, 'TTS_DIR', tmp_path)
+
+    async def mock_generate_mp3(text, voice, out_path):
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text('fake mp3 data')
+
+    monkeypatch.setattr(tts_module, '_generate_mp3', mock_generate_mp3)
+
+    shutdown_calls = []
+    original_shutdown = BaseEventLoop.shutdown_asyncgens
+
+    def tracked_shutdown(self):
+        shutdown_calls.append(True)
+        return original_shutdown(self)
+
+    monkeypatch.setattr(BaseEventLoop, 'shutdown_asyncgens', tracked_shutdown)
+
+    script = [{'slide_index': 0, 'text': 'Test narration.'}]
+    generate_lesson_audio('pathFD', 0, script, 'Ava')
+
+    assert len(shutdown_calls) >= 1, (
+        "shutdown_asyncgens() was not called before loop.close() — "
+        "aiohttp SSL sockets will leak file descriptors"
+    )
+
+
 def test_generate_lesson_audio_skips_empty_text(monkeypatch, tmp_path):
     monkeypatch.setattr('src.services.tts_service.TTS_DIR', tmp_path)
 

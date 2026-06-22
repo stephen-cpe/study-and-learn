@@ -50,7 +50,7 @@ This guide walks you through deploying the Study-and-Learn Flask application to 
    - **Size**: 4 vCPU / 8 GB RAM / 160 GB SSD ($48/month)
    - **Authentication**: SSH key (recommended) or password
    - **SSH Key**: Add your existing SSH key or create a new one (see below)
-4. (Optional) Add a hostname: `study-and-learn`
+4. (Optional) Add a hostname: `studyandlearn`
 5. Click **Create Droplet**
 6. Wait 1-2 minutes for provisioning
 7. Note your droplet's **IP address** (shown in dashboard)
@@ -61,7 +61,7 @@ This guide walks you through deploying the Study-and-Learn Flask application to 
 
 1. Go to https://duckdns.org
 2. Sign in with GitHub/Google
-3. In the domain field, type: `study-and-learn` (without .duckdns.org)
+3. In the domain field, type: `studyandlearn` (without .duckdns.org)
 4. Click **Add Domain**
 5. Update the IP address:
    - Enter your Droplet's IP address
@@ -527,7 +527,7 @@ nano duck.sh
 ```bash
 #!/bin/bash
 TOKEN="your-duckdns-token-here"
-DOMAIN="study-and-learn"
+DOMAIN="studyandlearn"
 echo url="https://www.duckdns.org/update?domains=${DOMAIN}&token=${TOKEN}&ip=" | curl -k -o ~/duckdns/duck.log -K -
 ```
 
