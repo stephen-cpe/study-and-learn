@@ -68,6 +68,9 @@ def login():
         flash('Invalid username or password.', 'error')
         return redirect(url_for('main.index'))
 
+    # GET /login — the login form lives on the index page, so redirect there.
+    return redirect(url_for('main.index'))
+
 
 @bp.route('/logout')
 def logout():

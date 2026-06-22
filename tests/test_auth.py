@@ -103,6 +103,19 @@ def test_login_nonexistent_user(client):
     assert b'Invalid username or password' in rv.data or b'Log In' in rv.data
 
 
+def test_login_get_redirects_to_index(client):
+    """GET /login redirects to the index page (login form lives there)."""
+    rv = client.get('/login', follow_redirects=False)
+    assert rv.status_code == 302
+    assert '/process' in rv.headers.get('Location', '') or rv.location.endswith('/')
+
+
+def test_login_get_follows_to_index(client):
+    """GET /login with follow_redirects renders the index page."""
+    rv = client.get('/login', follow_redirects=True)
+    assert rv.status_code == 200
+
+
 def test_logout_clears_flask_login_session(client):
     """GET /logout clears the Flask-Login session."""
     user = User(username='charlie', email='charlie@example.com')
