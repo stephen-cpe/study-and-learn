@@ -138,7 +138,7 @@ jobs:
 
       - name: Smoke test — GET /health
         run: |
-          HEALTH_URL="https://study-and-learn.duckdns.org/health"
+          HEALTH_URL="https://studyandlearn.duckdns.org/health"
           echo "Checking: $HEALTH_URL"
           RESPONSE=$(curl --silent --max-time 30 --write-out "\n%{http_code}" "$HEALTH_URL")
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
