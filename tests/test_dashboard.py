@@ -90,6 +90,34 @@ def test_dashboard_renders_active_paths(client):
     assert b'Cancel / Abandon' in rv.data
 
 
+def test_pre_generation_active_path_shows_continue_setup(client):
+    """A pre-generation active path (no LessonProgress rows, content_data is
+    None) must show 'Continue Setup' linking to /results — NOT 'View Lessons',
+    which would bounce back to /dashboard in a dead-end loop. See the revised
+    Option A analysis: this is the single change that kills the loop."""
+    _make_path_no_progress(client, title='Pre-Gen Course', goal='Pre-gen')
+
+    rv = client.get('/dashboard')
+    assert rv.status_code == 200
+    assert b'Continue Setup' in rv.data
+    # The Continue Setup link must point at /results, not /lessons
+    assert b'/results' in rv.data
+    # View Lessons must NOT appear for this card (the link would dead-end)
+    assert b'View Lessons' not in rv.data
+
+
+def test_post_generation_active_path_shows_view_lessons(client):
+    """A post-generation active path (LessonProgress rows present) must keep
+    showing 'View Lessons' — the Continue Setup branch must NOT fire once
+    modules exist."""
+    _make_active_path(client, title='Post-Gen Course')
+
+    rv = client.get('/dashboard')
+    assert rv.status_code == 200
+    assert b'View Lessons' in rv.data
+    assert b'Continue Setup' not in rv.data
+
+
 def test_dashboard_completed_tab(client):
     path = _make_active_path(client)
     path.status = 'completed'

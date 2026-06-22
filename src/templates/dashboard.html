@@ -71,7 +71,17 @@
             </div>
 
             <div class="path-actions">
+                {% if is_active and path.total_modules == 0 %}
+                {# Pre-generation active path: content_data is None, so /lessons
+                   would bounce back here in a dead-end loop. Route the user to
+                   /results instead — if the session is still alive they resume
+                   the upload results page and can click "Generate Interactive
+                   Lessons"; if the session expired, /results falls through to
+                   /index (honest start-over). #}
+                <a href="{{ url_for('main.results') }}" class="btn btn-primary btn-sm">Continue Setup</a>
+                {% else %}
                 <a href="{{ url_for('main.lessons', path_id=path.id) }}" class="btn btn-primary btn-sm">View Lessons</a>
+                {% endif %}
 
                 {% if is_active %}
                     {% if path.all_passed %}
