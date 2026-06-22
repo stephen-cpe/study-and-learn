@@ -178,8 +178,10 @@ GRANT CREATE ON SCHEMA public TO study_user;
 Now initialize the schema (tables, indexes, foreign keys, alembic stamp, and seed users):
 
 ```bash
-psql -U postgres -d study_and_learn -f /home/study-and-learn/init_db.sql
+sudo -u postgres psql -d study_and_learn -f /home/study-and-learn/init_db.sql
 ```
+
+> **Why `sudo -u postgres`?** On Ubuntu, PostgreSQL defaults to *peer authentication* for local socket connections — the OS user running `psql` must match the database username. Running `psql -U postgres` as `root` fails with `Peer authentication failed` because `root != postgres`. The fix is to run `psql` as the `postgres` OS user via `sudo -u postgres`. This is the same pattern used for the `CREATE USER` step above.
 
 This creates three seed accounts for testing:
 
