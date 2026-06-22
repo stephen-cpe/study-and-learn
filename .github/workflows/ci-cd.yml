@@ -1,0 +1,152 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ─────────────────────────────────────────
+  # JOB 1: Run all tests
+  # ─────────────────────────────────────────
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql+psycopg2://test:test@localhost:5432/test
+          AI_MOCK: "true"
+          CI: "true"
+        run: pytest -v tests/
+
+  # ─────────────────────────────────────────
+  # JOB 2: Deploy to DigitalOcean
+  # ─────────────────────────────────────────
+  deploy:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Deploy to DigitalOcean Droplet via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DO_SSH_HOST }}
+          username: ${{ secrets.DO_SSH_USER }}
+          key: ${{ secrets.DO_SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            DEPLOY_DIR="/home/study-and-learn"
+
+            echo ">>> Checking deployment directory..."
+            if [ ! -d "$DEPLOY_DIR" ]; then
+              echo "Directory doesn't exist. Creating fresh clone..."
+              cd /home
+              git clone https://github.com/stephen-cpe/study-and-learn.git
+              cd study-and-learn
+              python3 -m venv venv
+            else
+              cd "$DEPLOY_DIR"
+              # Check if it's a valid git repo
+              if [ ! -d ".git" ]; then
+                echo "Directory exists but not a git repo. Reinitializing..."
+                cd /home
+                rm -rf "$DEPLOY_DIR"
+                git clone https://github.com/stephen-cpe/study-and-learn.git
+                cd study-and-learn
+                python3 -m venv venv
+              else
+                echo ">>> Pulling latest code..."
+                cd "$DEPLOY_DIR"
+                git config --global --add safe.directory "$DEPLOY_DIR"
+                echo ">>> Current commit: $(git rev-parse --short HEAD)"
+                git fetch origin
+                echo ">>> Remote main commit: $(git rev-parse origin/main)"
+                git reset --hard origin/main
+                echo ">>> New commit: $(git rev-parse --short HEAD)"
+              fi
+            fi
+
+            echo ">>> Setting up virtual environment..."
+            cd "$DEPLOY_DIR"
+
+            # Remove old venv to prevent corruption issues
+            echo ">>> Removing old virtual environment..."
+            rm -rf venv
+
+            # Create fresh venv
+            echo ">>> Creating fresh virtual environment..."
+            python3 -m venv venv
+            source venv/bin/activate
+
+            # Clean up pip cache to prevent space issues
+            export PIP_NO_CACHE_DIR=1
+
+            # Install dependencies
+            echo ">>> Installing dependencies..."
+            pip install --upgrade pip
+            pip install -r requirements.txt
+
+            echo ">>> Ensuring logs directory exists..."
+            mkdir -p logs
+            touch logs/access.log logs/error.log
+
+            echo ">>> Restarting application..."
+            sudo systemctl daemon-reload
+            sudo systemctl restart study-and-learn
+
+            echo ">>> Waiting for service to start..."
+            sleep 5
+
+            echo ">>> Checking service status..."
+            sudo systemctl status study-and-learn --no-pager || true
+
+            echo ">>> Deployment complete."
+
+  # ─────────────────────────────────────────
+  # JOB 3: Post-deploy smoke test
+  # ─────────────────────────────────────────
+  smoke-test:
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Wait for app to be ready
+        run: sleep 15
+
+      - name: Smoke test — GET /health
+        run: |
+          HEALTH_URL="https://study-and-learn.duckdns.org/health"
+          echo "Checking: $HEALTH_URL"
+          RESPONSE=$(curl --silent --max-time 30 --write-out "\n%{http_code}" "$HEALTH_URL")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n-1)
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response body: $BODY"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "SMOKE TEST FAILED: /health returned $HTTP_CODE (expected 200)"
+            exit 1
+          fi
+          echo "SMOKE TEST PASSED: App is healthy and responding."

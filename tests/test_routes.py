@@ -60,6 +60,16 @@ def test_index(client):
     response = client.get('/')
     assert response.status_code == 200
 
+
+def test_health_endpoint_no_auth_required(client):
+    """GET /health returns 200 + JSON without requiring login."""
+    response = client.get('/health')
+    assert response.status_code == 200
+    assert response.content_type == 'application/json'
+    data = response.get_json()
+    assert data is not None
+    assert data.get('status') == 'healthy'
+
 def test_process_empty_goal_rejected(client):
     data = {
         'learning_goal': '',

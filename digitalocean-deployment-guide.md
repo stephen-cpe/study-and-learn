@@ -275,14 +275,22 @@ postgresql+psycopg2://study_user:study_pass@localhost:5432/study_and_learn
 
 ## 7. Create Systemd Service (Gunicorn)
 
-### Step 7.1: Create the Service File
+The repo includes versioned deployment configs in the `deploy/` directory and a standalone `gunicorn.conf.py` at the project root. Copy them into place instead of creating them from scratch.
+
+### Step 7.1: Copy the Service File and Gunicorn Config
 
 ```bash
-nano /etc/systemd/system/study-and-learn.service
+# Copy the systemd unit from the repo
+sudo cp /home/study-and-learn/deploy/study-and-learn.service /etc/systemd/system/
+
+# The gunicorn.conf.py is already in the project root (used by the service via -c flag)
+# Verify it exists:
+ls -la /home/study-and-learn/gunicorn.conf.py
 ```
 
-Add this configuration:
+**What's in these files:**
 
+`deploy/study-and-learn.service` — the systemd unit:
 ```ini
 [Unit]
 Description=Study-and-Learn Flask Application (Gunicorn)
@@ -294,25 +302,39 @@ User=root
 Group=root
 WorkingDirectory=/home/study-and-learn
 Environment="PATH=/home/study-and-learn/venv/bin"
-EnvironmentFile=/home/study-and-learn/.env
-ExecStart=/home/study-and-learn/venv/bin/gunicorn \
-    --worker-class gthread \
-    --workers 1 \
-    --threads 8 \
-    --timeout 7200 \
-    --bind 127.0.0.1:5000 \
-    --access-logfile /home/study-and-learn/logs/access.log \
-    --error-logfile /home/study-and-learn/logs/error.log \
-    app:app
+EnvironmentFile=-/home/study-and-learn/.env
+ExecStart=/home/study-and-learn/venv/bin/gunicorn -c gunicorn.conf.py app:app
 Restart=on-failure
 RestartSec=10
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-Save: `Ctrl+O`, `Enter`, `Ctrl+X`
+`gunicorn.conf.py` — the Gunicorn config (extracted from the systemd unit for clarity):
+```python
+bind = "127.0.0.1:5000"
+workers = 1
+worker_class = "gthread"
+threads = 8
+timeout = 7200  # 2 hours — lesson generation with cloud AI can take 45-90 min
+max_requests = 1000
+max_requests_jitter = 100
+accesslog = "/home/study-and-learn/logs/access.log"
+errorlog = "/home/study-and-learn/logs/error.log"
+loglevel = "info"
+proc_name = "study-and-learn"
+daemon = False
+pidfile = "/tmp/study-and-learn.pid"
+```
 
+> **Why 1 worker + 8 threads (gthread)?**  
+> The app uses `cachelib.FileSystemCache` for Flask sessions (`data/flask_session/`) and progress tracking (`data/progress_cache/`). These are per-process filesystem caches. Multiple Gunicorn workers would split the cache and break session/progress consistency. A single worker with 8 threads keeps all caching in one process and trivially handles 3 concurrent users.
+>
 > **Why `--timeout 7200` (2 hours)?**  
 > Lesson generation with cloud AI (gemma3:27b-cloud) and 3+ modules can take 45-90 minutes end-to-end (lessons + checkpoints + quiz + narration script + edge-tts audio). The 2-hour timeout ensures Gunicorn doesn't kill long-running generation requests. The app's own JS hard-timeout is also 2 hours and stops polling without redirecting.
 >
@@ -339,29 +361,32 @@ Press `q` to exit status view.
 ### Step 7.3: Verify Application
 
 ```bash
-curl http://127.0.0.1:5000/
+curl http://127.0.0.1:5000/health
 ```
 
-**Expected response:** HTML (the login page). You should see `<html` or a redirect in the output.
+**Expected response:**
+```json
+{"status":"healthy"}
+```
 
 ```bash
 # Check logs if something went wrong
 sudo journalctl -u study-and-learn -n 50 --no-pager
 ```
 
-**If you see the login page HTML, the app is running!**
+**If you see the JSON health response, the app is running!**
 
 ---
 
 ## 8. Configure Nginx (Reverse Proxy)
 
-### Step 8.1: Create Nginx Site Configuration
+### Step 8.1: Copy Nginx Configuration from Repo
 
 ```bash
-nano /etc/nginx/sites-available/study-and-learn
+sudo cp /home/study-and-learn/deploy/nginx.conf /etc/nginx/sites-available/study-and-learn
 ```
 
-Add this configuration:
+**What's in this file:**
 
 ```nginx
 server {
@@ -400,7 +425,10 @@ server {
 }
 ```
 
-**Save and exit** (`Ctrl+O`, Enter, `Ctrl+X`)
+> If your DuckDNS domain differs from `study-and-learn.duckdns.org`, edit the `server_name` line:
+> ```bash
+> sudo nano /etc/nginx/sites-available/study-and-learn
+> ```
 
 ### Step 8.2: Enable Site
 
@@ -530,17 +558,17 @@ Should show: `*/5 * * * * /root/duckdns/duck.sh >/dev/null 2>&1`
 
 ## 10. Configure GitHub Secrets for CI/CD
 
-Your GitHub Actions workflow deploys automatically on push to `main`. It uses **3 secrets**.
+Your GitHub Actions workflow (`.github/workflows/ci-cd.yml`) is a 3-job pipeline that runs on every push/PR to `main`. The deploy and smoke-test jobs require **3 secrets** to SSH into your droplet.
 
-### Step 10.1: Get Your Droplet IP (DO_HOST)
+### Step 10.1: Get Your Droplet IP (DO_SSH_HOST)
 
 1. Go to https://cloud.digitalocean.com/droplets
 2. Find your droplet
 3. Copy the **IP address** (e.g., `134.209.11.38`)
 
-**This is your `DO_HOST`**
+**This is your `DO_SSH_HOST`**
 
-### Step 10.2: SSH Username (DO_USERNAME)
+### Step 10.2: SSH Username (DO_SSH_USER)
 
 **Default:** `root`
 
@@ -549,7 +577,7 @@ Unless you created a different user, this is always:
 root
 ```
 
-**This is your `DO_USERNAME`**
+**This is your `DO_SSH_USER`**
 
 ### Step 10.3: Create SSH Key for GitHub Actions
 
@@ -588,7 +616,7 @@ cat ~/.ssh/github_actions_do
 
 **Copy the ENTIRE output** (including `-----BEGIN OPENSSH PRIVATE KEY-----` and `-----END OPENSSH PRIVATE KEY-----`)
 
-**This is your `DO_SSH_KEY`**
+**This is your `DO_SSH_PRIVATE_KEY`**
 
 ### Step 10.4: Add Secrets to GitHub
 
@@ -600,36 +628,81 @@ cat ~/.ssh/github_actions_do
 
 | Name | Value | Example |
 |------|-------|---------|
-| `DO_HOST` | Your droplet IP | `134.209.11.38` |
-| `DO_USERNAME` | SSH username | `root` |
-| `DO_SSH_KEY` | Entire private key file | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
+| `DO_SSH_HOST` | Your droplet IP | `134.209.11.38` |
+| `DO_SSH_USER` | SSH username | `root` |
+| `DO_SSH_PRIVATE_KEY` | Entire private key file | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
 
 4. Click **"Add secret"** for each
 
 5. **Verify** all 3 secrets are listed
 
+> **Why no `SECRET_KEY` or API keys in GitHub Secrets?**  
+> Like the malware-detector pattern, `SECRET_KEY`, `OLLAMA_CLOUD_API_KEY`, and `CHROMA_CLOUD_API_KEY` live only on the droplet in `.env` — they are NOT in GitHub Secrets and NOT deployed by CI/CD. CI/CD only deploys code (`git pull` + `pip install` + `systemctl restart`). This keeps secrets off GitHub entirely.
+
 ---
 
 ## 11. Test Deployment
 
+### Step 11.1: Understand the CI/CD Pipeline
+
+Your workflow (`.github/workflows/ci-cd.yml`) has **3 jobs** that run sequentially:
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   TEST      │────▶│   DEPLOY    │────▶│ SMOKE TEST  │
+│ (Run tests) │     │ (SSH + pull)│     │ (curl /health)│
+└─────────────┘     └─────────────┘     └─────────────┘
+```
+
+| Job | What It Does | Runs When |
+|-----|--------------|-----------|
+| **test** | `pytest` with `AI_MOCK=true`, `CI=true`, `DATABASE_URL` + `poppler-utils` | Every push/PR to `main` |
+| **deploy** | SSH to droplet, `git reset --hard origin/main`, recreate venv, `pip install`, `systemctl restart` | Only on `main` push, if test passes |
+| **smoke-test** | `curl https://study-and-learn.duckdns.org/health`, assert HTTP 200 | Only on `main` push, if deploy succeeds |
+
+> **What the deploy job does NOT do:** It does NOT run `init_db.sql` (one-time manual setup), does NOT touch `.env` (stays on the droplet), and does NOT run model training (AI is via Ollama Cloud). It only deploys code and restarts the service.
+
+### Step 11.2: Trigger Your First Deployment
+
 **On your LOCAL machine:**
 
 ```bash
+# Make sure you're on main branch
+git checkout main
+
 # Make a small change (e.g., edit README.md)
 git add .
 git commit -m "Test CI/CD deployment"
 git push origin main
 ```
 
-**Watch the deployment:**
+### Step 11.3: Monitor the Deployment
 
 1. Go to: https://github.com/stephen-cpe/study-and-learn/actions
-2. Click the running workflow
-3. Watch the **"Deploy to DigitalOcean"** step
+2. Click on the running workflow
+3. Watch each job complete (green checkmarks):
+   - **test** — runs pytest (426+ tests, ~4-6 min)
+   - **deploy** — SSH to droplet, pull code, recreate venv, restart service (~1-2 min)
+   - **smoke-test** — curl /health, verify HTTP 200 (~30 sec)
 
-**Expected output:**
+**What to look for:**
 ```
-✅ Deployed to DigitalOcean Droplet
+CI/CD Pipeline
+   ├── test  ✅
+   ├── deploy  ✅
+   └── smoke-test  ✅
+```
+
+### Step 11.4: Verify Deployment
+
+**Test the smoke-test endpoint from your browser:**
+```
+https://study-and-learn.duckdns.org/health
+```
+
+**Expected response:**
+```json
+{"status":"healthy"}
 ```
 
 **Verify on your droplet:**
@@ -644,7 +717,12 @@ git log -1
 
 # Check service status
 sudo systemctl status study-and-learn
+
+# Check the health endpoint locally
+curl http://127.0.0.1:5000/health
 ```
+
+**Your app is deployed with CI/CD.** Every future `git push origin main` will automatically test, deploy, and verify.
 
 ---
 
@@ -690,7 +768,7 @@ Since this is a temporary 3-4 week deployment:
 4. **Revoke credentials when done:**
    - Rotate or revoke the Ollama Cloud API key
    - Rotate or revoke the Chroma Cloud API key
-   - Remove the `DO_SSH_KEY` from GitHub Secrets
+   - Remove the `DO_SSH_PRIVATE_KEY` from GitHub Secrets
    - Delete the DuckDNS domain if no longer needed
 
 ---
@@ -736,7 +814,7 @@ Since this is a temporary 3-4 week deployment:
 **Fix:**
 1. Check if Gunicorn is running: `sudo systemctl status study-and-learn`
 2. If failed, check logs: `sudo journalctl -u study-and-learn -n 50 --no-pager`
-3. Check if port 5000 is listening: `curl http://127.0.0.1:5000/`
+3. Check if port 5000 is listening: `curl http://127.0.0.1:5000/health`
 4. Restart both services:
    ```bash
    sudo systemctl restart study-and-learn

@@ -30,6 +30,11 @@ from src.utils import allowed_file
 logger = logging.getLogger(__name__)
 
 
+@bp.route('/health')
+def health():
+    return jsonify({'status': 'healthy'})
+
+
 @bp.route('/')
 def index():
     from src.models import StudyPath

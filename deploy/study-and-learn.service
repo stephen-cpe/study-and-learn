@@ -1,0 +1,21 @@
+[Unit]
+Description=Study-and-Learn Flask Application (Gunicorn)
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/home/study-and-learn
+Environment="PATH=/home/study-and-learn/venv/bin"
+EnvironmentFile=-/home/study-and-learn/.env
+ExecStart=/home/study-and-learn/venv/bin/gunicorn -c gunicorn.conf.py app:app
+Restart=on-failure
+RestartSec=10
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
