@@ -504,7 +504,7 @@ study-and-learn/
 | Story ID | User Story | Acceptance Criteria |
 |---|---|---|
 | US-042 | As a reviewer, I want a deployed web app link so I can evaluate the capstone without local setup. | Deployed to DigitalOcean cloud VPS; all routes and features functional in production; demo link in README |
-| US-043 | As a developer, I want production environment variables configured so the deployed app runs the correct AI and DB backends. | AI_BACKEND, DATABASE_URL, SECRET_KEY, OLLAMA_MODEL set in production; AI_MOCK=true documented as demo fallback |
+| US-043 | As a developer, I want production environment variables configured so the deployed app runs the correct AI and DB backends. | AI_BACKEND=cloud, CHROMA_DB=cloud, DATABASE_URL, SECRET_KEY, OLLAMA_MODEL set in production; local Ollama running with qwen3-embedding:0.6b for ChromaDB RAG retrieval; AI_MOCK=true documented as demo fallback |
 | US-044 | As a reviewer, I want a recorded 15–20 minute demo so I can evaluate the full workflow. | Demo script covers goal → upload → results → lessons → quiz → grade → retake; recording submission-ready |
 | US-045 | As a developer, I want all documentation finalized and CI passing so the capstone submission is complete. | DESIGN_AND_TESTING.md, AI_AGENT_PROTOCOL.md, task board all reflect final Sprint 8 state; CI pipeline green; grader GitHub access confirmed |
 
@@ -536,8 +536,8 @@ study-and-learn/
 - Server-side session storage (Flask-Session + cachelib).
 - Custom CSS/JS slide-deck engine (retro-themed).
 - Content-addressable global deduplication (SHA-256 + ContentRegistry).
-- pytest test suite (421 tests).
-- GitHub Actions test workflow.
+- pytest test suite (427 tests).
+- GitHub Actions CI/CD pipeline (test → deploy → smoke-test).
 - Static public task board.
 - Design and testing document.
 - Opt-in TTS audio narration (Edge-TTS Neural voices, AI-generated narration scripts).
@@ -679,19 +679,22 @@ Use a fixed demo script with known input documents so the capstone presentation 
 
 ## 11. CI/CD Strategy
 
-The initial CI/CD target is intentionally simple:
+The CI/CD pipeline is a 3-job workflow (`.github/workflows/ci-cd.yml`) that runs on every push/PR to `main`:
 
-1. On push or pull request:
+1. **test** — On push or pull request:
    - check out repository,
-   - install Python,
+   - install Python 3.13 + poppler-utils,
    - install dependencies,
-   - run `pytest -v tests/`.
+   - run `pytest -v tests/` with `AI_MOCK=true`, `CI=true`, `DATABASE_URL` set.
 
-Later additions:
-- linting,
-- formatting checks,
-- security checks,
-- deployment workflow.
+2. **deploy** — Only on `main` push, if test passes:
+   - SSH to DigitalOcean droplet,
+   - `git reset --hard origin/main`, recreate venv, `pip install`,
+   - `systemctl restart study-and-learn`.
+
+3. **smoke-test** — Only on `main` push, if deploy succeeds:
+   - `curl https://studyandlearn.duckdns.org/health`,
+   - assert HTTP 200.
 
 ---
 

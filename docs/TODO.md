@@ -223,7 +223,7 @@ Build the smallest working version first, then iterate:
 - [x] Write 5 additional parser tests (pptx, image, dedup)
 - [x] Write 4 additional RAG tests (multi-collection retrieval, metadata)
 - [x] Add `ollama pull glm-ocr` to README setup instructions
-- [x] Run full test suite — 172 passing tests at Sprint 6 close (143 original + 29 new); suite has since grown to 421 tests by Sprint 8
+- [x] Run full test suite — 172 passing tests at Sprint 6 close (143 original + 29 new); suite has since grown to 427 tests by Sprint 8
 
 **Sprint 6 Definition of Done:**
 - OCR pipeline processes scanned PDFs with text/table/figure recognition
@@ -232,7 +232,7 @@ Build the smallest working version first, then iterate:
 - Multi-collection retrieval merges results across all uploaded documents
 - Progress bar shows 9 stages including OCR progress
 - All new features gated behind env vars (OCR_FULL, OCR_FIGURE_DESCRIPTION, AI_MOCK)
-- 172 tests passing at Sprint 6 close (suite is now 421 tests as of Sprint 8)
+- 172 tests passing at Sprint 6 close (suite is now 427 tests as of Sprint 8)
 - README updated with OCR setup instructions
 
 ---
@@ -362,7 +362,7 @@ deferred to Sprint 8 and completed there (kept privately outside the repo for th
 - [x] AI-powered OCR/vision (GLM-OCR local + Qwen3.5 cloud)
 - [x] Content-addressable global deduplication
 - [x] Multi-collection ChromaDB retrieval
-- [x] 421 automated tests (Sprint 8 active; suite rebuilt from Tasks 1–11)
+- [x] 427 automated tests (Sprint 8 active; suite rebuilt from Tasks 1–11 + deployment bug fixes)
 - [x] GitHub Actions CI
 - [x] Static task board
 - [x] Design/testing document
@@ -497,8 +497,10 @@ deferred to Sprint 8 and completed there (kept privately outside the repo for th
 - [x] extracted_texts cleanup test
 
 ### To Add (Sprint 8)
-- [ ] End-to-end deployment smoke test (production URL responds)
+- [x] End-to-end deployment smoke test (GET /health endpoint for CI/CD smoke-test job)
 - [x] TTS 404 regression test (path_id re-resolved after first save) — added in Task 11
+- [x] GET /login redirect fix test (was returning None, crashing Gunicorn)
+- [x] TTS asyncgens drain test (loop.shutdown_asyncgens before loop.close to prevent FD leak)
 
 ### Manual Demo Tests
 - [ ] Demo document uploads successfully

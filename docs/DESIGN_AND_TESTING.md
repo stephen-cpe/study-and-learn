@@ -3,7 +3,7 @@
 
 **Version:** 1.0
 **Status:** Living document
-**Last updated:** June 19, 2026
+**Last updated:** June 22, 2026
 
 ---
 
@@ -375,7 +375,7 @@ The single `main` blueprint is split across five route modules. URL paths do not
 | File | Owns |
 |---|---|
 | `auth.py` | `/signup`, `/login`, `/logout`, `/reset-password`, `/settings` |
-| `processing.py` | `/` (unified form), `/process` (POST upload+goal), `/results`, `/progress` (long-running progress polling) |
+| `processing.py` | `/` (unified form), `/process` (POST upload+goal), `/results`, `/progress` (long-running progress polling), `/health` (GET, no auth, CI/CD smoke-test) |
 | `lessons.py` | `/generate-lessons` (POST), `/lessons` (module grid), `/lessons/<i>` (deck), `/lessons/<i>/grade` (POST), `/lessons/<i>/retake` (POST), `/lessons/<i>/save-position` (POST), `/lessons/<i>/audio/<idx>` (GET), `/lessons/generation-status` (GET), `/lessons/<i>/audio/manifest` (GET) |
 | `dashboard.py` | `/dashboard`, `/study-path/<id>/complete` (POST), `/study-path/<id>/cancel` (POST), `/study-path/<id>/delete` (POST), `/lessons/<i>/export` (GET, PDF), `/reset` |
 | `admin.py` | `/admin`, `/admin/toggle/<user_id>`, `/admin/reset-password/<user_id>` (POST) |
@@ -425,13 +425,14 @@ Integration tests cover routes and workflow behavior:
 - mocked generate-lessons flow: session data → lesson + quiz generation → redirect,
 - lesson deck route with pre-populated session lessons returns 200.
 
-Current test suite: 421 tests passing (Sprint 8 active — suite rebuilt from Tasks 1–11).
+Current test suite: 427 tests passing (Sprint 8 active — suite rebuilt from Tasks 1–11 + deployment bug fixes).
 Sprint 7 test additions cover: TTS service (5), narration script (4), cloze_dropdown grading
 (3), checkpoint variety (3), humor/difficulty prompt injection (5), route-level TTS flags (3),
 save-position (2), audio routes (2), difficulty snapshotting (1), extracted_texts cleanup (1).
 Sprint 8 additions: TTS 404 regression (path_id re-resolved after first save), two-poll
 parallel-endpoint assertion, hard-timeout-no-redirect, static-cache disabled, audio-route
-path_id fallback (5+ tests).
+path_id fallback (5+ tests), GET /login redirect fix (2 tests), GET /health endpoint (1 test),
+asyncgens drain before loop.close (1 test).
 
 ### Smoke Tests
 
@@ -452,17 +453,25 @@ Smoke tests run before sprint demos and final recording:
 
 ## 6. CI/CD
 
-Initial GitHub Actions workflow:
+GitHub Actions workflow (`.github/workflows/ci-cd.yml`) — 3 jobs:
 
-- trigger on push and pull request,
-- install Python,
-- install dependencies,
-- run `pytest -v tests/`.
+1. **test** (every push/PR to `main`):
+   - install Python 3.13 + poppler-utils,
+   - install dependencies,
+   - run `pytest -v tests/` with `AI_MOCK=true`, `CI=true`, `DATABASE_URL` set.
+
+2. **deploy** (main push only, if test passes):
+   - SSH to DigitalOcean droplet via `appleboy/ssh-action`,
+   - `git reset --hard origin/main`, recreate venv, `pip install`,
+   - `systemctl restart study-and-learn`.
+
+3. **smoke-test** (main push only, if deploy succeeds):
+   - `curl https://studyandlearn.duckdns.org/health`,
+   - assert HTTP 200.
 
 Future additions:
 - linting,
 - formatting,
-- deployment automation,
 - security scanning.
 
 ---
