@@ -104,7 +104,7 @@ def settings():
         _, message = apply_settings(
             current_user,
             avatar=request.form.get('avatar'),
-            tts_enabled=request.form.get('tts_enabled'),
+            tts_enabled=request.form.get('tts_enabled', False),
             tts_speaker=request.form.get('tts_speaker'),
             lesson_difficulty=request.form.get('lesson_difficulty'),
         )

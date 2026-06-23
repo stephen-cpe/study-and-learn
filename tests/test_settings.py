@@ -248,6 +248,33 @@ class TestSettingsRoute:
             assert user.lesson_difficulty == 'Normal'
             assert user.tts_enabled is True  # bool field untouched
 
+    def test_post_unchecked_checkbox_disables_tts(self, app, client, make_user):
+        """Regression: an unchecked checkbox is absent from the POST body.
+        The route must interpret that absence as False so a user who enabled
+        TTS can later disable it. Previously `request.form.get('tts_enabled')`
+        returned None and apply_settings skipped the field entirely."""
+        uid = make_user()
+        with app.app_context():
+            user = db.session.get(User, uid)
+            user.tts_enabled = True
+            db.session.commit()
+        _login(client)
+        # NOTE: 'tts_enabled' intentionally omitted from the form data,
+        # mirroring how a real browser submits an unchecked checkbox.
+        resp = client.post(
+            '/settings',
+            data={
+                'avatar': 'avatar-0.png',
+                'tts_speaker': 'Ava',
+                'lesson_difficulty': 'Normal',
+            },
+            follow_redirects=False,
+        )
+        assert resp.status_code in (302, 303)
+        with app.app_context():
+            user = db.session.get(User, uid)
+            assert user.tts_enabled is False
+
     def test_get_reflects_existing_preferences(self, app, client, make_user):
         uid = make_user()
         with app.app_context():
