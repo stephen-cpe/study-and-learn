@@ -1,5 +1,5 @@
-# DigitalOcean Deployment Guide
-## For $48/month Ubuntu 25.10 Droplet + DuckDNS + Let's Encrypt SSL
+# AWS EC2 Deployment Guide
+## For AWS EC2 m7i-flex.large (2 vCPU / 8 GB RAM / 40 GB gp3) + DuckDNS + Let's Encrypt SSL
 ### Complete Guide for Windows 11 Users
 
 ## Disclaimer
@@ -9,7 +9,7 @@ _This guide is a work in progress. Use at your own risk. No warranties, guarante
 
 ## Overview
 
-This guide walks you through deploying the Study-and-Learn Flask application to DigitalOcean with:
+This guide walks you through deploying the Study-and-Learn Flask application to AWS EC2 with:
 -  **Automated CI/CD** via GitHub Actions
 -  **HTTPS/SSL** with Let's Encrypt
 -  **Dynamic DNS** with DuckDNS
@@ -18,19 +18,19 @@ This guide walks you through deploying the Study-and-Learn Flask application to 
 -  **Windows 11** compatible (uses Git Bash)
 
 **Time Required:** 60-90 minutes  
-**Cost:** $48/month (DigitalOcean droplet, 4 vCPU / 8 GB RAM / 160 GB SSD)
+**Cost:** ~$28-35/month (EC2 m7i-flex.large, 2 vCPU / 8 GB RAM / 40 GB gp3; or free with AWS trial credits)
 
 > **Why gthread (1 worker, 8 threads) instead of multi-worker?**  
 > The app uses `cachelib.FileSystemCache` for Flask sessions (`data/flask_session/`) and progress tracking (`data/progress_cache/`). These are per-process filesystem caches. Multiple Gunicorn workers would split the cache and break session/progress consistency. A single worker with 8 threads keeps all caching in one process and trivially handles 3 concurrent users.
 
-> **Droplet sizing note:** The 4 vCPU / 8 GB RAM / 160 GB SSD tier ($48/month) is sufficient because heavy AI inference runs on Ollama Cloud (`AI_BACKEND=cloud`) and vector storage on Chroma Cloud (`CHROMA_DB=cloud`). The droplet only runs Flask/Gunicorn, Nginx, and PostgreSQL.
+> **Instance sizing note:** The m7i-flex.large (2 vCPU / 8 GB RAM / 40 GB gp3) is sufficient because heavy AI inference runs on Ollama Cloud (`AI_BACKEND=cloud`) and vector storage on Chroma Cloud (`CHROMA_DB=cloud`). The EC2 instance only runs Flask/Gunicorn, Nginx, and PostgreSQL. The app is I/O-bound (waiting on cloud API responses), so 2 vCPUs handle 3 concurrent users without bottlenecking. The 40 GB gp3 volume provides headroom for OS (~6 GB), venv (~2 GB), PostgreSQL (~1 GB), and ~10 GB of TTS audio + uploads (enough for a 3-4 week capstone deployment).
 
 ---
 
 ## Prerequisites
 
 ### What You Need:
-1. **DigitalOcean Account** - https://digitalocean.com
+1. **AWS Account** - https://aws.amazon.com (free tier or trial credits)
 2. **GitHub Account** - https://github.com
 3. **DuckDNS Account** - https://duckdns.org (free)
 4. **Git for Windows** - https://git-scm.com/download/win (includes Git Bash)
@@ -39,21 +39,53 @@ This guide walks you through deploying the Study-and-Learn Flask application to 
 
 ---
 
-## 1. Create a DigitalOcean Droplet
+## 1. Create an AWS EC2 Instance
 
 ### Step-by-Step:
 
-1. Log in to https://cloud.digitalocean.com
-2. Click **Create** → **Droplets**
+1. Log in to https://console.aws.amazon.com
+2. Go to **EC2** → **Instances** → **Launch instances**
 3. Choose the following configuration:
-   - **Image**: Ubuntu 25.10
-   - **Size**: 4 vCPU / 8 GB RAM / 160 GB SSD ($48/month)
-   - **Authentication**: SSH key (recommended) or password
-   - **SSH Key**: Add your existing SSH key or create a new one (see below)
-4. (Optional) Add a hostname: `studyandlearn`
-5. Click **Create Droplet**
-6. Wait 1-2 minutes for provisioning
-7. Note your droplet's **IP address** (shown in dashboard)
+   - **Name**: `studyandlearn-aws`
+   - **AMI**: Ubuntu Server 26.04 LTS (64-bit x86)
+   - **Instance type**: `m7i-flex.large` (2 vCPU / 8 GB RAM)
+   - **Key pair**: Create a new key pair (RSA, `.pem` format) — name it `aws-ec2-key` — download and save it (you cannot download it again)
+   - **Storage**: 40 GB gp3 (EBS volume)
+   - **Network settings**: Create or select a security group with the following inbound rules (see Step 1.1 below)
+4. Click **Launch instance**
+5. Wait 1-2 minutes for provisioning
+6. Note your instance's **Public IPv4 address** (shown in the EC2 Instances list)
+
+### Step 1.1: Configure Security Group (AWS Firewall)
+
+AWS uses **security groups** instead of UFW for firewall management. You must create these inbound rules before the instance is usable:
+
+| Type | Port | Source | Purpose |
+|------|------|--------|---------|
+| SSH | 22 | My IP (or `0.0.0.0/0` for testing) | SSH access |
+| HTTP | 80 | `0.0.0.0/0` | Web traffic (Let's Encrypt + redirect) |
+| HTTPS | 443 | `0.0.0.0/0` | Secure web traffic |
+
+**To configure:**
+1. During instance launch, under **Network settings** → **Security group**, click **Create security group**
+2. Name it `studyandlearn-sg`
+3. Add the 3 inbound rules above
+4. Outbound rules: leave default (allow all)
+
+> **Note:** We do NOT open port 5000 in the security group. Gunicorn is bound to `127.0.0.1:5000` (localhost only) and is never exposed to the internet. All external traffic goes through Nginx on ports 80/443.
+
+### Step 1.2: Allocate an Elastic IP (Optional but Recommended)
+
+AWS EC2 instances get a new public IP on every stop/start. An Elastic IP gives you a fixed IP that survives reboots:
+
+1. Go to **EC2** → **Elastic IPs** → **Allocate Elastic IP address**
+2. Click **Allocate**
+3. Select the new Elastic IP → **Actions** → **Associate Elastic IP address**
+4. Select your `studyandlearn-aws` instance
+5. Click **Associate**
+6. Note the **Elastic IP** — this is your instance's permanent public IP
+
+> **Cost note:** Elastic IPs are free while associated with a running instance. They incur a small hourly charge if allocated but NOT associated. For a 3-4 week capstone deployment, this is effectively free.
 
 ---
 
@@ -61,26 +93,33 @@ This guide walks you through deploying the Study-and-Learn Flask application to 
 
 1. Go to https://duckdns.org
 2. Sign in with GitHub/Google
-3. In the domain field, type: `studyandlearn` (without .duckdns.org)
+3. In the domain field, type: `studyandlearnaws` (without .duckdns.org)
 4. Click **Add Domain**
 5. Update the IP address:
-   - Enter your Droplet's IP address
+   - Enter your EC2 instance's Public IPv4 address (or Elastic IP)
    - Click **Update IP**
 6. Note your **DuckDNS Token** (click "token" link) - you'll need this later
 
 **Keep this page open** or save:
-- Domain: `studyandlearn.duckdns.org`
+- Domain: `studyandlearnaws.duckdns.org`
 - Token: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
-- IP: `134.209.11.38` (example)
+- IP: `54.209.11.38` (example)
 
 ---
 
-## 3. Connect to Your Droplet
+## 3. Connect to Your EC2 Instance
 
 ### Using Git Bash (Windows):
 
+First, set permissions on your downloaded `.pem` key file (AWS requires strict permissions):
+
 ```bash
-ssh -i ~/.ssh/digitalocean_key root@YOUR_DROPLET_IP
+# Move the downloaded key to your .ssh directory
+mv ~/Downloads/aws-ec2-key.pem ~/.ssh/aws-ec2-key.pem
+chmod 600 ~/.ssh/aws-ec2-key.pem
+
+# Connect (AWS Ubuntu AMIs use 'ubuntu' as the default user, not 'root')
+ssh -i ~/.ssh/aws-ec2-key.pem ubuntu@YOUR_EC2_PUBLIC_IP
 ```
 
 **First time?** You'll see:
@@ -89,21 +128,22 @@ Are you sure you want to continue connecting (yes/no/[fingerprint])?
 ```
 Type `yes` and press Enter.
 
-**Using password?** If you didn't set up SSH key, use your droplet password.
+> **Important AWS difference:** AWS Ubuntu AMIs use `ubuntu` as the default SSH user, NOT `root`. You will use `sudo` for commands that need root privileges. This is a security best practice — you should NOT enable root SSH login.
 
-### Using DigitalOcean Console (Alternative):
+### Using AWS EC2 Instance Connect (Alternative):
 
 If SSH fails:
-1. Go to DigitalOcean Dashboard → Droplets
-2. Click your droplet
-3. Click **Console** (top-right)
-4. Log in with root password
+1. Go to AWS Console → EC2 → Instances
+2. Select your instance
+3. Click **Connect** → **EC2 Instance Connect**
+4. Click **Connect**
+5. You get a browser-based terminal logged in as `ubuntu`
 
 ---
 
 ## 4. Prepare the Server
 
-**Once connected via SSH**, run these commands on the droplet:
+**Once connected via SSH**, run these commands on the EC2 instance:
 
 ```bash
 # Update system
@@ -134,7 +174,7 @@ git clone https://github.com/stephen-cpe/study-and-learn.git
 
 ### Step 6.1: Create Virtual Environment
 
-**On the droplet:**
+**On the EC2 instance:**
 
 ```bash
 cd /home/study-and-learn
@@ -181,7 +221,7 @@ Now initialize the schema (tables, indexes, foreign keys, alembic stamp, and see
 sudo -u postgres psql -d study_and_learn -f /home/study-and-learn/init_db.sql
 ```
 
-> **Why `sudo -u postgres`?** On Ubuntu, PostgreSQL defaults to *peer authentication* for local socket connections — the OS user running `psql` must match the database username. Running `psql -U postgres` as `root` fails with `Peer authentication failed` because `root != postgres`. The fix is to run `psql` as the `postgres` OS user via `sudo -u postgres`. This is the same pattern used for the `CREATE USER` step above.
+> **Why `sudo -u postgres`?** On Ubuntu, PostgreSQL defaults to *peer authentication* for local socket connections — the OS user running `psql` must match the database username. Running `psql -U postgres` as `ubuntu` or `root` fails with `Peer authentication failed`. The fix is to run `psql` as the `postgres` OS user via `sudo -u postgres`.
 
 This creates three seed accounts for testing:
 
@@ -264,12 +304,12 @@ CI=false
 Save: `Ctrl+O`, `Enter`, `Ctrl+X`
 
 ```bash
-# Secure the file (only root can read it)
+# Secure the file (only owner can read it)
 chmod 600 .env
 ```
 
 > **Why `AI_BACKEND=cloud` and `CHROMA_DB=cloud`?**  
-> Running local AI models (e.g., a 27B parameter LLM) on an 8 GB RAM droplet would cause OOM crashes. Ollama Cloud offloads all LLM inference to Ollama's hosted infrastructure. Chroma Cloud offloads vector storage and similarity search. The droplet only orchestrates HTTP requests, DB reads/writes, and the background TTS worker thread — all lightweight CPU work.
+> Running local AI models (e.g., a 27B parameter LLM) on an 8 GB RAM instance would cause OOM crashes. Ollama Cloud offloads all LLM inference to Ollama's hosted infrastructure. Chroma Cloud offloads vector storage and similarity search. The EC2 instance only orchestrates HTTP requests, DB reads/writes, and the background TTS worker thread — all lightweight CPU work.
 
 ### Step 6.5: Create Logs and Data Directories
 
@@ -341,19 +381,35 @@ RestartSec=10
 NoNewPrivileges=true
 PrivateTmp=true
 
+# Raise the file descriptor limit from the Linux default (1024) to 65536.
+# The default 1024 is too low for a Gunicorn gthread worker doing async I/O:
+# the two-poll JS design opens 2 HTTP connections per 2s tick, TTS generation
+# opens WebSocket+SSL sockets to Microsoft Edge-TTS (1 per slide), and
+# FileSystemCache + PostgreSQL hold FDs open. Without this, the worker
+# crashes with OSError: [Errno 24] Too many open files during long
+# TTS-enabled lesson generations.
+LimitNOFILE=65536
+
 [Install]
 WantedBy=multi-user.target
 ```
 
-`gunicorn.conf.py` — the Gunicorn config (extracted from the systemd unit for clarity):
+> **AWS note:** The systemd unit uses `User=root`. On AWS Ubuntu AMIs, the default SSH user is `ubuntu`, but the systemd service runs as `root` — this is correct. The `User=root` in the service file refers to the user the Gunicorn process runs as, not who you SSH in as.
+
+`gunicorn.conf.py` — the Gunicorn config:
 ```python
 bind = "127.0.0.1:5000"
 workers = 1
 worker_class = "gthread"
 threads = 8
 timeout = 7200  # 2 hours — lesson generation with cloud AI can take 45-90 min
-max_requests = 1000
-max_requests_jitter = 100
+
+# NOTE: max_requests / max_requests_jitter are deliberately omitted.
+# The two-poll JS design fires ~1-2 HTTP requests per second. With
+# max_requests=1000, the worker auto-restarts every ~15-20 minutes,
+# killing the TTS background thread mid-generation.
+
+# Logging
 accesslog = "/home/study-and-learn/logs/access.log"
 errorlog = "/home/study-and-learn/logs/error.log"
 loglevel = "info"
@@ -365,10 +421,13 @@ pidfile = "/tmp/study-and-learn.pid"
 > **Why 1 worker + 8 threads (gthread)?**  
 > The app uses `cachelib.FileSystemCache` for Flask sessions (`data/flask_session/`) and progress tracking (`data/progress_cache/`). These are per-process filesystem caches. Multiple Gunicorn workers would split the cache and break session/progress consistency. A single worker with 8 threads keeps all caching in one process and trivially handles 3 concurrent users.
 >
-> **Why `--timeout 7200` (2 hours)?**  
+> **Why `timeout 7200` (2 hours)?**  
 > Lesson generation with cloud AI (gemma3:27b-cloud) and 3+ modules can take 45-90 minutes end-to-end (lessons + checkpoints + quiz + narration script + edge-tts audio). The 2-hour timeout ensures Gunicorn doesn't kill long-running generation requests. The app's own JS hard-timeout is also 2 hours and stops polling without redirecting.
 >
-> **Why `--bind 127.0.0.1:5000`?**  
+> **Why no `max_requests`?**  
+> The two-poll JS design fires ~1-2 HTTP requests per second. With `max_requests=1000`, the worker would auto-restart every ~15-20 minutes, killing the daemon TTS background thread mid-generation. TTS-enabled generation takes 45-90 minutes; the worker must stay alive for the entire duration.
+>
+> **Why `bind 127.0.0.1:5000`?**  
 > Gunicorn binds to localhost only. Nginx (the public-facing reverse proxy) forwards external traffic to Gunicorn. This means port 5000 is never exposed to the internet directly.
 
 ### Step 7.2: Enable and Start Service
@@ -416,13 +475,26 @@ sudo journalctl -u study-and-learn -n 50 --no-pager
 sudo cp /home/study-and-learn/deploy/nginx.conf /etc/nginx/sites-available/study-and-learn
 ```
 
+**Then update the `server_name` to match your DuckDNS domain:**
+
+```bash
+sudo nano /etc/nginx/sites-available/study-and-learn
+```
+
+Change the `server_name` line to:
+```nginx
+    server_name studyandlearnaws.duckdns.org;
+```
+
+**Save and exit** (`Ctrl+O`, Enter, `Ctrl+X`)
+
 **What's in this file:**
 
 ```nginx
 server {
     listen 80;
     listen [::]:80;
-    server_name studyandlearn.duckdns.org;  # Replace with your DuckDNS domain or droplet IP
+    server_name studyandlearnaws.duckdns.org;  # Your DuckDNS domain
 
     # Upload size limit — must be >= your max PDF upload size
     # The app caps at 5 files per upload; set this generously
@@ -455,11 +527,6 @@ server {
 }
 ```
 
-> If your DuckDNS domain differs from `studyandlearn.duckdns.org`, edit the `server_name` line:
-> ```bash
-> sudo nano /etc/nginx/sites-available/study-and-learn
-> ```
-
 > **⚠️ WARNING: This repo config is HTTP-only (port 80).** It does NOT contain SSL directives — those are added by Certbot in Step 8.4. If you ever re-copy this file to `/etc/nginx/sites-available/` (e.g., after a config change), you **MUST re-run the Certbot commands in Step 8.4** afterward to restore the SSL block (`listen 443 ssl`, certificate paths, and HTTP→HTTPS redirect). Otherwise HTTPS will break. This is a one-time manual step — CI/CD does NOT touch the live Nginx config.
 
 ### Step 8.2: Enable Site
@@ -487,7 +554,7 @@ nginx: configuration file /etc/nginx/nginx.conf test is successful
 
 ### Step 8.3: Test Without SSL First
 
-Open your browser and go to: `http://studyandlearn.duckdns.org`
+Open your browser and go to: `http://studyandlearnaws.duckdns.org`
 
 **You should see the Study-and-Learn login page!**
 
@@ -499,52 +566,39 @@ sudo journalctl -u study-and-learn -n 50 --no-pager
 sudo tail -20 /var/log/nginx/study-and-learn-error.log
 ```
 
+> **AWS-specific check:** If the page doesn't load, verify your EC2 security group allows inbound HTTP (port 80) from `0.0.0.0/0`. Go to AWS Console → EC2 → Security Groups → your security group → Inbound Rules.
+
 ### Step 8.4: Obtain SSL Certificate (Let's Encrypt)
 
 ```bash
 # First run WITHOUT --redirect (obtains the certificate)
-sudo certbot --nginx -d studyandlearn.duckdns.org --email your-email@example.com --agree-tos
+sudo certbot --nginx -d studyandlearnaws.duckdns.org --email your-email@example.com --agree-tos
 
 # Then run WITH --redirect (forces all HTTP → HTTPS)
-sudo certbot --nginx -d studyandlearn.duckdns.org --email your-email@example.com --agree-tos --redirect
+sudo certbot --nginx -d studyandlearnaws.duckdns.org --email your-email@example.com --agree-tos --redirect
 ```
 
 **Replace `your-email@example.com`** with your actual email.
 
-### Step 8.5: Configure Firewall
+### Step 8.5: Verify HTTPS
 
-```bash
-# Allow HTTP/HTTPS
-sudo ufw allow 'Nginx Full'
-
-# Allow SSH
-sudo ufw allow OpenSSH
-
-# Enable firewall
-sudo ufw enable
-```
-
-**Type `y`** when prompted.
-
-> **Note:** We do NOT open port 5000 in the firewall. Gunicorn is bound to `127.0.0.1:5000` (localhost only) and is never exposed to the internet. All external traffic goes through Nginx on ports 80/443.
-
-### Step 8.6: Verify HTTPS
-
-Open browser and go to: `https://studyandlearn.duckdns.org`
+Open browser and go to: `https://studyandlearnaws.duckdns.org`
 
 **You should see the login page with the padlock icon!**
 
 Log in with the seed credentials (`admin` / `ADMINpassword`) and verify you can navigate the app.
 
+> **Note:** On AWS, you do NOT need to configure UFW (Uncomplicated Firewall). AWS security groups handle all firewall management at the hypervisor level. The security group rules you set in Step 1.1 (ports 22/80/443) are the only firewall configuration needed.
+
 ---
 
 ## 9. Configure DuckDNS Automatic Updates
 
-Your IP might change. DuckDNS keeps your domain updated.
+Your IP might change (especially without an Elastic IP). DuckDNS keeps your domain updated.
 
 ### Step 9.1: Create DuckDNS Script
 
-**On the droplet:**
+**On the EC2 instance:**
 
 ```bash
 mkdir -p ~/duckdns
@@ -557,7 +611,7 @@ nano duck.sh
 ```bash
 #!/bin/bash
 TOKEN="your-duckdns-token-here"
-DOMAIN="studyandlearn"
+DOMAIN="studyandlearnaws"
 echo url="https://www.duckdns.org/update?domains=${DOMAIN}&token=${TOKEN}&ip=" | curl -k -o ~/duckdns/duck.log -K -
 ```
 
@@ -584,32 +638,42 @@ cat duck.log
 crontab -l
 ```
 
-Should show: `*/5 * * * * /root/duckdns/duck.sh >/dev/null 2>&1`
+Should show: `*/5 * * * * /home/ubuntu/duckdns/duck.sh >/dev/null 2>&1`
+
+> **AWS note:** The cron path will be `/home/ubuntu/duckdns/duck.sh` (not `/root/`) because AWS Ubuntu AMIs use `ubuntu` as the default user.
 
 ---
 
 ## 10. Configure GitHub Secrets for CI/CD
 
-Your GitHub Actions workflow (`.github/workflows/ci-cd.yml`) is a 3-job pipeline that runs on every push/PR to `main`. The deploy and smoke-test jobs require **3 secrets** to SSH into your droplet.
+Your GitHub Actions workflow (`.github/workflows/ci-cd.yml`) is a 3-job pipeline that runs on every push/PR to `main`. The deploy and smoke-test jobs require **3 secrets** to SSH into your EC2 instance.
 
-### Step 10.1: Get Your Droplet IP (DO_SSH_HOST)
+> **AWS note:** The CI/CD workflow's smoke-test job hits `https://studyandlearn.duckdns.org/health` (the DigitalOcean domain). If you want the smoke-test to verify the AWS deployment instead, you need to either:
+> - Create a separate workflow for AWS (e.g., `ci-cd-aws.yml`) with the AWS domain, OR
+> - Update the existing workflow's smoke-test URL to `https://studyandlearnaws.duckdns.org/health`, OR
+> - Keep the smoke-test pointed at the DigitalOcean deployment (if both are running simultaneously)
+>
+> For a single-target AWS deployment, the simplest approach is to update the smoke-test URL in `ci-cd.yml`.
 
-1. Go to https://cloud.digitalocean.com/droplets
-2. Find your droplet
-3. Copy the **IP address** (e.g., `134.209.11.38`)
+### Step 10.1: Get Your EC2 Public IP (AWS_SSH_HOST)
 
-**This is your `DO_SSH_HOST`**
+1. Go to AWS Console → EC2 → Instances
+2. Find your instance
+3. Copy the **Public IPv4 address** (or Elastic IP, if allocated)
 
-### Step 10.2: SSH Username (DO_SSH_USER)
+**This is your `AWS_SSH_HOST`**
 
-**Default:** `root`
+### Step 10.2: SSH Username (AWS_SSH_USER)
 
-Unless you created a different user, this is always:
+**Default for AWS Ubuntu AMIs:** `ubuntu`
+
 ```
-root
+ubuntu
 ```
 
-**This is your `DO_SSH_USER`**
+> **AWS difference:** AWS Ubuntu AMIs use `ubuntu` as the default SSH user, NOT `root` (which is the DigitalOcean default). The CI/CD workflow's `username` field must be set to `ubuntu` for AWS.
+
+**This is your `AWS_SSH_USER`**
 
 ### Step 10.3: Create SSH Key for GitHub Actions
 
@@ -617,25 +681,30 @@ root
 
 ```bash
 # Create new SSH key
-ssh-keygen -t ed25519 -C "github-actions-deploy" -f ~/.ssh/github_actions_do
+ssh-keygen -t ed25519 -C "github-actions-deploy-aws" -f ~/.ssh/github_actions_aws
 ```
 
 **Press Enter twice** (no passphrase)
 
-**Copy the PUBLIC key to your droplet:**
+**Copy the PUBLIC key to your EC2 instance:**
 
 ```bash
-ssh-copy-id -i ~/.ssh/github_actions_do.pub root@YOUR_DROPLET_IP
+ssh-copy-id -i ~/.ssh/github_actions_aws.pub ubuntu@YOUR_EC2_PUBLIC_IP
 ```
 
-**Enter droplet password** when prompted.
+> **AWS note:** You may need to specify the EC2 key pair to connect first:
+> ```bash
+> ssh-copy-id -i ~/.ssh/github_actions_aws.pub -o IdentityFile=~/.ssh/aws-ec2-key.pem ubuntu@YOUR_EC2_PUBLIC_IP
+> ```
+
+**Enter the EC2 instance password** when prompted (or if using key-based auth only, this should work automatically).
 
 **Expected output:** `Number of key(s) added: 1`
 
 **Test it:**
 
 ```bash
-ssh -i ~/.ssh/github_actions_do root@YOUR_DROPLET_IP
+ssh -i ~/.ssh/github_actions_aws ubuntu@YOUR_EC2_PUBLIC_IP
 ```
 
 **Should log in without password!**
@@ -643,12 +712,12 @@ ssh -i ~/.ssh/github_actions_do root@YOUR_DROPLET_IP
 **Display the PRIVATE key:**
 
 ```bash
-cat ~/.ssh/github_actions_do
+cat ~/.ssh/github_actions_aws
 ```
 
 **Copy the ENTIRE output** (including `-----BEGIN OPENSSH PRIVATE KEY-----` and `-----END OPENSSH PRIVATE KEY-----`)
 
-**This is your `DO_SSH_PRIVATE_KEY`**
+**This is your `AWS_SSH_PRIVATE_KEY`**
 
 ### Step 10.4: Add Secrets to GitHub
 
@@ -660,16 +729,23 @@ cat ~/.ssh/github_actions_do
 
 | Name | Value | Example |
 |------|-------|---------|
-| `DO_SSH_HOST` | Your droplet IP | `134.209.11.38` |
-| `DO_SSH_USER` | SSH username | `root` |
-| `DO_SSH_PRIVATE_KEY` | Entire private key file | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
+| `AWS_SSH_HOST` | Your EC2 public IP | `54.209.11.38` |
+| `AWS_SSH_USER` | SSH username | `ubuntu` |
+| `AWS_SSH_PRIVATE_KEY` | Entire private key file | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
 
 4. Click **"Add secret"** for each
 
 5. **Verify** all 3 secrets are listed
 
 > **Why no `SECRET_KEY` or API keys in GitHub Secrets?**  
-> Like the malware-detector pattern, `SECRET_KEY`, `OLLAMA_CLOUD_API_KEY`, and `CHROMA_CLOUD_API_KEY` live only on the droplet in `.env` — they are NOT in GitHub Secrets and NOT deployed by CI/CD. CI/CD only deploys code (`git pull` + `pip install` + `systemctl restart`). This keeps secrets off GitHub entirely.
+> `SECRET_KEY`, `OLLAMA_CLOUD_API_KEY`, and `CHROMA_CLOUD_API_KEY` live only on the EC2 instance in `.env` — they are NOT in GitHub Secrets and NOT deployed by CI/CD. CI/CD only deploys code (`git pull` + `pip install` + `systemctl restart`). This keeps secrets off GitHub entirely.
+
+> **CI/CD workflow note:** The current `ci-cd.yml` uses `DO_SSH_HOST`, `DO_SSH_USER`, `DO_SSH_PRIVATE_KEY` secrets and deploys to DigitalOcean. To deploy to AWS instead, either:
+> 1. Update the workflow to use `AWS_SSH_HOST`, `AWS_SSH_USER`, `AWS_SSH_PRIVATE_KEY`, OR
+> 2. Reuse the existing `DO_SSH_*` secret names but put the AWS values in them, OR
+> 3. Create a separate `ci-cd-aws.yml` workflow for the AWS deployment
+>
+> The simplest approach for a single-target migration: reuse the existing `DO_SSH_*` secret names and put the AWS values in them. The workflow code doesn't need to change — only the secret values and the smoke-test URL.
 
 ---
 
@@ -689,10 +765,10 @@ Your workflow (`.github/workflows/ci-cd.yml`) has **3 jobs** that run sequential
 | Job | What It Does | Runs When |
 |-----|--------------|-----------|
 | **test** | `pytest` with `AI_MOCK=true`, `CI=true`, `DATABASE_URL` + `poppler-utils` | Every push/PR to `main` |
-| **deploy** | SSH to droplet, `git reset --hard origin/main`, recreate venv, `pip install`, `systemctl restart` | Only on `main` push, if test passes |
-| **smoke-test** | `curl https://studyandlearn.duckdns.org/health`, assert HTTP 200 | Only on `main` push, if deploy succeeds |
+| **deploy** | SSH to instance, `git reset --hard origin/main`, recreate venv, `pip install`, `systemctl restart` | Only on `main` push, if test passes |
+| **smoke-test** | `curl https://studyandlearnaws.duckdns.org/health`, assert HTTP 200 | Only on `main` push, if deploy succeeds |
 
-> **What the deploy job does NOT do:** It does NOT run `init_db.sql` (one-time manual setup), does NOT touch `.env` (stays on the droplet), and does NOT run model training (AI is via Ollama Cloud). It only deploys code and restarts the service.
+> **What the deploy job does NOT do:** It does NOT run `init_db.sql` (one-time manual setup), does NOT touch `.env` (stays on the instance), and does NOT run model training (AI is via Ollama Cloud). It only deploys code and restarts the service.
 
 ### Step 11.2: Trigger Your First Deployment
 
@@ -704,7 +780,7 @@ git checkout main
 
 # Make a small change (e.g., edit README.md)
 git add .
-git commit -m "Test CI/CD deployment"
+git commit -m "Test AWS CI/CD deployment"
 git push origin main
 ```
 
@@ -713,8 +789,8 @@ git push origin main
 1. Go to: https://github.com/stephen-cpe/study-and-learn/actions
 2. Click on the running workflow
 3. Watch each job complete (green checkmarks):
-   - **test** — runs pytest (426+ tests, ~4-6 min)
-   - **deploy** — SSH to droplet, pull code, recreate venv, restart service (~1-2 min)
+   - **test** — runs pytest (427+ tests, ~4-6 min)
+   - **deploy** — SSH to EC2, pull code, recreate venv, restart service (~1-2 min)
    - **smoke-test** — curl /health, verify HTTP 200 (~30 sec)
 
 **What to look for:**
@@ -729,7 +805,7 @@ CI/CD Pipeline
 
 **Test the smoke-test endpoint from your browser:**
 ```
-https://studyandlearn.duckdns.org/health
+https://studyandlearnaws.duckdns.org/health
 ```
 
 **Expected response:**
@@ -737,11 +813,11 @@ https://studyandlearn.duckdns.org/health
 {"status":"healthy"}
 ```
 
-**Verify on your droplet:**
+**Verify on your EC2 instance:**
 
 ```bash
-# SSH to your droplet
-ssh root@YOUR_DROPLET_IP
+# SSH to your EC2 instance
+ssh -i ~/.ssh/aws-ec2-key.pem ubuntu@YOUR_EC2_PUBLIC_IP
 
 # Check if code was updated
 cd /home/study-and-learn
@@ -776,6 +852,7 @@ This is the capstone-specific test — verify 3 users can use the app at the sam
 - **Progress polls work:** The `/progress` cosmetic poll updates each user's mascot independently
 - **Generation completes:** The `generation_completed_at` DB column is set per-path, and each user redirects to their own `/lessons` page when done
 - **No 500 errors:** Check `logs/error.log` and `journalctl -u study-and-learn`
+- **No file descriptor exhaustion:** Monitor `ls /proc/$(pgrep -f gunicorn | tail -1)/fd 2>/dev/null | wc -l` during generation — should stay well under 65536
 
 > **If progress bars flicker or sessions cross:** This would indicate a multi-worker issue. Verify the systemd service is using `--workers 1` (single process). Run `sudo systemctl cat study-and-learn` to confirm.
 
@@ -785,22 +862,28 @@ This is the capstone-specific test — verify 3 users can use the app at the sam
 
 Since this is a temporary 3-4 week deployment:
 
-1. **Power off the droplet** (not destroy) if you might need it again:
-   - DigitalOcean Dashboard → Droplets → Power Off
-   - You stop paying for CPU/RAM but keep the disk (small charge)
+1. **Stop the EC2 instance** (not terminate) if you might need it again:
+   - AWS Console → EC2 → Instances → Actions → Stop Instance
+   - You stop paying for compute but still pay for EBS storage (~$0.08/GB-month for gp3)
 
-2. **Destroy the droplet** when completely done:
-   - DigitalOcean Dashboard → Droplets → Destroy
-   - Stops all charges
+2. **Terminate the EC2 instance** when completely done:
+   - AWS Console → EC2 → Instances → Actions → Terminate Instance
+   - Stops all charges (including EBS storage)
+   - ⚠️ **This destroys all data** — take a snapshot first if you want to preserve anything
 
-3. **Optional: Take a snapshot** before destroying:
-   - DigitalOcean Dashboard → Droplets → Snapshots → Take Snapshot
-   - Lets you restore the exact state later (snapshot storage is cheap)
+3. **Optional: Create an AMI snapshot** before terminating:
+   - AWS Console → EC2 → Instances → Actions → Image and templates → Create image
+   - Lets you launch a new instance with the same state later
+   - AMI storage costs ~$0.05/GB-month
 
-4. **Revoke credentials when done:**
+4. **Release the Elastic IP** (if allocated):
+   - AWS Console → EC2 → Elastic IPs → Disassociate → Release Elastic IP address
+   - ⚠️ Elastic IPs incur charges if allocated but NOT associated with a running instance
+
+5. **Revoke credentials when done:**
    - Rotate or revoke the Ollama Cloud API key
    - Rotate or revoke the Chroma Cloud API key
-   - Remove the `DO_SSH_PRIVATE_KEY` from GitHub Secrets
+   - Remove the `AWS_SSH_PRIVATE_KEY` (or `DO_SSH_PRIVATE_KEY`) from GitHub Secrets
    - Delete the DuckDNS domain if no longer needed
 
 ---
@@ -853,14 +936,25 @@ Since this is a temporary 3-4 week deployment:
    sudo systemctl restart nginx
    ```
 
+### Cannot Connect to EC2 Instance (Timeout)
+
+**Error:** SSH or browser connection times out
+
+**Fix:**
+1. Verify your EC2 security group allows inbound SSH (port 22), HTTP (port 80), and HTTPS (port 443)
+2. Verify the instance is running: AWS Console → EC2 → Instances
+3. Verify the Public IPv4 address is correct
+4. Check if the instance has an Elastic IP — if it was stopped and restarted without an Elastic IP, the public IP changed (update DuckDNS)
+
 ### SSL Certificate Issues
 
 **Error:** Certbot fails to verify domain
 
 **Fix:**
-1. Verify DuckDNS is pointing to your droplet: `ping studyandlearn.duckdns.org`
-2. Verify Nginx is running and port 80 is open: `sudo ufw status`
-3. Wait 5 minutes for DNS propagation, then retry certbot
+1. Verify DuckDNS is pointing to your EC2 instance: `ping studyandlearnaws.duckdns.org`
+2. Verify Nginx is running and port 80 is open: `sudo systemctl status nginx`
+3. Verify the AWS security group allows inbound HTTP (port 80) from `0.0.0.0/0`
+4. Wait 5 minutes for DNS propagation, then retry certbot
 
 ### Tests Fail Locally
 
@@ -878,7 +972,7 @@ pytest -v tests/
 ### Deployment Runs But Doesn't Update
 
 **Check:**
-1. SSH key is authorized: `cat ~/.ssh/authorized_keys` (on droplet)
+1. SSH key is authorized: `cat ~/.ssh/authorized_keys` (on EC2 instance)
 2. Directory exists: `ls -la /home/study-and-learn`
 3. Service restarts: `sudo systemctl status study-and-learn`
 4. Git pull works: `cd /home/study-and-learn && git pull origin main`
@@ -893,13 +987,11 @@ pytest -v tests/
 1. Is Ollama Cloud reachable? `curl -H "Authorization: Bearer $OLLAMA_CLOUD_API_KEY" https://ollama.com/api/tags`
 2. Check app logs: `tail -50 /home/study-and-learn/logs/error.log`
 3. Check the DB column: `psql -U study_user -d study_and_learn -c "SELECT id, generation_completed_at FROM study_paths ORDER BY created_at DESC LIMIT 5;"`
-4. If `generation_completed_at` is NULL after 2 hours, the TTS worker may have crashed — check logs for `tts-` thread errors.
+4. If `generation_completed_at` is NULL after 2 hours, the TTS worker may have crashed — check logs for `tts-` thread errors or `OSError: [Errno 24] Too many open files`.
 
 ### TTS Generation Fails (Errno 24: Too many open files)
 
-**Symptom:** Error log shows `OSError: [Errno 24] Too many open files` during TTS-enabled generation, and the worker crashes/restarts.
-
-**Root Cause:** The Linux default file descriptor limit (1024) is too low for a Gunicorn gthread worker doing async I/O. The two-poll JS design opens 2 HTTP connections per 2-second tick, TTS generation opens WebSocket+SSL sockets to Microsoft Edge-TTS (1 per slide), and FileSystemCache + PostgreSQL hold FDs open. Without the raised limit, the worker exhausts FDs and crashes.
+**Symptom:** Error log shows `OSError: [Errno 24] Too many open files` during TTS-enabled generation
 
 **Fix:**
 1. Verify `LimitNOFILE=65536` is in the systemd unit: `grep LimitNOFILE /etc/systemd/system/study-and-learn.service`
@@ -907,131 +999,8 @@ pytest -v tests/
 3. Verify `max_requests` is NOT set in `gunicorn.conf.py`: `grep max_requests gunicorn.conf.py` — should show only the comment explaining why it's omitted
 4. If the limit is still 1024, reload and restart:
    ```bash
-   sudo cp /home/study-and-learn/deploy/study-and-learn.service /etc/systemd/system/
    sudo systemctl daemon-reload
    sudo systemctl restart study-and-learn
    ```
-
-### TTS Worker Crashes Mid-Generation (max_requests)
-
-**Symptom:** Worker restarts ~15-20 minutes into a TTS-enabled generation, killing the background TTS thread. The user is stuck on the results page forever (`generation_completed_at` stays NULL, no redirect fires).
-
-**Root Cause:** `max_requests=1000` in `gunicorn.conf.py` causes Gunicorn to auto-restart the worker after 1000 HTTP requests. The two-poll JS design fires ~1-2 requests per second, so the worker hits 1000 requests in ~15-20 minutes — well before TTS generation (45-90 minutes) finishes. When the worker restarts, the daemon TTS thread is killed, and the `finally` block that sets `generation_completed_at` never runs.
-
-**Fix:**
-1. Verify `max_requests` is NOT set in `gunicorn.conf.py`: `grep max_requests gunicorn.conf.py`
-2. If it's still set, pull the latest code: `cd /home/study-and-learn && git pull origin main && sudo systemctl restart study-and-learn`
-3. If a study path is stuck (generation_completed_at is NULL but lessons were saved), manually set the flag:
-   ```bash
-   sudo -u postgres psql -d study_and_learn -c "UPDATE study_paths SET generation_completed_at = NOW() WHERE generation_completed_at IS NULL AND status='active';"
-   ```
-
-### "View Sources" Button Missing in Production
-
-**Symptom:** The "View Sources" button does not appear in the lesson deck in production, but it works locally on Windows 11.
-
-**Root Cause:** The ChromaDB vector store uses `langchain_ollama.OllamaEmbeddings` to embed query text during RAG retrieval. This class calls the **local Ollama** API (`http://localhost:11434/api/embed`), NOT the Ollama Cloud OpenAI-compatible endpoint. If Ollama is not installed on the droplet (or the `qwen3-embedding:0.6b` model is not pulled), the embedding call fails, ChromaDB returns empty context and empty sources, and lessons are generated without document-grounded context (pure LLM hallucination).
-
-**Diagnosis:**
-```bash
-# 1. Check if Ollama is running
-curl http://localhost:11434/api/tags
-
-# 2. Check for embedding/retrieval errors in the logs
-sudo journalctl -u study-and-learn --since "60 min ago" --no-pager | grep -i "chroma\|retriev\|embed\|source\|Ollama"
-
-# 3. Check if sources are empty in the lesson dict
-sudo -u postgres psql -d study_and_learn -c "SELECT content_data::jsonb->0->>'sources' FROM study_paths ORDER BY created_at DESC LIMIT 1;"
-# If this returns [], sources were not populated
-
-# 4. Check ChromaDB collections for chunks (run inside venv)
-source venv/bin/activate
-python3 -c "
-import os, sys
-sys.path.insert(0, '/home/study-and-learn')
-os.chdir('/home/study-and-learn')
-from dotenv import load_dotenv
-load_dotenv()
-from src.services.vector_store import get_chroma_client
-client = get_chroma_client()
-collections = client.list_collections()
-print(f'Total collections: {len(collections)}')
-for c in collections:
-    print(f'  {c.name}: {c.count()} chunks')
-"
-```
-
-**Fix — If Ollama is not installed (Step 1):**
-```bash
-# Install Ollama
-curl -fsSL https://ollama.com/install.sh | sh
-
-# Pull the embedding model (tiny, ~600 MB, CPU-only)
-ollama pull qwen3-embedding:0.6b
-
-# Verify
-curl http://localhost:11434/api/tags
-
-# Restart the app
-sudo systemctl restart study-and-learn
-```
-
-**Fix — If ChromaDB collections are empty (Step 2):**
-
-If a previous generation ran without Ollama, ChromaDB may have deleted the original collections (thinking they were corrupted) and created empty replacements. You must delete the empty collections and clear `content_registry` so documents are re-ingested from scratch:
-
-```bash
-# Delete all empty ChromaDB collections (run inside venv)
-source venv/bin/activate
-python3 -c "
-import os, sys
-sys.path.insert(0, '/home/study-and-learn')
-os.chdir('/home/study-and-learn')
-from dotenv import load_dotenv
-load_dotenv()
-from src.services.vector_store import get_chroma_client
-client = get_chroma_client()
-collections = client.list_collections()
-print(f'Deleting {len(collections)} collections...')
-for c in collections:
-    client.delete_collection(c.name)
-    print(f'  Deleted: {c.name}')
-print(f'Remaining: {len(client.list_collections())}')
-"
-
-# Clear the content_registry (forces re-ingestion on next upload)
-sudo -u postgres psql -d study_and_learn -c "DELETE FROM content_registry;"
-
-# Cancel and delete existing study paths (they have empty sources baked in)
-sudo -u postgres psql -d study_and_learn -c "UPDATE study_paths SET status='cancelled' WHERE status='active';"
-sudo -u postgres psql -d study_and_learn -c "DELETE FROM lesson_progress WHERE study_path_id IN (SELECT id FROM study_paths WHERE status='cancelled');"
-sudo -u postgres psql -d study_and_learn -c "DELETE FROM study_paths WHERE status='cancelled';"
-
-# Restart the app
-sudo systemctl restart study-and-learn
-```
-
-Then upload documents and generate lessons fresh from the browser. Verify:
-```bash
-# Collections should have chunks
-source venv/bin/activate
-python3 -c "
-import os, sys
-sys.path.insert(0, '/home/study-and-learn')
-os.chdir('/home/study-and-learn')
-from dotenv import load_dotenv
-load_dotenv()
-from src.services.vector_store import get_chroma_client
-client = get_chroma_client()
-for c in client.list_collections():
-    print(f'  {c.name}: {c.count()} chunks')
-"
-
-# Sources should be non-empty
-sudo -u postgres psql -d study_and_learn -c "SELECT content_data::jsonb->0->>'sources' FROM study_paths ORDER BY created_at DESC LIMIT 1;"
-
-# No errors in logs
-sudo journalctl -u study-and-learn --since "10 min ago" --no-pager | grep -i "ERROR\|Failed\|WARNING" | tail -10
-```
 
 ---
