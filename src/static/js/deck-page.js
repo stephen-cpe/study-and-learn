@@ -42,6 +42,27 @@
     pathId = getPathId();
     if (moduleIndex === null) return;
 
+    // Hydrate checkpointAnswers from any persisted answers on the lesson
+    // dict so a resumed session credits the user for checkpoints they
+    // answered in a prior visit. The deck container carries these as a
+    // JSON data-checkpoint-answers attribute ({} when none). Keys are
+    // checkpoint slide_indices (strings) and values are the user's
+    // selections (ints for mcq/cloze, booleans for true_false).
+    var containerEl = document.querySelector('.deck-container');
+    if (containerEl) {
+      try {
+        var raw = containerEl.dataset.checkpointAnswers;
+        if (raw) {
+          var parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') {
+            Object.keys(parsed).forEach(function (k) {
+              checkpointAnswers[String(k)] = parsed[k];
+            });
+          }
+        }
+      } catch (e) { /* malformed attribute — start empty */ }
+    }
+
     var deck = new window.StudyAndLearnDeck({
       onSlideChange: function (event) {
         var state = event.slide.dataset.state;

@@ -396,7 +396,53 @@ def grade_lesson(module_index):
 
     quiz_questions = lesson.get('quiz', {}).get('questions', [])
     checkpoints = lesson.get('checkpoints', {})
-    checkpoint_answers = data.get('checkpoint_answers', {})
+    checkpoint_answers = data.get('checkpoint_answers', {}) or {}
+
+    # ── Persisted checkpoint answers across sessions ─────────────────────
+    # Checkpoint answers are graded formative-style as the user advances
+    # through the deck. Because the deck's JS checkpointAnswers map lives
+    # only in memory, a user who exits mid-lesson (after answering some
+    # checkpoints) and later resumes would otherwise lose those answers —
+    # the final-quiz grade would then count every unsubmitted checkpoint
+    # as wrong, failing a user who actually answered all checkpoints
+    # correctly. To survive a page reload we persist each answered
+    # checkpoint into lesson['checkpoint_user_answers'] (a {slide_index:
+    # value} map on the JSON content_data — no schema change).
+    #
+    # On the final-quiz submission we merge the persisted map with the
+    # freshly-submitted one (fresh wins) so resumers get credit for the
+    # checkpoints they answered in a prior session.
+    persisted_cp_answers = lesson.get('checkpoint_user_answers', {}) or {}
+
+    # ── Final-quiz vs checkpoint-only grading ─────────────────────────────
+    # The deck calls /grade twice:
+    #   (a) Per-checkpoint formative grades — `answers` is empty/absent,
+    #       only `checkpoint_answers` carries the single checkpoint being
+    #       answered. These MUST NOT flip completed/score/passed, otherwise
+    #       a user who exits mid-lesson returns to a "Retry Available /
+    #       Retake Lesson" card that regenerates the module and resets
+    #       deck_position, discarding their progress.
+    #   (b) The final-quiz submission — `answers` carries the per-question
+    #       quiz answers (plus any accumulated checkpoint_answers). This is
+    #       the only call that marks the lesson complete.
+    # Edge case: a lesson with zero quiz questions has no "final quiz" in
+    # the deck, so we fall back to the legacy behavior (any grade POST
+    # finalizes the lesson) to avoid stranding a lesson that can never be
+    # marked complete.
+    is_final_submission = bool(answers) or len(quiz_questions) == 0
+
+    # Merge persisted answers for grading. Fresh submissions take
+    # precedence so a user who re-answers a checkpoint on resume overrides
+    # their earlier choice. checkpoint_answers keys arrive as strings
+    # (JSON object keys) — normalize so lookup against the checkpoints
+    # dict (whose keys are also strings) is consistent.
+    if is_final_submission:
+        effective_cp_answers = dict(persisted_cp_answers)
+        effective_cp_answers.update(
+            {str(k): v for k, v in checkpoint_answers.items()}
+        )
+    else:
+        effective_cp_answers = checkpoint_answers
 
     total_points = len(quiz_questions) + len(checkpoints)
     earned_points = 0
@@ -422,7 +468,7 @@ def grade_lesson(module_index):
 
     checkpoint_results = []
     for slide_idx, cp in checkpoints.items():
-        user_cp = checkpoint_answers.get(slide_idx)
+        user_cp = effective_cp_answers.get(slide_idx)
         cp_correct = _grade_single_question(cp, user_cp)
         if cp_correct:
             earned_points += 1
@@ -440,10 +486,25 @@ def grade_lesson(module_index):
     score_pct = round((earned_points / total_points) * 100)
     passed = score_pct >= PASS_THRESHOLD
 
-    lessons_data[module_index]['completed'] = True
-    lessons_data[module_index]['score'] = score_pct
-    lessons_data[module_index]['passed'] = passed
-    save_lessons(lessons_data, current_user, path_id=path_id)
+    if is_final_submission:
+        lessons_data[module_index]['completed'] = True
+        lessons_data[module_index]['score'] = score_pct
+        lessons_data[module_index]['passed'] = passed
+        save_lessons(lessons_data, current_user, path_id=path_id)
+    else:
+        # Persist the answered checkpoint(s) so a resumed session can
+        # credit them on the final-quiz grade. Only record checkpoints
+        # that actually appear in the lesson's checkpoints dict (defensive
+        # guard against stray/legacy keys).
+        new_persisted = dict(persisted_cp_answers)
+        for k, v in checkpoint_answers.items():
+            if str(k) in checkpoints:
+                new_persisted[str(k)] = v
+        if new_persisted != persisted_cp_answers:
+            lessons_data[module_index]['checkpoint_user_answers'] = (
+                new_persisted
+            )
+            save_lessons(lessons_data, current_user, path_id=path_id)
 
     return jsonify({
         'score': score_pct,
@@ -502,6 +563,10 @@ def retake_lesson(module_index):
     # slide 0 instead of being dropped mid-deck with stale UI from the
     # previous (failed) attempt.
     lessons_data[module_index]['deck_position'] = 0
+    # Clear any persisted checkpoint answers from the prior attempt so the
+    # retake starts with a clean slate (the regenerated checkpoints have
+    # new prompts/options and the old answers no longer apply).
+    lessons_data[module_index].pop('checkpoint_user_answers', None)
     save_lessons(lessons_data, current_user, path_id=path_id)
 
     if tts_enabled:

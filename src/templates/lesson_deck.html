@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/deck-components.css') }}">
 </head>
 <body>
-    <div class="deck-container" data-module-index="{{ module_index }}" data-path-id="{{ path_id or '' }}" data-resume-slide="{{ lesson.get('deck_position', 0) }}" data-tts-enabled="{{ 'true' if lesson.get('tts_enabled') else 'false' }}" data-tts-speaker="{{ lesson.get('tts_speaker', 'Ava') or 'Ava' }}">
+    <div class="deck-container" data-module-index="{{ module_index }}" data-path-id="{{ path_id or '' }}" data-resume-slide="{{ lesson.get('deck_position', 0) }}" data-tts-enabled="{{ 'true' if lesson.get('tts_enabled') else 'false' }}" data-tts-speaker="{{ lesson.get('tts_speaker', 'Ava') or 'Ava' }}" data-checkpoint-answers="{{ lesson.get('checkpoint_user_answers', {}) | tojson }}">
         <a id="save-exit-btn"
            href="{{ url_for('main.lessons', path_id=path_id) }}"
            class="btn-exit-deck"

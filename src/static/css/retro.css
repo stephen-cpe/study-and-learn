@@ -747,6 +747,11 @@ h2, .section-title {
     color: var(--az-muted);
     border: 1px solid var(--az-muted);
 }
+.badge-in-progress {
+    background: rgba(0, 180, 216, 0.15);
+    color: var(--az-cyan);
+    border: 1px solid var(--az-cyan);
+}
 .badge-difficulty {
     display: inline-block;
     font-size: 0.7em;

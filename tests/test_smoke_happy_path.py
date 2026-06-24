@@ -137,6 +137,17 @@ def test_full_happy_path_mocked(client):
     assert 'score' in result
     assert 'passed' in result
 
+    # The final-quiz submission (answers present) must persist completion
+    # status — guards the checkpoint-vs-final-quiz distinction.
+    from src.repositories.lesson_repo import get_lessons as _get_lessons
+    from src.models import User as _U
+    _user = _U.query.filter_by(username='smoker').first()
+    _lessons = _get_lessons(_user)
+    assert _lessons[0]['completed'] is True, (
+        "Final-quiz submission must mark the lesson completed."
+    )
+    assert _lessons[0]['score'] == result['score']
+
     # 6) Retake should reset state
     rv = client.post('/lessons/0/retake')
     assert rv.status_code == 200

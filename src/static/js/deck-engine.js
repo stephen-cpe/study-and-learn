@@ -48,6 +48,7 @@
             this.wheelCooldown = false;
 
             this.bindEvents();
+            this.restoreCheckpointState();
 
             var resumeSlide = parseInt(this.container.dataset.resumeSlide) || 0;
             if (resumeSlide > 0 && resumeSlide < this.totalSlides) {
@@ -55,6 +56,62 @@
             } else {
                 this.goToSlide(0);
             }
+        }
+
+        // Visually restore previously-answered checkpoints on a resumed
+        // session. The deck container carries persisted answers as a JSON
+        // data-checkpoint-answers attribute; deck-page.js hydrates the
+        // shared checkpointAnswers map from it. Here we reflect each
+        // persisted answer onto the matching checkpoint slide so the user
+        // sees their prior selection (and the slide unblocks advancement)
+        // without having to re-answer. This is cosmetic + flow only — the
+        // authoritative grading uses the persisted map on the server.
+        restoreCheckpointState() {
+            var persisted = {};
+            try {
+                var raw = this.container.dataset.checkpointAnswers;
+                if (raw) {
+                    var parsed = JSON.parse(raw);
+                    if (parsed && typeof parsed === 'object') persisted = parsed;
+                }
+            } catch (e) { /* malformed — ignore */ }
+
+            Object.keys(persisted).forEach((slideIdx) => {
+                var slide = this.container.querySelector(
+                    '.checkpoint-slide[data-checkpoint="' + slideIdx + '"]'
+                );
+                if (!slide || slide.dataset.answered === 'true') return;
+                var value = persisted[slideIdx];
+                var cpType = slide.dataset.cpType || 'mcq';
+
+                if (cpType === 'true_false') {
+                    var tfOpt = slide.querySelector(
+                        '.checkpoint-option[data-value="' + (value ? 'true' : 'false') + '"]'
+                    );
+                    if (tfOpt) tfOpt.classList.add('selected');
+                } else if (cpType === 'cloze_dropdown') {
+                    var sel = slide.querySelector('.checkpoint-select');
+                    if (sel && value !== null && value !== undefined) {
+                        sel.value = String(value);
+                        sel.classList.add('has-value');
+                    }
+                } else {
+                    var opt = slide.querySelector(
+                        '.checkpoint-option[data-value="' + parseInt(value, 10) + '"]'
+                    );
+                    if (opt) opt.classList.add('selected');
+                }
+
+                var fb = slide.querySelector('.checkpoint-feedback');
+                if (fb) {
+                    fb.style.display = 'block';
+                    fb.className = 'checkpoint-feedback correct';
+                    fb.textContent = 'Answered (saved from your last visit).';
+                }
+                slide.dataset.answered = 'true';
+                var select = slide.querySelector('.checkpoint-select');
+                if (select) select.disabled = true;
+            });
         }
 
         bindEvents() {

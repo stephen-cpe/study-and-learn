@@ -51,6 +51,8 @@
                         {% else %}
                         <span class="badge badge-failed">{{ lesson.score }}% — Retry Available</span>
                         {% endif %}
+                    {% elif lesson.get('deck_position', 0) > 0 %}
+                        <span class="badge badge-in-progress">In Progress</span>
                     {% elif not lesson.unlocked %}
                         <span class="badge badge-locked">Locked</span>
                     {% endif %}
@@ -96,6 +98,8 @@
                     Retake Lesson
                     {% elif lesson.completed and lesson.passed %}
                     Review Lesson
+                    {% elif lesson.get('deck_position', 0) > 0 %}
+                    Resume Lesson
                     {% else %}
                     Start Lesson
                     {% endif %}
