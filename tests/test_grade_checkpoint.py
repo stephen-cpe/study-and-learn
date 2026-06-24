@@ -259,6 +259,20 @@ class TestLessonsPageUIStates:
         c.post('/login', data={'username': 'gradetester', 'password': 'pass'})
         return c.get(f'/lessons?path_id={path_id}')
 
+    @staticmethod
+    def _cards_only(body):
+        """Return only the lesson-card markup, stripping inline <script>
+        blocks. The lessons page includes a retake-handler script whose
+        literal strings ('Retake Lesson', '.lesson-retake-btn') would
+        otherwise false-positive against whole-page substring checks.
+        The cards live inside <div class="lessons-grid">...</div>."""
+        import re
+        m = re.search(
+            r'<div class="lessons-grid">(.*?)</div>\s*<div class="action-buttons',
+            body, flags=re.DOTALL,
+        )
+        return m.group(1) if m else body
+
     def test_in_progress_lesson_shows_resume_and_in_progress_badge(
             self, grade_client):
         """A not-completed lesson with deck_position > 0 must show
@@ -271,16 +285,17 @@ class TestLessonsPageUIStates:
         }])
         with app.test_client() as c:
             body = self._login_and_view(c, path_id).get_data(as_text=True)
-        assert 'Resume Lesson' in body, (
+        cards = self._cards_only(body)
+        assert 'Resume Lesson' in cards, (
             "An in-progress lesson (deck_position > 0, not completed) must "
             "offer 'Resume Lesson', not 'Retake Lesson'."
         )
-        assert 'In Progress' in body, (
+        assert 'In Progress' in cards, (
             "An in-progress lesson must show the 'In Progress' badge, not "
             "'Retry Available'."
         )
-        assert 'Retry Available' not in body
-        assert 'Retake Lesson' not in body
+        assert 'Retry Available' not in cards
+        assert 'lesson-retake-btn' not in cards
 
     def test_failed_lesson_still_shows_retake(self, grade_client):
         """Guard against over-correction: a genuinely failed lesson
@@ -293,10 +308,105 @@ class TestLessonsPageUIStates:
         }])
         with app.test_client() as c:
             body = self._login_and_view(c, path_id).get_data(as_text=True)
-        assert 'Retake Lesson' in body
-        assert 'Retry Available' in body
-        assert 'Resume Lesson' not in body
-        assert 'In Progress' not in body
+        cards = self._cards_only(body)
+        assert 'Retake Lesson' in cards
+        assert 'Retry Available' in cards
+        assert 'Resume Lesson' not in cards
+        assert 'In Progress' not in cards
+
+    def test_failed_lesson_card_renders_retake_button_not_deck_link(
+            self, grade_client):
+        """Regression: a failed-lesson card must render a retake TRIGGER
+        (button posting to /retake) — NOT a plain <a> linking to the deck
+        route. The plain link dropped users onto the stale final-quiz
+        slide instead of regenerating the lesson.
+
+        The card must carry the .lesson-retake-btn class with the
+        module_index + path_id data attributes the inline JS binds to,
+        and the page must include the inline handler that POSTs to
+        /lessons/<i>/retake. Crucially the card must NOT link to
+        /lessons/<i>?path_id=... (the deck route) for the failed module.
+        """
+        app, user = grade_client
+        path_id = _seed_path(app, user, module_overrides=[{
+            'completed': True, 'passed': False, 'score': 40,
+            'deck_position': 5,
+        }])
+        with app.test_client() as c:
+            body = self._login_and_view(c, path_id).get_data(as_text=True)
+        cards = self._cards_only(body)
+        # The retake trigger button is present with the right wiring.
+        assert 'lesson-retake-btn' in cards, (
+            "Failed-lesson card must render a .lesson-retake-btn button."
+        )
+        assert 'data-module-index="0"' in cards
+        assert f'data-path-id="{path_id}"' in cards
+        # The inline handler that POSTs to /retake is on the page.
+        assert "/lessons/' + mIdx + '/retake" in body, (
+            "Inline retake handler must POST to /lessons/<i>/retake."
+        )
+        assert "Regenerating..." in body, (
+            "The retake button must show 'Regenerating...' while the POST "
+            "is in flight, matching the in-deck retake button."
+        )
+        # The failed-lesson card must NOT link to the deck route (which
+        # would land the user on the stale final-quiz slide). The deck
+        # link href uses url_for('main.lesson_deck', module_index=0, ...).
+        assert 'lesson-start-btn' not in cards, (
+            "A failed-lesson card must not render a .lesson-start-btn deck "
+            "link — it must use the retake POST button instead."
+        )
+
+    def test_retake_post_from_card_regenerates_and_resets(
+            self, grade_client):
+        """End-to-end: hitting the retake POST (as the card's inline
+        handler does) regenerates the lesson, resets deck_position to 0,
+        and returns a redirect to the fresh deck — not the stale final
+        quiz."""
+        from unittest.mock import patch
+        app, user = grade_client
+        path_id = _seed_path(app, user, module_overrides=[{
+            'completed': True, 'passed': False, 'score': 40,
+            'deck_position': 9,
+        }])
+        with app.test_client() as c:
+            c.post('/login', data={'username': 'gradetester',
+                                   'password': 'pass'})
+            with patch('src.services.quiz_generator.call_ollama') as mq, \
+                    patch('src.services.lesson_generator.call_ollama') as ml:
+                mq.return_value = json.dumps({
+                    'questions': [{
+                        'id': 'q_new', 'type': 'mcq', 'prompt': 'N?',
+                        'options': ['A', 'B', 'C', 'D'],
+                        'answer_index': 0, 'explanation': 'E',
+                    }]
+                })
+                ml.return_value = json.dumps({
+                    'module_title': 'Module 1',
+                    'slides': [
+                        {'type': 'title', 'title': 'T', 'subtitle': ''},
+                    ],
+                })
+                resp = c.post(
+                    f'/lessons/0/retake?path_id={path_id}',
+                    data=json.dumps({'path_id': path_id}),
+                    content_type='application/json',
+                )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['success'] is True
+        assert 'redirect' in data
+        assert '/lessons/0' in data['redirect']
+        assert f'path_id={path_id}' in data['redirect']
+        with app.app_context():
+            lessons = get_lessons(user, path_id=path_id)
+            assert lessons[0]['deck_position'] == 0, (
+                "Retake must reset deck_position so the user starts from "
+                "slide 0, not the stale final-quiz position."
+            )
+            assert lessons[0]['completed'] is False
+            assert lessons[0]['passed'] is False
+            assert lessons[0]['score'] is None
 
     def test_passed_lesson_shows_review(self, grade_client):
         """A passed lesson must show 'Review Lesson' and 'Passed'."""
@@ -307,10 +417,11 @@ class TestLessonsPageUIStates:
         }])
         with app.test_client() as c:
             body = self._login_and_view(c, path_id).get_data(as_text=True)
-        assert 'Review Lesson' in body
-        assert 'Passed' in body
-        assert 'Retake Lesson' not in body
-        assert 'Resume Lesson' not in body
+        cards = self._cards_only(body)
+        assert 'Review Lesson' in cards
+        assert 'Passed' in cards
+        assert 'lesson-retake-btn' not in cards
+        assert 'Resume Lesson' not in cards
 
     def test_fresh_lesson_shows_start(self, grade_client):
         """A fresh, never-started lesson (deck_position == 0, not completed)
@@ -322,10 +433,11 @@ class TestLessonsPageUIStates:
         }])
         with app.test_client() as c:
             body = self._login_and_view(c, path_id).get_data(as_text=True)
-        assert 'Start Lesson' in body
-        assert 'Resume Lesson' not in body
-        assert 'Retake Lesson' not in body
-        assert 'In Progress' not in body
+        cards = self._cards_only(body)
+        assert 'Start Lesson' in cards
+        assert 'Resume Lesson' not in cards
+        assert 'lesson-retake-btn' not in cards
+        assert 'In Progress' not in cards
 
 
 # ── Resume after checkpoints: persisted answers credited on final quiz ──────

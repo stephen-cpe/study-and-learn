@@ -91,12 +91,20 @@
 
             <div class="lesson-actions">
                 {% if lesson.unlocked %}
+                {% if lesson.completed and not lesson.passed %}
+                {# Failed lesson: fire the /retake POST (regenerate + reset),
+                   NOT a plain deck link. Mirrors the in-deck results-page
+                   retake button so both entry points behave identically. #}
+                <button class="btn btn-primary btn-lg w-100 lesson-retake-btn"
+                        data-module-index="{{ lesson.index }}"
+                        data-path-id="{{ path_id }}">
+                    Retake Lesson
+                </button>
+                {% else %}
                 <a href="{{ url_for('main.lesson_deck', module_index=lesson.index, path_id=path_id) }}"
                    class="btn btn-primary btn-lg w-100 lesson-start-btn"
                    data-requires-audio-ready="{{ 'true' if tts_status == 'pending' else 'false' }}">
-                    {% if lesson.completed and not lesson.passed %}
-                    Retake Lesson
-                    {% elif lesson.completed and lesson.passed %}
+                    {% if lesson.completed and lesson.passed %}
                     Review Lesson
                     {% elif lesson.get('deck_position', 0) > 0 %}
                     Resume Lesson
@@ -104,6 +112,7 @@
                     Start Lesson
                     {% endif %}
                 </a>
+                {% endif %}
                 {% if lesson.passed %}
                 <a href="{{ url_for('main.export_lesson_pdf', module_index=lesson.index, path_id=path_id) }}" class="btn btn-export btn-sm w-100 mt-2">Export PDF</a>
                 {% endif %}
@@ -200,4 +209,43 @@
   })();
 </script>
 {% endif %}
+
+<script>
+  // Retake Lesson handlers for failed-lesson cards on the modules list.
+  // Mirrors the in-deck results-page retake button so both entry points
+  // POST to /lessons/<i>/retake (regenerate + reset deck_position) and
+  // navigate to the redirected deck — instead of a plain GET deck link
+  // that would drop the user onto the stale final quiz slide.
+  (function () {
+    'use strict';
+    document.querySelectorAll('.lesson-retake-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var mIdx = btn.getAttribute('data-module-index');
+        var pId = btn.getAttribute('data-path-id') || '';
+        btn.disabled = true;
+        btn.textContent = 'Regenerating...';
+        fetch('/lessons/' + mIdx + '/retake', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path_id: pId })
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data && data.success && data.redirect) {
+              window.location.href = data.redirect;
+            } else {
+              btn.disabled = false;
+              btn.textContent = 'Retake Lesson';
+              alert('Error regenerating the lesson. Please try again.');
+            }
+          })
+          .catch(function () {
+            btn.disabled = false;
+            btn.textContent = 'Retake Lesson';
+            alert('Error regenerating the lesson. Please try again.');
+          });
+      });
+    });
+  })();
+</script>
 {% endblock %}
