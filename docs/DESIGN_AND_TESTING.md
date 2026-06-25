@@ -3,7 +3,7 @@
 
 **Version:** 1.0
 **Status:** Living document
-**Last updated:** June 22, 2026
+**Last updated:** June 24, 2026
 
 ---
 
@@ -14,11 +14,39 @@ Study-and-Learn is a Flask web application with a Bootstrap-and-retro-CSS fronte
 ```mermaid
 flowchart TD
     A["Unified Form: Goal + Files"] --> B["POST /process Route"]
-    B --> C["Document Parser: .txt, .md, .pdf, .docx, .pptx"]
-    B --> C2["Vision Parser: .png, .jpg, .jpeg"]
-    C --> C3["OCR Pipeline: GLM-OCR local + Qwen3.5 cloud"]
-    C2 --> C3
-    C3 --> D["Chunker: RecursiveCharacterTextSplitter"]
+    B --> BCHK{"File hash in<br/>ContentRegistry?<br/>(route-level dedup)"}
+    BCHK -->|Yes| D["Chunker: RecursiveCharacterTextSplitter"]
+    BCHK -->|No| EXT["extract_text_with_vision()"]
+
+    EXT -->|.txt / .md| BASIC["Basic raw-text read<br/>(pypdf / python-docx / python-pptx NOT used)"]
+    BASIC --> REG["register_content(hash, text)"]
+    REG --> D
+
+    EXT -->|.pdf / .docx / .pptx / images| CACHE{"Cached in<br/>ContentRegistry?<br/>(parser-level dedup)"}
+    CACHE -->|Yes| D
+    CACHE -->|No| TXT["Basic text-layer extraction<br/>(pypdf / python-docx / python-pptx)"]
+    TXT --> VMODE{"File type?"}
+
+    VMODE -->|.png / .jpg / .jpeg| IMG["Images ALWAYS enter OCR loop<br/>(bypass the OCR_FULL early-return guard)"]
+    VMODE -->|.pdf / .docx / .pptx| OFULL{"OCR_FULL=true?"}
+    OFULL -->|No — DEFAULT / PRODUCTION| SKIP["Early return:<br/>basic text only, no OCR, no figures"]
+    SKIP --> REG
+    OFULL -->|Yes| IMG
+
+    IMG --> OLOOP["OCR loop (per page/image)"]
+    OLOOP --> OMULT{"OCR_FULL=true?"}
+    OMULT -->|No| OTEXT["GLM-OCR local — text mode only"]
+    OMULT -->|Yes| OALL["GLM-OCR local — text + table + figure modes"]
+    OTEXT --> FMERGE
+    OALL --> FMERGE
+    FMERGE["merge OCR output<br/>into parts[]"]
+    FMERGE --> FDESC{"OCR_FIGURE_DESCRIPTION=true?"}
+    FDESC -->|No — DEFAULT / PRODUCTION| FSKIP["Qwen3.5 cloud SKIPPED"]
+    FSKIP --> DONE
+    FDESC -->|Yes| FIG["Qwen3.5 cloud<br/>(OLLAMA_VISION_MODEL)<br/>per-image figure descriptions"]
+    FIG --> DONE["register_content(hash, result)<br/>cleanup _ocr_temp/"]
+    DONE --> D
+
     D --> E["Vector Store: Content-Keyed ChromaDB (doc_{hash})"]
     E --> F["RAG Retriever: Multi-Collection top-k=5 context + sources metadata"]
     F --> G["Summarizer"]
@@ -52,34 +80,46 @@ flowchart TD
     V --> O
 ```
 
+**Two-level deduplication.** The route (`processing.py:160`) checks `is_content_registered()` and short-circuits duplicate files to the Chunker without invoking any parser. A second cache check inside `vision_parser.extract_text_with_vision()` (line 366) catches files that were registered by a prior request.
+
+**Text extraction (no AI).** `.txt`/`.md` are raw-read and never touch OCR. `.pdf`/`.docx`/`.pptx` always attempt a basic text-layer pass (pypdf / python-docx / python-pptx) **regardless of `OCR_FULL`** — the extracted text becomes the corpus when `OCR_FULL=false`.
+
+**GLM-OCR gating.** The early-return guard at `vision_parser.py:389` only fires for `.pdf`/`.docx`/`.pptx` when `OCR_FULL=false`. Image files (`.png`/`.jpg`/`.jpeg`) **always** enter the OCR loop and always run GLM-OCR in at least `text` mode — there is no way to disable OCR for images short of rejecting the file type at upload.
+
+**Qwen3.5 cloud gating.** `describe_figure()` (line 332) returns `""` immediately when `OCR_FIGURE_DESCRIPTION=false`. Even when `OCR_FULL=true`, Qwen3.5 only runs if `OCR_FIGURE_DESCRIPTION=true` is also set — the two flags are independent toggles, not a pair.
+
+**Default / production config.** The shipped defaults (`.env.example`) and the production droplet config (see `digitalocean-deployment-guide.md` lines 257-258) are `OCR_FULL=false` + `OCR_FIGURE_DESCRIPTION=false`. Under this config, the live pipeline is: raw read for `.txt`/`.md`, text-layer extraction for `.pdf`/`.docx`/`.pptx`, and GLM-OCR **text-mode-only** for images. Qwen3.5 cloud never executes.
+
 Core workflow:
 
 1. User enters a learning goal and uploads study documents in a single unified form.
 2. Backend validates and stores uploads.
-3. Document parser extracts text from `.txt`, `.md`, `.pdf`, `.docx`, `.pptx`.
-4. Vision parser renders pages/images and runs AI-powered OCR (GLM-OCR local, Qwen3.5 cloud) for `.png`, `.jpg`, `.jpeg`, and scanned PDFs.
-5. File hashes are computed, ContentRegistry check skips duplicates globally.
-6. RAG pipeline chunks, embeds, stores, and retrieves relevant context from content-keyed ChromaDB collections.
-7. AI services generate summary and relevance check.
-8. If weak match → display alternative feedback card (study path + lesson generation gated). Otherwise → full pipeline.
-9. AI generates study path (if not gated).
-10. Results page displays structured output: summary, relevance (with partial warning banners or weak feedback card), and study path (if applicable).
-11. User clicks "Generate Interactive Lessons" to produce slide-based lessons (if not gated by weak relevance).
-12. AI generates lesson slides + inline checkpoints + mixed-type quiz per module.
-12a. If TTS is enabled (user opt-in), an AI-generated narration script is produced
+3. Route-level dedup: file hash is checked against `ContentRegistry`; duplicates skip parsing entirely and flow straight to the Chunker.
+4. **Document parser** extracts text from `.txt`, `.md`, `.pdf`, `.docx`, `.pptx` via the basic text-layer path (pypdf / python-docx / python-pptx). `.txt`/`.md` stop here — no OCR.
+5. **Vision parser** runs for `.png`, `.jpg`, `.jpeg` (and for `.pdf`/`.docx`/`.pptx` **only when `OCR_FULL=true`**): renders pages/images, runs AI-powered OCR (GLM-OCR local, text mode by default; text+table+figure modes when `OCR_FULL=true`). Image files always enter the OCR loop regardless of `OCR_FULL`.
+6. When `OCR_FIGURE_DESCRIPTION=true`, per-image figure descriptions are additionally generated via Qwen3.5 cloud (`OLLAMA_VISION_MODEL`). Disabled by default.
+7. File hashes are computed and the extracted corpus is registered in `ContentRegistry` (second-level dedup).
+8. RAG pipeline chunks, embeds, stores, and retrieves relevant context from content-keyed ChromaDB collections.
+9. AI services generate summary and relevance check.
+10. If weak match → display alternative feedback card (study path + lesson generation gated). Otherwise → full pipeline.
+11. AI generates study path (if not gated).
+12. Results page displays structured output: summary, relevance (with partial warning banners or weak feedback card), and study path (if applicable).
+13. User clicks "Generate Interactive Lessons" to produce slide-based lessons (if not gated by weak relevance).
+14. AI generates lesson slides + inline checkpoints + mixed-type quiz per module.
+14a. If TTS is enabled (user opt-in), an AI-generated narration script is produced
      per module (tutor-voice, personalized intro/outro) and converted to per-slide MP3
      files via Edge-TTS (Microsoft Neural voices). Audio files are stored under
      data/tts/<path_id>/<module_index>/ and served via authenticated Flask routes.
-12b. Difficulty level (Easy/Normal/Hard, from user settings at generation time) is
+14b. Difficulty level (Easy/Normal/Hard, from user settings at generation time) is
      injected into all lesson and quiz prompts and snapshotted into each lesson record.
-12c. Deck slide position is auto-saved to DB on every slide change (debounced 500ms),
+14c. Deck slide position is auto-saved to DB on every slide change (debounced 500ms),
      enabling session resume on revisit.
-13. Source citation metadata (chunk provenance) is preserved through retrieval and stored alongside lesson artifacts.
-14. Custom CSS/JS slide deck presents lessons with retro fonts, checkpoint blocking, and a "View Sources" button in the controls bar (opens modal overlay with document excerpts).
-15. Learner completes quiz, receives instant grading with per-question feedback.
-16. Failed modules can be retaken with fresh regenerated questions.
-17. Progression is gated (80% pass threshold required to unlock next module).
-18. Passed lessons can be exported to PDF via a per-lesson export button (slides, checkpoints, quiz answers, source materials).
+15. Source citation metadata (chunk provenance) is preserved through retrieval and stored alongside lesson artifacts.
+16. Custom CSS/JS slide deck presents lessons with retro fonts, checkpoint blocking, and a "View Sources" button in the controls bar (opens modal overlay with document excerpts).
+17. Learner completes quiz, receives instant grading with per-question feedback.
+18. Failed modules can be retaken with fresh regenerated questions.
+19. Progression is gated (80% pass threshold required to unlock next module).
+20. Passed lessons can be exported to PDF via a per-lesson export button (slides, checkpoints, quiz answers, source materials).
 
 ---
 
@@ -210,7 +250,7 @@ Core workflow:
 
 **Decision:** Preserve chunk-level provenance metadata (chunk ID, source hash, filename, full chunk text) from ChromaDB retrieval through the entire pipeline: `retrieve_from_multiple_collections_with_sources()` → `build_rag_context_for_module()` → `generate_lesson()` → `build_module_artifacts()` → `save_lessons()`. Store sources in the lesson JSON alongside slides/quiz/checkpoints. Render them via a "View Sources" button in the slide deck controls bar that opens a modal overlay (not a slide, so it never blocks navigation). A parallel `file_names` JSON column on `StudyPath` provides human-readable filenames for citation display.
 
-**Reason:** The critical provenance break was at `vector_store.py:181` where `retrieve_from_multiple_collections()` discarded all metadata (joining only document text). The function `retrieve_with_scores()` already queried ChromaDB with `include=["documents", "distances", "metadatas"]` — the data was available but thrown away. Adding a parallel `retrieve_from_multiple_collections_with_sources()` that returns `{"context_text": str, "sources": [...]}` required updating the retriever callable signature from `Callable[[str], str]` to `Callable[[str], Dict[str, Any]]` across 6 service files. The `isinstance(result, dict)` fallback in quiz/checkpoint generators maintains backward compatibility with string-only mock retrievers in tests. Tradeoffs: ✅ Deterministic provenance (no LLM hallucination risk), one-click source access, existing `retrieve_with_scores()` infra already in place ❌ ~6 service file signature changes, `file_names` DB column added, retriever type change ripples to all callers
+**Reason:** The critical provenance break was at `vector_store.py:245` where `retrieve_from_multiple_collections()` discarded all metadata (joining only document text). The function `retrieve_with_scores()` already queried ChromaDB with `include=["documents", "distances", "metadatas"]` — the data was available but thrown away. Adding a parallel `retrieve_from_multiple_collections_with_sources()` that returns `{"context_text": str, "sources": [...]}` required updating the retriever callable signature from `Callable[[str], str]` to `Callable[[str], Dict[str, Any]]` across 6 service files. The `isinstance(result, dict)` fallback in quiz/checkpoint generators maintains backward compatibility with string-only mock retrievers in tests. Tradeoffs: ✅ Deterministic provenance (no LLM hallucination risk), one-click source access, existing `retrieve_with_scores()` infra already in place ❌ ~6 service file signature changes, `file_names` DB column added, retriever type change ripples to all callers
 
 ### ADR-021: Dashboard Tabs + StudyPath Status Lifecycle
 
@@ -425,7 +465,7 @@ Integration tests cover routes and workflow behavior:
 - mocked generate-lessons flow: session data → lesson + quiz generation → redirect,
 - lesson deck route with pre-populated session lessons returns 200.
 
-Current test suite: 427 tests passing (Sprint 8 active — suite rebuilt from Tasks 1–11 + deployment bug fixes).
+Current test suite: 445 tests passing (Sprint 8 complete — suite rebuilt from Tasks 1–11 + deployment bug fixes).
 Sprint 7 test additions cover: TTS service (5), narration script (4), cloze_dropdown grading
 (3), checkpoint variety (3), humor/difficulty prompt injection (5), route-level TTS flags (3),
 save-position (2), audio routes (2), difficulty snapshotting (1), extracted_texts cleanup (1).
@@ -504,11 +544,11 @@ The deployed version should be stable enough for capstone demonstration and acce
 ---
 
 ## 9. Deployment Strategy & Cost Analysis
-- Option A: Local-First Demo (Current)
+- Option A: Local-First Demo (Dev/Local Only)
   - Host: Developer laptop running Ollama + Flask
   - Cost: $0 (uses existing hardware)
   - Tradeoff: Not publicly accessible; suitable for sprint demos & local dev
-- Option B: Cloud VPS (Selected for Submission)
+- Option B: Cloud VPS (Deployed — Current Production)
   - Host: DigitalOcean droplet (Basic, Regular, 4 vCPU / 8 GB RAM / 160 GB disk, $48/month)
   - Cost: $48/month (temporary 3-4 week deployment); the 8 vCPU / 16 GB RAM / 320 GB SSD tier ($96/month) was rejected because DigitalOcean requires a $50 prepayment to unlock it
   - AI Strategy: All AI inference offloaded to Ollama Cloud via `AI_BACKEND=cloud` (`OLLAMA_MODEL=gemma3:27b-cloud`); `AI_MOCK=true` remains the deterministic-demo fallback

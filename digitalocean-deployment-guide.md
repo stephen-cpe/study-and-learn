@@ -3,7 +3,7 @@
 ### Complete Guide for Windows 11 Users
 
 ## Disclaimer
-_This guide is a work in progress. Use at your own risk. No warranties, guarantees, or support are provided._
+_This guide documents the deployed production configuration (Sprint 8, capstone submission). Reproduces the live DigitalOcean droplet hosting https://studyandlearn.duckdns.org._
 
 ---
 
@@ -754,7 +754,7 @@ sudo systemctl status study-and-learn
 curl http://127.0.0.1:5000/health
 ```
 
-**Your app is deployed with CI/CD.** Every future `git push origin main` will automatically test, deploy, and verify.
+**Your app is deployed with CI/CD.** Every `git push origin main` automatically tests, deploys, and verifies (verified live during Sprint 8).
 
 ---
 

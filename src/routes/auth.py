@@ -99,7 +99,7 @@ def reset_password():
 @bp.route('/settings', methods=['GET', 'POST'])
 @login_required
 def settings():
-    """User preferences — avatar, TTS, lesson difficulty (placeholders)."""
+    """User preferences — avatar, TTS narration toggle/speaker, lesson difficulty."""
     if request.method == 'POST':
         _, message = apply_settings(
             current_user,

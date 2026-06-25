@@ -6,7 +6,7 @@
 **Capstone track:** Software system / AI system  
 **Repository name:** `study-and-learn`  
 **Primary development approach:** Spec-Driven Development with AI tooling support  
-**Last updated:** June 19, 2026
+**Last updated:** June 24, 2026
 
 ---
 
@@ -499,14 +499,14 @@ study-and-learn/
 | US-040 | As a learner, I want my lesson session to be cleaned up after generation so the server doesn't accumulate stale data. | extracted_texts nullified after generate_lessons completes; session bloat prevented |
 | US-041 | As a learner, I want to save my slide position and resume where I left off so I don't lose my place. | deck_position auto-saved to content_data JSON on every slide advance (debounced 500ms); restored on revisit; "Start Over" button resets to 0; "Exit & Save" button explicit |
 
-### Epic 10: Final Deployment & Capstone Submission (Sprint 8)
+### Epic 10: Final Deployment & Capstone Submission (Sprint 8) ✅ COMPLETE
 
 | Story ID | User Story | Acceptance Criteria |
 |---|---|---|
-| US-042 | As a reviewer, I want a deployed web app link so I can evaluate the capstone without local setup. | Deployed to DigitalOcean cloud VPS; all routes and features functional in production; demo link in README |
-| US-043 | As a developer, I want production environment variables configured so the deployed app runs the correct AI and DB backends. | AI_BACKEND=cloud, CHROMA_DB=cloud, DATABASE_URL, SECRET_KEY, OLLAMA_MODEL set in production; local Ollama running with qwen3-embedding:0.6b for ChromaDB RAG retrieval; AI_MOCK=true documented as demo fallback |
-| US-044 | As a reviewer, I want a recorded 15–20 minute demo so I can evaluate the full workflow. | Demo script covers goal → upload → results → lessons → quiz → grade → retake; recording submission-ready |
-| US-045 | As a developer, I want all documentation finalized and CI passing so the capstone submission is complete. | DESIGN_AND_TESTING.md, AI_AGENT_PROTOCOL.md, task board all reflect final Sprint 8 state; CI pipeline green; grader GitHub access confirmed |
+| US-042 | As a reviewer, I want a deployed web app link so I can evaluate the capstone without local setup. | Deployed to DigitalOcean cloud VPS; all routes and features functional in production; demo link in README ✅ DONE |
+| US-043 | As a developer, I want production environment variables configured so the deployed app runs the correct AI and DB backends. | AI_BACKEND=cloud, CHROMA_DB=cloud, DATABASE_URL, SECRET_KEY, OLLAMA_MODEL set in production; local Ollama running with qwen3-embedding:0.6b for ChromaDB RAG retrieval; AI_MOCK=true documented as demo fallback ✅ DONE |
+| US-044 | As a reviewer, I want a recorded 15–20 minute demo so I can evaluate the full workflow. | Demo script covers goal → upload → results → lessons → quiz → grade → retake; recording submission-ready ✅ DONE |
+| US-045 | As a developer, I want all documentation finalized and CI passing so the capstone submission is complete. | DESIGN_AND_TESTING.md, AI_AGENT_PROTOCOL.md, task board all reflect final Sprint 8 state; CI pipeline green; grader GitHub access confirmed ✅ DONE |
 
 ---
 
@@ -536,7 +536,7 @@ study-and-learn/
 - Server-side session storage (Flask-Session + cachelib).
 - Custom CSS/JS slide-deck engine (retro-themed).
 - Content-addressable global deduplication (SHA-256 + ContentRegistry).
-- pytest test suite (427 tests).
+- pytest test suite (445 tests).
 - GitHub Actions CI/CD pipeline (test → deploy → smoke-test).
 - Static public task board.
 - Design and testing document.
@@ -621,7 +621,7 @@ Ranked from easier to harder. Items above the line are implemented; items below 
 45. cloze_dropdown replaces fill_blank — done (legacy compat preserved)
 46. Humor injection in quiz distractors — done (HUMOR_INSTRUCTIONS in quiz prompt)
 
-### Sprint 8 (Active)
+### Sprint 8 ✅ COMPLETE
 47. Deployment to a cloud VPS (DigitalOcean)
 48. Final documentation and demo recording
 49. Capstone submission

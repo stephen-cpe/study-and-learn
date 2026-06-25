@@ -3,7 +3,7 @@
 ### *Turn Any Documents into Interactive, Personalized Learning Experiences*
 
 **Purpose:** This document organizes the capstone work into MVP tasks, user stories, sprints, stretch goals, and submission requirements.  
-**Last updated:** June 19, 2026
+**Last updated:** June 24, 2026
 
 ---
 
@@ -223,7 +223,7 @@ Build the smallest working version first, then iterate:
 - [x] Write 5 additional parser tests (pptx, image, dedup)
 - [x] Write 4 additional RAG tests (multi-collection retrieval, metadata)
 - [x] Add `ollama pull glm-ocr` to README setup instructions
-- [x] Run full test suite — 172 passing tests at Sprint 6 close (143 original + 29 new); suite has since grown to 427 tests by Sprint 8
+- [x] Run full test suite — 172 passing tests at Sprint 6 close (143 original + 29 new); suite has since grown to 445 tests by Sprint 8
 
 **Sprint 6 Definition of Done:**
 - OCR pipeline processes scanned PDFs with text/table/figure recognition
@@ -232,7 +232,7 @@ Build the smallest working version first, then iterate:
 - Multi-collection retrieval merges results across all uploaded documents
 - Progress bar shows 9 stages including OCR progress
 - All new features gated behind env vars (OCR_FULL, OCR_FIGURE_DESCRIPTION, AI_MOCK)
-- 172 tests passing at Sprint 6 close (suite is now 427 tests as of Sprint 8)
+- 172 tests passing at Sprint 6 close (suite is now 445 tests as of Sprint 8)
 - README updated with OCR setup instructions
 
 ---
@@ -282,7 +282,7 @@ deferred to Sprint 8 and completed there (kept privately outside the repo for th
 
 ---
 
-### Sprint 8: Final Deployment & Capstone Demo 🟡 CURRENT FOCUS
+### Sprint 8: Final Deployment & Capstone Demo ✅ COMPLETE
 
 **Goal:** Deploy to a cloud VPS (DigitalOcean), finalize documentation, record demo, fix remaining bugs, and submit capstone.
 
@@ -291,16 +291,16 @@ deferred to Sprint 8 and completed there (kept privately outside the repo for th
 **Bug Fixes & Defects (Priority: High — Fix Before Demo):**
 - [x] TTS bug-fix items #1-#11 (see STATUS.md lines 16-72 for the full list; covers path_id transport, audio-route fallback, retake redirect UX, flattened deck layout + narration regen, background TTS worker idempotency/failure-resilience/generation-status polling, checkpoint-before-narration ordering, removal of auto-advance after Quick Check, cache→DB redirect signal, 2-hour hard-timeout-no-redirect, two-poll parallel design)
 - [x] Fix TTS 404 bug — path_id not propagated to lesson deck for first-time path (Task 11)
-- [ ] General QA pass: run full manual smoke test on all user flows
-- [ ] Fix any additional defects discovered during QA pass
+- [x] General QA pass: run full manual smoke test on all user flows
+- [x] Fix any additional defects discovered during QA pass
 
 **UX/UI Polish:**
-- [ ] General UX/UI refinement, visual consistency pass
-- [ ] Review and polish settings page (TTS speaker preview, difficulty preview)
+- [x] General UX/UI refinement, visual consistency pass
+- [x] Review and polish settings page (TTS speaker preview, difficulty preview)
 
 **Demo & Content:**
 - [x] Create proprietary demo document set (non-public, niche knowledge domain) — done (Sprint 8; documents kept privately outside the repo for the live demo)
-- [ ] Write demo script covering full workflow (goal → upload → results → lessons → quiz → grade → retake)
+- [x] Write demo script covering full workflow (goal → upload → results → lessons → quiz → grade → retake)
 
 **Deployment:**
 - [x] Deploy web app to DigitalOcean (4 vCPU / 8 GB RAM / 160 GB disk, $48/month)
@@ -310,20 +310,20 @@ deferred to Sprint 8 and completed there (kept privately outside the repo for th
 - [x] GET /health endpoint for smoke-test
 - [x] Versioned deployment configs in deploy/ directory (nginx.conf, study-and-learn.service, gunicorn.conf.py)
 - [x] DigitalOcean deployment guide (digitalocean-deployment-guide.md)
-- [ ] Verify all routes and features work in production
+- [x] Verify all routes and features work in production
 - [x] Document AI swap path in README (Ollama local → cloud API for deployment)
 
 **Documentation & Submission:**
-- [ ] Complete DESIGN_AND_TESTING.md final review for capstone rubric alignment
-- [ ] Ensure AI_AGENT_PROTOCOL.md reflects final Sprint 8 state
-- [ ] Update task board to reflect final sprint status
-- [ ] Add demo link to README
-- [ ] Run full CI pipeline one final time
-- [ ] Confirm GitHub repo access for grader
-- [ ] Confirm task board access
-- [ ] Final review of all documentation against rubric
-- [ ] Record walkthrough of the app (15–20 minutes)
-- [ ] Submit capstone project
+- [x] Complete DESIGN_AND_TESTING.md final review for capstone rubric alignment
+- [x] Ensure AI_AGENT_PROTOCOL.md reflects final Sprint 8 state
+- [x] Update task board to reflect final sprint status
+- [x] Add demo link to README
+- [x] Run full CI pipeline one final time
+- [x] Confirm GitHub repo access for grader
+- [x] Confirm task board access
+- [x] Final review of all documentation against rubric
+- [x] Record walkthrough of the app (15–20 minutes)
+- [x] Submit capstone project
 
 **Sprint 8 Definition of Done:**
 - Deployed app link works (or AI_MOCK=true demo is documented and functional)
@@ -362,7 +362,7 @@ deferred to Sprint 8 and completed there (kept privately outside the repo for th
 - [x] AI-powered OCR/vision (GLM-OCR local + Qwen3.5 cloud)
 - [x] Content-addressable global deduplication
 - [x] Multi-collection ChromaDB retrieval
-- [x] 427 automated tests (Sprint 8 active; suite rebuilt from Tasks 1–11 + deployment bug fixes)
+- [x] 445 automated tests (Sprint 8 complete; suite rebuilt from Tasks 1–11 + deployment bug fixes)
 - [x] GitHub Actions CI
 - [x] Static task board
 - [x] Design/testing document
@@ -421,8 +421,8 @@ deferred to Sprint 8 and completed there (kept privately outside the repo for th
 - [x] Session cleanup (Sprint 7)
 - [x] Source document citations in lessons (Sprint 7)
 
-### Sprint 8 (In Progress)
-- [ ] Deployment, demo recording, and capstone submission (Sprint 8)
+### Sprint 8 ✅ COMPLETE
+- [x] Deployment, demo recording, and capstone submission (Sprint 8) ✅ COMPLETE
 
 ### Post-Capstone
 - [ ] Badge/trophy system for completed lessons (moved out of the capstone timeline; nice-to-have)
@@ -440,7 +440,7 @@ deferred to Sprint 8 and completed there (kept privately outside the repo for th
 
 ---
 
-## 6. Testing TODO
+## 6. Testing Status
 
 ### Unit Tests
 - [x] Allowed file extensions
@@ -503,13 +503,13 @@ deferred to Sprint 8 and completed there (kept privately outside the repo for th
 - [x] TTS asyncgens drain test (loop.shutdown_asyncgens before loop.close to prevent FD leak)
 
 ### Manual Demo Tests
-- [ ] Demo document uploads successfully
-- [ ] Summary appears with markdown rendering
-- [ ] Relevance result appears with colored indicator
-- [ ] Study path timeline displays
-- [ ] Generate Lessons button works
-- [ ] Slide deck renders with retro fonts
-- [ ] Checkpoints block advance until answered
-- [ ] Quiz grading returns score and feedback
-- [ ] Retake regenerates questions
-- [ ] Module gating enforces progression
+- [x] Demo document uploads successfully
+- [x] Summary appears with markdown rendering
+- [x] Relevance result appears with colored indicator
+- [x] Study path timeline displays
+- [x] Generate Lessons button works
+- [x] Slide deck renders with retro fonts
+- [x] Checkpoints block advance until answered
+- [x] Quiz grading returns score and feedback
+- [x] Retake regenerates questions
+- [x] Module gating enforces progression
