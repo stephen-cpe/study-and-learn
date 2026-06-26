@@ -253,8 +253,12 @@ CHROMA_CLOUD_API_KEY=your-chroma-cloud-api-key-here
 CHROMA_CLOUD_CONNECTION_STRING=your-chroma-tenant-id-here
 CHROMA_COLLECTION_NAME=study-and-learn-chromadb
 
-# ── OCR (disabled for cloud deployment — no local GPU needed) ───────────────
+# ── OCR (disabled in production to avoid memory pressure on 8 GB droplet) ───
+# OCR_FULL=false still runs GLM-OCR text-mode on image uploads (.png/.jpg/.jpeg).
+# Setting OCR_FULL=true enables text+table+figure OCR on every PDF/DOCX/PPTX page
+# (3 local Ollama calls/page) — untested on this droplet size; enable with caution.
 OCR_FULL=false
+# OCR_FIGURE_DESCRIPTION=true adds a qwen3.5:397b-cloud call per page (Ollama Cloud).
 OCR_FIGURE_DESCRIPTION=false
 
 # ── CI / Testing (set to false in production) ───────────────────────────────
@@ -341,6 +345,10 @@ RestartSec=10
 NoNewPrivileges=true
 PrivateTmp=true
 
+# Raise the file descriptor limit from the Linux default (1024) to 65536.
+# See gunicorn.conf.py and the Troubleshooting section for the rationale.
+LimitNOFILE=65536
+
 [Install]
 WantedBy=multi-user.target
 ```
@@ -352,12 +360,24 @@ workers = 1
 worker_class = "gthread"
 threads = 8
 timeout = 7200  # 2 hours — lesson generation with cloud AI can take 45-90 min
-max_requests = 1000
-max_requests_jitter = 100
+
+# NOTE: max_requests / max_requests_jitter are deliberately omitted.
+# The two-poll JS design fires ~1-2 HTTP requests per second. With
+# max_requests=1000, the worker would auto-restart every ~15-20
+# minutes — killing the daemon TTS background thread mid-generation.
+# TTS-enabled generation takes 45-90 minutes; the worker must stay
+# alive for the entire duration. See gunicorn.conf.py in the repo
+# for the full rationale.
+
+# Logging
 accesslog = "/home/study-and-learn/logs/access.log"
 errorlog = "/home/study-and-learn/logs/error.log"
 loglevel = "info"
+
+# Process naming
 proc_name = "study-and-learn"
+
+# Server mechanics
 daemon = False
 pidfile = "/tmp/study-and-learn.pid"
 ```
@@ -713,7 +733,7 @@ git push origin main
 1. Go to: https://github.com/stephen-cpe/study-and-learn/actions
 2. Click on the running workflow
 3. Watch each job complete (green checkmarks):
-   - **test** — runs pytest (426+ tests, ~4-6 min)
+   - **test** — runs pytest (445 tests, ~4-6 min)
    - **deploy** — SSH to droplet, pull code, recreate venv, restart service (~1-2 min)
    - **smoke-test** — curl /health, verify HTTP 200 (~30 sec)
 

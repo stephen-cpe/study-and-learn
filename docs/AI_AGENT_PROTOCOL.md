@@ -23,7 +23,7 @@ You follow Spec-Driven Development strictly.
    `🧪 TESTS: [passed/failed + command used]`
    `⚠️ BLOCKERS/NEXT: [none or specific]`
    Then STOP. Wait for my next prompt.
-4. **CONTEXT RECOVERY — Fresh Session**: If starting a brand-new agent session, paste the entire block from `spec-driven-instruction.md` as the first message. The agent will discover the project by reading docs/STATUS.md, docs/SRS.md, docs/TODO.md, docs/DESIGN_AND_TESTING.md, and docs/AI_AGENT_PROTOCOL.md via tools — no manual file pasting required. After reading all 5 files, the agent will reply "Ready for task assignment."
+4. **CONTEXT RECOVERY — Fresh Session**: If starting a brand-new agent session, the agent will discover the project by reading docs/STATUS.md, docs/SRS.md, docs/TODO.md, docs/DESIGN_AND_TESTING.md, and docs/AI_AGENT_PROTOCOL.md via tools — no manual file pasting required. After reading all 5 files, the agent will reply "Ready for task assignment."
 
 4a. **CONTEXT RECOVERY — Same Session**: If I say `RESUME` mid-session, I will paste the last STATUS.md. Continue exactly where left off.
 5. **NO ASSUMPTIONS**: If a requirement is ambiguous, state your
@@ -39,7 +39,7 @@ You follow Spec-Driven Development strictly.
     - Use `AI_BACKEND` env var to control local vs cloud AI provider. `AI_BACKEND` is read at call time in `ai_client.py::call_ollama` (line 98), NOT from `config.py` — there is no `Config.AI_BACKEND` attribute; do not read it from `current_app.config`
     - Never hardcode Ollama endpoints
     - `call_ollama(prompt, model, force_local=False)` has a `force_local` parameter (`ai_client.py:83`). OCR/vision calls always pass `force_local=True` because GLM-OCR has no cloud variant and must run on local Ollama regardless of `AI_BACKEND`. Never route OCR calls through `AI_BACKEND=cloud` — the cloud endpoint has no GLM-OCR model and will fail silently
-    - OCR behavior is dual-gated. Pulling `glm-ocr` is necessary but NOT sufficient: OCR is also gated by `OCR_FULL=true` (default `false`, `config.py:77`, `vision_parser.py:316`) which switches from text-only extraction to text+table+figure OCR per page. `OCR_FIGURE_DESCRIPTION=true` (default `false`, `config.py:79`, `vision_parser.py:332`) additionally enables cloud Qwen3.5 figure descriptions. With `OCR_FULL=false` the app does traditional text-layer extraction even if `glm-ocr` is installed
+    - OCR behavior is dual-gated. Pulling `glm-ocr` is necessary but NOT sufficient: OCR is also gated by `OCR_FULL=true` (default `false`, `config.py:77`, `vision_parser.py:387`) which switches from text-only extraction to text+table+figure OCR per page. `OCR_FIGURE_DESCRIPTION=true` (default `false`, `config.py:79`, `vision_parser.py:332`) additionally enables cloud Qwen3.5 figure descriptions. With `OCR_FULL=false` the app does traditional text-layer extraction even if `glm-ocr` is installed
     - Use persistent ChromaDB (`./data/chroma_db`) for dev; in-memory for CI tests; optional Chroma Cloud via `CHROMA_DB=cloud` (see ADR-027)
     - **CRITICAL DEPLOYMENT NOTE:** Even when `AI_BACKEND=cloud`, the ChromaDB vector store uses `langchain_ollama.OllamaEmbeddings` which calls the **local Ollama** API (`http://localhost:11434/api/embed`), NOT the Ollama Cloud OpenAI-compatible endpoint. Ollama Cloud does not expose the native `/api/embed` endpoint (only `/v1/chat/completions`). Therefore, any production deployment with `CHROMA_DB=cloud` MUST also have a local Ollama instance running with the `OLLAMA_EMBEDDING_MODEL` (default `qwen3-embedding:0.6b`) pulled. Without this, ChromaDB retrieval silently returns empty context and empty sources — lessons are generated without document-grounded content and the "View Sources" button never appears. The embedding model is tiny (~600 MB, CPU-only) and does not compete with the app for resources. See `digitalocean-deployment-guide.md` Step 6.3.
     - Multi-upload route must cap at 5 files; validate before processing
@@ -144,9 +144,9 @@ You follow Spec-Driven Development strictly.
       but manifest missing OR file missing on disk — JS retries in ~2s), 404 (TTS disabled,
       module_index out of range, OR manifest present but slide_index has no entry — JS
       stops retrying). Do not collapse 202 into 404 or vice versa; the retry-vs-stop
-      decision in deck-page.js keys off this distinction. See `lessons.py:553-597`.
+      decision in deck-page.js keys off this distinction. See `lessons.py:618-660`.
     - The audio and manifest routes use `get_most_recent_active_path_id()`
-      (`lessons.py:611`) as a fallback when `path_id` is missing from
+      (`lessons.py:676`) as a fallback when `path_id` is missing from
       the URL (e.g. page refresh, deep link). Do not remove this
       fallback — it prevents audio breakage on reload.
     - Dev server forces `SEND_FILE_MAX_AGE_DEFAULT=0` (`src/__init__.py:83`) to prevent

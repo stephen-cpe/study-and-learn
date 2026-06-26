@@ -134,6 +134,20 @@ Open http://localhost:5000 in your browser.
 pytest -v tests/
 ```
 
+Tests use SQLite in-memory via a per-fixture config override (`app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'`) for isolation. PostgreSQL-only validation is enforced at the app-factory level (`src/__init__.py`) but bypassed per-test so no external database is required to run the suite.
+
+## Demo Access
+
+The deployed app is at [https://studyandlearn.duckdns.org/](https://studyandlearn.duckdns.org/). Log in with any of the seeded accounts:
+
+| Username | Password       | Role  |
+|----------|---------------|-------|
+| admin    | ADMINpassword | ADMIN |
+| bob      | BOBpassword   | USER  |
+| alice    | ALICEpassword | USER  |
+
+For a no-Ollama walkthrough, set `AI_MOCK=true` in `.env` (see "Mock AI Mode" below).
+
 ## Using Ollama Cloud (Optional)
 
 The `AI_BACKEND` env var selects the AI provider. The default is `local` (Ollama on `http://localhost:11434`); setting `AI_BACKEND=cloud` routes all AI calls through the Ollama Cloud OpenAI-compatible endpoint.

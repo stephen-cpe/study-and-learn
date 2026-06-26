@@ -496,7 +496,7 @@ deferred to Sprint 8 and completed there (kept privately outside the repo for th
 - [x] Save-position and audio route tests
 - [x] extracted_texts cleanup test
 
-### To Add (Sprint 8)
+### Added (Sprint 8)
 - [x] End-to-end deployment smoke test (GET /health endpoint for CI/CD smoke-test job)
 - [x] TTS 404 regression test (path_id re-resolved after first save) — added in Task 11
 - [x] GET /login redirect fix test (was returning None, crashing Gunicorn)

@@ -63,8 +63,8 @@ flowchart TD
     L --> N["Quiz Generator: questions + checkpoints"]
     M --> M2["Narration Script Generator (generate_narration_script)"]
     M2 --> M2b["Background TTS worker thread (async, spawn_tts_background_task)"]
-    M2b -->|"sets generation_completed_at"| O
-    M2 -->|"request returns immediately"| O
+    M2b -->|"sets generation_completed_at (finally block)"| O
+    M2 -->|"if TTS disabled: route else/except sets generation_completed_at"| O
     N --> O
     O["lessons.html: Module Grid with Gating + Export PDF buttons + difficulty/TTS badges"]
     O --> P["lesson_deck.html: Custom Slide Deck + Sources modal + difficulty badge + TTS player bar + Exit & Save + session resume"]
@@ -509,10 +509,7 @@ GitHub Actions workflow (`.github/workflows/ci-cd.yml`) — 3 jobs:
    - `curl https://studyandlearn.duckdns.org/health`,
    - assert HTTP 200.
 
-Future additions:
-- linting,
-- formatting,
-- security scanning.
+Out of scope for the capstone submission: linting, formatting, security scanning.
 
 ---
 
@@ -531,15 +528,14 @@ All AI-generated code must be reviewed before commit. Important project behavior
 
 ## 8. Deployment Notes
 
-Deployment target (decided): a cloud VPS sized to fit the full stack (PostgreSQL +
-ChromaDB + Ollama + Poppler + GLM-OCR). Primary platform:
+Deployment target (live at https://studyandlearn.duckdns.org/): a cloud VPS running the application stack (PostgreSQL + ChromaDB + Ollama + Poppler). GLM-OCR is available locally but OCR-intensive workloads (`OCR_FULL=true`) are disabled in production by default to avoid memory pressure on an 8 GB droplet; the capability is verified locally and available on-demand for image-only uploads (`OCR_FULL=false` still runs GLM-OCR text-mode on `.png`/`.jpg`/`.jpeg` uploads). Primary platform:
 - DigitalOcean (Basic, Regular, 4 vCPU / 8 GB RAM / 160 GB disk, slug `s-4vcpu-8gb`, $48/month).
 
 The 8 vCPU / 16 GB RAM / 320 GB SSD tier ($96/month) was evaluated but rejected — DigitalOcean requires a $50 prepayment to unlock it, which is not practical for a temporary 3-4 week capstone deployment. The 4 vCPU / 8 GB tier is sufficient because AI inference is offloaded to Ollama Cloud (`AI_BACKEND=cloud`) and vector storage to Chroma Cloud (`CHROMA_DB=cloud`).
 
 Free-tier PaaS hosts (Render, Railway, PythonAnywhere) were evaluated and rejected — the stack does not fit a 512 MB–1 GB container.
 
-The deployed version should be stable enough for capstone demonstration and accessible from the final submission link.
+The deployed version is stable enough for capstone demonstration and accessible at https://studyandlearn.duckdns.org/.
 
 ---
 
@@ -555,7 +551,7 @@ The deployed version should be stable enough for capstone demonstration and acce
   - Vector DB: Chroma Cloud (`CHROMA_DB=cloud` — see ADR-027); local PersistentClient as automatic fallback
   - Tradeoff: No inactivity sleep (always-on); operator manages OS/Postgres/Poppler; Gunicorn (gthread, 1 worker, 8 threads) + Nginx reverse proxy + systemd + Let's Encrypt SSL + DuckDNS
 - Option C: Free-Tier PaaS (Render/Railway) — Rejected
-  - Cost: $0/month, but 512 MB–1 GB RAM is insufficient for the full stack (Ollama alone needs ~6 GB VRAM + RAM); rejected after evaluation
+  - Cost: $0/month, but 512 MB–1 GB RAM is insufficient for the application stack (PostgreSQL + Ollama embedding service + Poppler); rejected after evaluation
 Recommendation: Deploy to a DigitalOcean cloud VPS (4 vCPU / 8 GB RAM, $48/month) with AI inference offloaded to Ollama Cloud and vector storage to Chroma Cloud; keep `AI_MOCK=true` as the deterministic-demo fallback and document the cloud-API swap path in README.
 
 ---
