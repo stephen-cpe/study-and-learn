@@ -138,7 +138,7 @@ Tests use SQLite in-memory via a per-fixture config override (`app.config['SQLAL
 
 ## Demo Access
 
-The deployed app is at [https://studyandlearn.duckdns.org/](https://studyandlearn.duckdns.org/). Log in with any of the seeded accounts:
+The deployed app is at [https://studyandlearn.duckdns.org/](https://studyandlearn.duckdns.org/). For security, production credentials differ from the local seed defaults and are provided in the recorded demo/presentation. To run locally with the seeded accounts below, follow the "Setup" section.
 
 | Username | Password       | Role  |
 |----------|---------------|-------|

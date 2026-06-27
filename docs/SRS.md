@@ -6,7 +6,7 @@
 **Capstone track:** Software system / AI system  
 **Repository name:** `study-and-learn`  
 **Primary development approach:** Spec-Driven Development with AI tooling support  
-**Last updated:** June 24, 2026
+**Last updated:** June 27, 2026
 
 ---
 
@@ -84,7 +84,7 @@ Initial target content areas:
 
 ### 2.1 Product Perspective
 
-Study-and-Learn is a local-first AI-assisted learning web application. It should be simple enough to build and demonstrate within a capstone timeline while still showing real software engineering value.
+Study-and-Learn is an AI-assisted learning web application designed for local development and cloud deployment (Sprint 8 live at https://studyandlearn.duckdns.org/). It should be simple enough to build and demonstrate within a capstone timeline while still showing real software engineering value.
 
 The project should demonstrate:
 - requirements engineering,
@@ -251,7 +251,7 @@ study-and-learn/
 |---|---|---|
 | Serving framework | Ollama (default) | Local-first via Ollama; cloud API selected via the `AI_BACKEND=cloud` env var (the Sprint-5 "import toggle" pattern has been removed — backend selection is exclusively env-var-driven in `ai_client.py::call_ollama`) |
 | Chat model | Configured via `OLLAMA_MODEL` env var | `config.py` ships `gemma3:27b-cloud` as the single package default (used by `Config.summary()` only). When `AI_BACKEND=local` and `OLLAMA_MODEL` is unset at call time, `ai_client.py` falls back to `qwen3:0.6b` (suitable for 6GB VRAM). For local dev without cloud credentials, set `OLLAMA_MODEL=qwen3:0.6b` and `AI_BACKEND=local` in `.env`. |
-| Embedding model | Configured via `OLLAMA_EMBEDDING_MODEL` env var | Used exclusively for ChromaDB vector embeddings. Swappable via env var. |
+| Embedding model | Configured via `OLLAMA_EMBEDDING_MODEL` env var | Used exclusively for ChromaDB vector embeddings. Swappable via env var. **Deployment note:** `langchain_ollama.OllamaEmbeddings` calls the local Ollama `/api/embed` endpoint, which Ollama Cloud does NOT expose. Even when `AI_BACKEND=cloud`, a local Ollama instance with the embedding model pulled is REQUIRED for RAG retrieval — see `digitalocean-deployment-guide.md` §6.3. |
 | Testing mode | `AI_MOCK=true` returns a deterministic plain-text stub string (e.g. `Mock response for prompt: <first 50 chars>...`), NOT structured JSON. Downstream services must parse defensively and fall back to defaults when the mock string is returned. | Ensures deterministic CI/CD without GPU or cloud dependency |
 | OCR model | GLM-OCR (0.9B, local-only) | AI-powered text/table/figure recognition for scanned PDFs and images |
 
@@ -290,7 +290,7 @@ study-and-learn/
 | FR-008 | The system shall chunk, embed, and store extracted text in a local vector database using OllamaEmbeddings. | Must |
 | FR-009 | The system shall retrieve top-k relevant chunks using goal-aligned similarity search before AI prompt injection. | Must |
 | FR-010 | The system should handle extraction failures gracefully. | Should |
-| FR-011 | The system shall perform AI-powered OCR on uploaded images, scanned PDFs, and embedded document images using local vision models, with graceful fallback to traditional text extraction. | Must |
+| FR-011 | The system shall perform AI-powered OCR on uploaded images, scanned PDFs, and embedded document images using local vision models, with graceful fallback to traditional text extraction. | Must — Implemented. Note: full per-page OCR (text+table+figure) is gated by `OCR_FULL=true` (default `false`); production disables it to avoid memory pressure on an 8 GB droplet. Image-only uploads still run GLM-OCR text-mode regardless of this flag. |
 
 ### 5.4 AI Summary Generation
 
@@ -555,8 +555,8 @@ study-and-learn/
 - YouTube integration.
 - Export to PPTX or SCORM.
 - Adaptive difficulty based on learner performance.
-- Rich companion behavior and interactive mascot.
-- Admin content management workflow.
+- Rich companion behavior and interactive mascot (current mascot is functional but limited — see §9 item 6 for the implemented baseline).
+- Admin content management workflow (current `/admin` panel handles lesson-generation toggle and password reset only — full content authoring/editing is deferred).
 - Social features (friends, chat, share lessons).
 - Full offline mode (C/C++ rewrite without Ollama).
 
@@ -571,7 +571,7 @@ Ranked from easier to harder. Items above the line are implemented; items below 
 2. Learner dashboard with progress tracking — done (DB-backed lesson repository, StudyPath/LessonProgress models, progress bars)
 3. Max 3 active lessons gating — done (active_lesson_count, cap warning banner, blocked generation)
 4. Admin access control for lesson generation — done (is_admin flag, can_generate_lessons toggle, /admin/toggle route)
-5. Bob/Alice demo account seeding — removed (superseded by init_db.sql seed; see README.md)
+5. Bob/Alice demo account seeding — moved from runtime route to `init_db.sql` (accounts still seeded; only the `seed-demo` route was removed in Sprint 8)
 6. Static mascot image with progress-aware speech bubble — done (mascot-robot.png, click-to-talk, progress bar)
 7. Retro theme improvements — done (Retrograde Bold, BoldPixels fonts, cyberpunk theme)
 8. Better prompt templates — done

@@ -3,7 +3,7 @@
 ### *Turn Any Documents into Interactive, Personalized Learning Experiences*
 
 **Purpose:** This document organizes the capstone work into MVP tasks, user stories, sprints, stretch goals, and submission requirements.  
-**Last updated:** June 24, 2026
+**Last updated:** June 27, 2026
 
 ---
 
@@ -185,7 +185,7 @@ Build the smallest working version first, then iterate:
 - [x] Create super admin role with per-user lesson generation toggle
 - [x] Deny lesson generation by default for new registrations
 - [x] Landing page shows access-denied message for unauthorized users
-- [~] Seed demo accounts (Bob, Alice) with lesson generation access — superseded by init_db.sql seed (runtime seed-demo route removed in Sprint 8; see STATUS.md)
+- [x] Seed demo accounts (Bob, Alice) with lesson generation access — superseded by init_db.sql seed (runtime seed-demo route removed in Sprint 8; accounts still seeded via SQL — see STATUS.md)
 - [x] Allow public registration but auto-deny lesson access
 - [x] Write unit and integration tests for auth flow
 - [x] Update task board with sprint progress
@@ -396,7 +396,6 @@ deferred to Sprint 8 and completed there (kept privately outside the repo for th
 - [x] Static mascot image with progress-aware speech bubble
 - [x] Simple quiz generation (4 question types: mcq, true_false, multi_select, cloze_dropdown)
 - [x] Slide-style lesson viewer (custom CSS/JS)
-- [x] Editable generated summary
 - [x] Saved/loaded generated outputs in session
 - [x] Export results as HTML (rendered on results page)
 - [x] Gated module progression with pass/fail
@@ -426,6 +425,7 @@ deferred to Sprint 8 and completed there (kept privately outside the repo for th
 
 ### Post-Capstone
 - [ ] Badge/trophy system for completed lessons (moved out of the capstone timeline; nice-to-have)
+- [ ] Editable generated summary (not implemented — see SRS FR-029 "Could"; deferred out of the capstone timeline)
 - [ ] Extended file type support (.html, .odt)
 - [ ] YouTube/video transcript integration
 - [ ] External learning resource search
