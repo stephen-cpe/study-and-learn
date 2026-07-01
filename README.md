@@ -1,15 +1,16 @@
 # Study-and-Learn
 
-A Flask web application that converts uploaded study materials into structured summaries, study paths, interactive lessons, and auto-graded quizzes using AI.
-
 ## Links
 
 - [Public Task Board](https://stephen-cpe.github.io/task-board-v1/)
-- [Task Board Repository](https://github.com/stephen-cpe/task-board-v1/)
 - [Deployed App](https://studyandlearn.duckdns.org/)
 - [Design and Testing Document](https://github.com/stephen-cpe/study-and-learn/blob/main/docs/DESIGN_AND_TESTING.md)
 - [1st Set of Demo Documents](https://github.com/stpnpl/azthreus-systems/tree/main/demo-documents/1st-set)
 - [2nd Set of Demo Documents](https://github.com/stpnpl/azthreus-systems/tree/main/demo-documents/2nd-set)
+
+## Demo Access
+
+The deployed app is at [https://studyandlearn.duckdns.org/](https://studyandlearn.duckdns.org/). For security, production credentials differ from the local seed defaults and are provided in the recorded demo/presentation. To run locally with the seeded accounts below, follow the "Setup" section.
 
 ## Prerequisites
 
@@ -138,18 +139,6 @@ pytest -v tests/
 
 Tests use SQLite in-memory via a per-fixture config override (`app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'`) for isolation. PostgreSQL-only validation is enforced at the app-factory level (`src/__init__.py`) but bypassed per-test so no external database is required to run the suite.
 
-## Demo Access
-
-The deployed app is at [https://studyandlearn.duckdns.org/](https://studyandlearn.duckdns.org/). For security, production credentials differ from the local seed defaults and are provided in the recorded demo/presentation. To run locally with the seeded accounts below, follow the "Setup" section.
-
-| Username | Password       | Role  |
-|----------|---------------|-------|
-| admin    | ADMINpassword | ADMIN |
-| bob      | BOBpassword   | USER  |
-| alice    | ALICEpassword | USER  |
-
-For a no-Ollama walkthrough, set `AI_MOCK=true` in `.env` (see "Mock AI Mode" below).
-
 ## Using Ollama Cloud (Optional)
 
 The `AI_BACKEND` env var selects the AI provider. The default is `local` (Ollama on `http://localhost:11434`); setting `AI_BACKEND=cloud` routes all AI calls through the Ollama Cloud OpenAI-compatible endpoint.
@@ -171,7 +160,7 @@ Set `AI_MOCK=true` in your `.env` file to use mock responses. This is useful for
 
 - SRS.md - Software requirements and user stories
 - TODO.md - Sprint plan and task backlog
-- DESIGN_AND_TESTING.md - Architecture and testing strategy
+- DESIGN_AND_TESTING.md - Design and testing document
 - STATUS.md - Current sprint state and known issues
 - AI_AGENT_PROTOCOL.md - AI agent execution protocol and guardrails
 
