@@ -221,7 +221,7 @@ curl http://localhost:11434/api/tags
 > **Why local Ollama for embeddings when AI_BACKEND=cloud?**  
 > Ollama Cloud's API only supports the OpenAI-compatible `/v1/chat/completions` endpoint. The `langchain_ollama.OllamaEmbeddings` class uses the native Ollama `/api/embed` endpoint, which is not exposed by Ollama Cloud. So embedding calls must go to a local Ollama instance. The `qwen3-embedding:0.6b` model is tiny (~600 MB) and runs in CPU-only mode — it won't compete with the app for resources.
 >
-> **What about the chat model?** Chat/completion calls (lesson generation, quiz generation, relevance checks) go through `ai_client_cloud.py` to Ollama Cloud (`AI_BACKEND=cloud`, `OLLAMA_MODEL=gemma3:27b-cloud`). You do NOT need to pull `gemma3:27b-cloud` locally — only the embedding model.
+> **What about the chat model?** Chat/completion calls (lesson generation, quiz generation, relevance checks) go through `ai_client_cloud.py` to Ollama Cloud (`AI_BACKEND=cloud`, `OLLAMA_MODEL=gemma4:31b-cloud`). You do NOT need to pull `gemma4:31b-cloud` locally — only the embedding model.
 
 ### Step 6.4: Create Environment File
 
@@ -245,7 +245,7 @@ AI_MOCK=false
 AI_BACKEND=cloud
 OLLAMA_CLOUD_API_KEY=your-ollama-cloud-api-key-here
 OLLAMA_CLOUD_BASE_URL=https://ollama.com
-OLLAMA_MODEL=gemma3:27b-cloud
+OLLAMA_MODEL=gemma4:31b-cloud
 
 # ── Vector Store / Chroma Cloud ─────────────────────────────────────────────
 CHROMA_DB=cloud
@@ -386,7 +386,7 @@ pidfile = "/tmp/study-and-learn.pid"
 > The app uses `cachelib.FileSystemCache` for Flask sessions (`data/flask_session/`) and progress tracking (`data/progress_cache/`). These are per-process filesystem caches. Multiple Gunicorn workers would split the cache and break session/progress consistency. A single worker with 8 threads keeps all caching in one process and trivially handles 3 concurrent users.
 >
 > **Why `--timeout 7200` (2 hours)?**  
-> Lesson generation with cloud AI (gemma3:27b-cloud) and 3+ modules can take 45-90 minutes end-to-end (lessons + checkpoints + quiz + narration script + edge-tts audio). The 2-hour timeout ensures Gunicorn doesn't kill long-running generation requests. The app's own JS hard-timeout is also 2 hours and stops polling without redirecting.
+> Lesson generation with cloud AI (gemma4:31b-cloud) and 3+ modules can take 45-90 minutes end-to-end (lessons + checkpoints + quiz + narration script + edge-tts audio). The 2-hour timeout ensures Gunicorn doesn't kill long-running generation requests. The app's own JS hard-timeout is also 2 hours and stops polling without redirecting.
 >
 > **Why `--bind 127.0.0.1:5000`?**  
 > Gunicorn binds to localhost only. Nginx (the public-facing reverse proxy) forwards external traffic to Gunicorn. This means port 5000 is never exposed to the internet directly.
@@ -908,7 +908,7 @@ pytest -v tests/
 
 **Symptom:** Progress page stays at "Building lesson..." for a long time
 
-**This is expected with cloud AI.** Full generation with `gemma3:27b-cloud` and 3+ modules can take 45-90 minutes. The JS hard-timeout is 2 hours and will show a "still working" message without redirecting. Check:
+**This is expected with cloud AI.** Full generation with `gemma4:31b-cloud` and 3+ modules can take 45-90 minutes. The JS hard-timeout is 2 hours and will show a "still working" message without redirecting. Check:
 
 1. Is Ollama Cloud reachable? `curl -H "Authorization: Bearer $OLLAMA_CLOUD_API_KEY" https://ollama.com/api/tags`
 2. Check app logs: `tail -50 /home/study-and-learn/logs/error.log`

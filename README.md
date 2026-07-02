@@ -107,9 +107,9 @@ ollama pull glm-ocr
 
 The default models are placeholders. For better results, use larger models such as `qwen3:8b` or `gemma3:4b` if your hardware can accommodate them.
 
-Note: `config.py` ships `OLLAMA_MODEL=gemma3:27b-cloud` as the package default — to run locally without a `.env`, set `AI_BACKEND=local` and `OLLAMA_MODEL=qwen3:0.6b` in your `.env` (see `.env.example`).
+Note: `config.py` ships `OLLAMA_MODEL=gemma4:31b-cloud` as the package default — to run locally without a `.env`, set `AI_BACKEND=local` and `OLLAMA_MODEL=qwen3:0.6b` in your `.env` (see `.env.example`).
 
-**For cloud deployment (`AI_BACKEND=cloud`):** You only need to pull `qwen3-embedding:0.6b` locally — the embedding model runs on the server for ChromaDB RAG retrieval. The chat model (`gemma3:27b-cloud`) runs on Ollama Cloud and does NOT need to be pulled locally. See `digitalocean-deployment-guide.md` for full deployment instructions.
+**For cloud deployment (`AI_BACKEND=cloud`):** You only need to pull `qwen3-embedding:0.6b` locally — the embedding model runs on the server for ChromaDB RAG retrieval. The chat model (`gemma4:31b-cloud`) runs on Ollama Cloud and does NOT need to be pulled locally. See `digitalocean-deployment-guide.md` for full deployment instructions.
 
 `glm-ocr` (0.9B) is the local OCR model. Pulling it alone does NOT enable OCR — OCR is additionally gated by `OCR_FULL=true` (default `false`). With `OCR_FULL=false` the app uses traditional text-layer extraction even if `glm-ocr` is installed; set `OCR_FULL=true` to run AI-powered OCR on PDFs and images. Set `OCR_FIGURE_DESCRIPTION=true` to additionally generate cloud figure descriptions. Note: figure descriptions use `OLLAMA_VISION_MODEL` (default `qwen3.5:397b-cloud`) and require `AI_BACKEND=cloud` with valid `OLLAMA_CLOUD_API_KEY` — they do not run on a purely local setup.
 
@@ -147,7 +147,7 @@ The `AI_BACKEND` env var selects the AI provider. The default is `local` (Ollama
    ```
    AI_BACKEND=cloud
    OLLAMA_CLOUD_API_KEY=your-api-key-here
-   OLLAMA_MODEL=gemma3:27b-cloud
+   OLLAMA_MODEL=gemma4:31b-cloud
    ```
 
 2. Restart the application. All AI calls will route through the Ollama Cloud API instead of your local Ollama instance.

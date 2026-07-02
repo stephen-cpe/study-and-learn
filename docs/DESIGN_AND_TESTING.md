@@ -164,6 +164,8 @@ The project employs a rigorous, test-driven development (TDD) approach with a su
 *   **Smoke Tests:** Manual and automated checks performed before deployment to verify the health endpoint, basic upload flows, and deck rendering.
 *   **CI Isolation:** By utilizing `AI_MOCK=true` and `CI=true` (which forces ChromaDB to use an ephemeral in-memory client), the entire test suite runs deterministically in GitHub Actions without requiring GPUs, local Ollama instances, or network access.
 
+The suite spans 36 test modules organized into three layers: unit tests that isolate individual services (parsing, RAG retrieval, prompt construction, quiz generation, TTS), integration tests that exercise route behavior and database transactions through a test client, and a single end-to-end smoke test that walks the complete learner workflow from upload through grading and retake. Every integration fixture swaps the production PostgreSQL database for an in-memory SQLite instance on a per-test basis, so the full suite runs without an external database while still validating real SQLAlchemy model behavior. Coverage grew incrementally across all eight sprints, with regression tests added alongside each production bug fix — including the Sprint 8 deployment issues (login redirect crash, TTS file-descriptor leak, missing embedding model, and the `/health` endpoint). The documented 445-test count reflects 426 explicit test functions plus parametrized mascot-animation cases that expand the effective total. All tests run deterministically in GitHub Actions with mocked AI and no network access, making the suite both free to run and reproducible across environments.
+
 ---
 
 ## 8. CI/CD & Deployment Strategy
