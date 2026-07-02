@@ -157,14 +157,22 @@ Running local Vision models on every PDF page is memory-prohibitive in productio
 ---
 
 ## 7. Testing Strategy
-The project employs a rigorous, test-driven development (TDD) approach with a suite of **445 automated tests**.
 
-*   **Unit Tests:** Cover isolated logic including file validation, parser behavior, LangChain splitting, prompt construction, and AI client mocking.
-*   **Integration Tests:** Verify end-to-end route behavior, form submissions, session management, and database transactions using an in-memory SQLite override for speed.
-*   **Smoke Tests:** Manual and automated checks performed before deployment to verify the health endpoint, basic upload flows, and deck rendering.
-*   **CI Isolation:** By utilizing `AI_MOCK=true` and `CI=true` (which forces ChromaDB to use an ephemeral in-memory client), the entire test suite runs deterministically in GitHub Actions without requiring GPUs, local Ollama instances, or network access.
+The project follows a test driven development (TDD) approach. The final codebase contains **445 automated tests** that verify both individual components and complete application workflows.
 
-The suite spans 36 test modules organized into three layers: unit tests that isolate individual services (parsing, RAG retrieval, prompt construction, quiz generation, TTS), integration tests that exercise route behavior and database transactions through a test client, and a single end-to-end smoke test that walks the complete learner workflow from upload through grading and retake. Every integration fixture swaps the production PostgreSQL database for an in-memory SQLite instance on a per-test basis, so the full suite runs without an external database while still validating real SQLAlchemy model behavior. Coverage grew incrementally across all eight sprints, with regression tests added alongside each production bug fix — including the Sprint 8 deployment issues (login redirect crash, TTS file-descriptor leak, missing embedding model, and the `/health` endpoint). The documented 445-test count reflects 426 explicit test functions plus parametrized mascot-animation cases that expand the effective total. All tests run deterministically in GitHub Actions with mocked AI and no network access, making the suite both free to run and reproducible across environments.
+The automated test suite is organized into three categories:
+
+* **Unit Tests:** Verify isolated components such as file validation, document parsing, LangChain text splitting, prompt construction, AI client behavior, quiz generation, retrieval logic, and text to speech utilities.
+* **Integration Tests:** Exercise Flask routes, form submissions, session management, SQLAlchemy models, and database transactions through the Flask test client. Each test replaces the production PostgreSQL database with an in memory SQLite database, allowing the application to be tested without external infrastructure while still validating real database behavior.
+* **Smoke Tests:** Verify that the application can complete its primary workflow, including document upload, lesson generation, quiz completion, grading, retake functionality, deck rendering, and the `/health` endpoint.
+
+The test environment is fully isolated from production services. Setting `AI_MOCK=true` replaces AI responses with deterministic mock data, while `CI=true` configures ChromaDB to use an ephemeral in memory client. As a result, the complete test suite runs without GPUs, local Ollama models, external databases, or network access, making execution reproducible in GitHub Actions.
+
+The project contains **36 test modules**. These include unit tests for individual services, integration tests covering complete request and database workflows, and an end to end smoke test that follows the learner experience from document upload through quiz grading and retake.
+
+The test suite expanded throughout all eight development sprints. Whenever a production defect was identified, a corresponding regression test was added to prevent the issue from recurring. Sprint 8 introduced additional regression tests covering deployment related issues, including the login redirect crash, TTS file descriptor exhaustion, missing embedding model detection, and the `/health` endpoint.
+
+The reported total of **445 automated tests** consists of **426 explicit test functions** together with parameterized mascot animation tests that expand into additional executable test cases during test collection.
 
 ---
 
