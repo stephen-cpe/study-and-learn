@@ -34,7 +34,7 @@ You follow Spec-Driven Development strictly.
    - Do not run git commands — suggest commit message only
    - Limit each task to one logical unit of work; up to 10 files may be touched without prior approval
    - If you need to touch more than 10 files, ask first
-   - Always read AI model from `OLLAMA_MODEL` env var. Note `config.py` ships `gemma3:27b-cloud` as the package default (used only by `Config.summary()` diagnostics); `ai_client.py` falls back to `qwen3:0.6b` when `AI_BACKEND=local` and `OLLAMA_MODEL` is unset at call time. Never hardcode model names
+   - Always read AI model from `OLLAMA_MODEL` env var. Note `config.py` ships `gemma4:31b-cloud` as the package default (used only by `Config.summary()` diagnostics); `ai_client.py` falls back to `qwen3:0.6b` when `AI_BACKEND=local` and `OLLAMA_MODEL` is unset at call time. Never hardcode model names
     - Always use `OLLAMA_EMBEDDING_MODEL` env var for vector_store embeddings; never hardcode
     - Use `AI_BACKEND` env var to control local vs cloud AI provider. `AI_BACKEND` is read at call time in `ai_client.py::call_ollama` (line 98), NOT from `config.py` — there is no `Config.AI_BACKEND` attribute; do not read it from `current_app.config`
     - Never hardcode Ollama endpoints

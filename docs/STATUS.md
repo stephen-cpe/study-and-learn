@@ -4,7 +4,7 @@ Sprint: 8 (COMPLETE / SUBMISSION READY)
 Last Task Completed: Sprint 8 cloud deployment to DigitalOcean (4 vCPU / 8 GB / 160 GB, $48/month) — Gunicorn (gthread, 1 worker, 8 threads) + Nginx + systemd + Let's Encrypt SSL + DuckDNS + CI/CD pipeline (test → deploy → smoke-test via GitHub Actions). Production bug fixes: (1) GET /login returning None (redirect to index); (2) TTS OSError [Errno 24] Too many open files (LimitNOFILE=65536 + loop.shutdown_asyncgens()); (3) Gunicorn max_requests=1000 killing TTS thread mid-generation (removed max_requests); (4) missing local Ollama embedding model on droplet (installed qwen3-embedding:0.6b for ChromaDB RAG retrieval); (5) empty ChromaDB Cloud collections from earlier failed generation (deleted + re-ingested); (6) /health endpoint added for CI/CD smoke-test. RAG retrieval with sources + TTS audio both verified working in production. Test suite: 445 passed (was 421; +24 tests across login GET redirect, /health endpoint, asyncgens drain, plus Sprint 8 final sweep).
 Commit Message Suggestion: feat: cloud deployment to DigitalOcean + production bug fixes (login GET, TTS FD leak, max_requests, embedding model, /health endpoint)
 Known Issues:
-  - AI output consistency: qwen3:0.6b is placeholder-only; use cloud models (gemma3:27b-cloud)
+  - AI output consistency: qwen3:0.6b is placeholder-only; use cloud models (gemma4:31b-cloud)
     for production quality
   - Session storage uses Flask-Session (cachelib FileSystemCache) by design — single-worker Gunicorn keeps all caching in one process. DB-backed session store is a future optimization, not a bug.
   - fpdf2 Latin-1 limitation: all AI-generated text in PDF export must pass through _clean()

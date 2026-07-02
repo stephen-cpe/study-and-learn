@@ -51,7 +51,7 @@ class Config:
     OLLAMA_CLOUD_BASE_URL = os.environ.get(
         "OLLAMA_CLOUD_BASE_URL", "https://ollama.com"
     )
-    OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gemma3:27b-cloud")
+    OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gemma4:31b-cloud")
     OLLAMA_TIMEOUT = _int(os.environ.get("OLLAMA_TIMEOUT"), 300)
 
     # ── Local Ollama (alternative backend) ──────────────────────────────
