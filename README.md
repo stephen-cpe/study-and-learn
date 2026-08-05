@@ -3,7 +3,7 @@
 ## Links
 
 - [Public Task Board](https://stephen-cpe.github.io/task-board-v1/)
-- [Deployed App](https://studyandlearn.duckdns.org/)
+- ~~[Deployed App](https://studyandlearn.duckdns.org/)~~ *(Droplet being decommissioned Aug 8 — credit exhausted)*
 - [Design and Testing Document](https://github.com/stephen-cpe/study-and-learn/blob/main/docs/DESIGN_AND_TESTING.md)
 - [1st Set of Demo Documents](https://github.com/stpnpl/azthreus-systems/tree/main/demo-documents/1st-set)
 - [2nd Set of Demo Documents](https://github.com/stpnpl/azthreus-systems/tree/main/demo-documents/2nd-set)
