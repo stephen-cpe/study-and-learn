@@ -30,7 +30,6 @@ auto-advance, this test fails.
 import re
 from pathlib import Path
 
-
 DECK_ENGINE_JS = Path(__file__).resolve().parents[1] / 'src' / 'static' / 'js' / 'deck-engine.js'
 
 

@@ -1,7 +1,7 @@
-import logging
 import os
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 
 @pytest.fixture(autouse=True)
@@ -76,7 +76,7 @@ class TestContentRegistry:
 
     def test_register_content_new(self):
         with patch("src.services.vision_parser.ContentRegistry") as mock_cr, \
-             patch("src.services.vision_parser.db") as mock_db:
+             patch("src.services.vision_parser.db"):
             mock_cr.query.filter_by.return_value.first.return_value = None
             mock_cr.return_value = MagicMock()
             from src.services.vision_parser import register_content
@@ -86,7 +86,7 @@ class TestContentRegistry:
 
     def test_register_content_existing(self):
         with patch("src.services.vision_parser.ContentRegistry") as mock_cr, \
-             patch("src.services.vision_parser.db") as mock_db:
+             patch("src.services.vision_parser.db"):
             mock_existing = MagicMock()
             mock_existing.chroma_collection = "doc_existing"
             mock_cr.query.filter_by.return_value.first.return_value = mock_existing

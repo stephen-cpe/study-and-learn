@@ -1,8 +1,10 @@
 import io
 import tempfile
-import pytest
 from unittest.mock import patch
+
+import pytest
 from cachelib import FileSystemCache
+
 from src import create_app, db
 from src.models import User
 from src.services import progress_tracker

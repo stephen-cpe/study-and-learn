@@ -13,14 +13,16 @@ MAX_FILES = 5
 PASS_THRESHOLD = 80
 
 # ── Import sub-modules so routes are registered ─────────────────────────
-from src.routes import auth        # noqa: E402, F401
-from src.routes import admin       # noqa: E402, F401
-from src.routes import processing  # noqa: E402, F401
-from src.routes import lessons     # noqa: E402, F401
-from src.routes import dashboard   # noqa: E402, F401
-
 # ── Error Handlers (app-level) ──────────────────────────────────────────
 from src import db
+from src.routes import (
+    admin,  # noqa: E402, F401
+    auth,  # noqa: E402, F401
+    dashboard,  # noqa: E402, F401
+    lessons,  # noqa: E402, F401
+    processing,  # noqa: E402, F401
+)
+
 
 @bp.app_errorhandler(400)
 def bad_request(e):

@@ -3,12 +3,14 @@ Lesson orchestration service — generates lesson slides, inline checkpoints,
 and final quizzes for a single module.  Extracted from routes.py to keep
 route handlers thin and testable.
 """
-from typing import Callable, Dict, Any, List
+from typing import Any, Callable, Dict, List
 
-from src.services.rag_retriever import build_rag_context, build_rag_context_from_hashes_with_sources
 from src.services.lesson_generator import generate_lesson
-from src.services.quiz_generator import generate_quiz, generate_inline_checkpoint
-
+from src.services.quiz_generator import generate_inline_checkpoint, generate_quiz
+from src.services.rag_retriever import (
+    build_rag_context,
+    build_rag_context_from_hashes_with_sources,
+)
 
 # Type alias for the canonical deck layout. Each entry is one slot in the
 # rendered slide deck (content slide, checkpoint, final quiz, or results).

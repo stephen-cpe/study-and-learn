@@ -1,8 +1,6 @@
 """
 Unit tests for the summarizer service.
 """
-import os
-import pytest
 from src.services.summarizer import generate_summary
 
 

@@ -1,0 +1,10 @@
+target-version = "py313"
+
+exclude = ["venv", "__pycache__", ".pytest_cache", "migrations"]
+
+[lint]
+select = ["F", "I"]
+ignore = []
+
+[lint.isort]
+known-first-party = ["src", "config"]

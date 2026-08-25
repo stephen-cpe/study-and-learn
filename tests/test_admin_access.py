@@ -4,12 +4,13 @@ and Demo Account Seeding.
 
 Uses the SQLite in-memory fixture pattern established in test_dashboard.py.
 """
-import io
 import tempfile
+
 import pytest
 from cachelib import FileSystemCache
+
 from src import create_app, db
-from src.models import User, StudyPath
+from src.models import User
 
 
 @pytest.fixture
@@ -119,7 +120,7 @@ def test_admin_toggle_enables_access(client):
     assert target.can_generate_lessons is False
 
     _login_as(client, 'super')
-    rv = client.get(f'/admin/toggle/{target.id}', follow_redirects=True)
+    rv = client.post(f'/admin/toggle/{target.id}', follow_redirects=True)
     assert rv.status_code == 200
     assert b'enabled' in rv.data.lower()
 
@@ -138,7 +139,7 @@ def test_admin_toggle_disables_access(client):
     db.session.commit()
 
     _login_as(client, 'super2')
-    rv = client.get(f'/admin/toggle/{target.id}', follow_redirects=True)
+    rv = client.post(f'/admin/toggle/{target.id}', follow_redirects=True)
     assert rv.status_code == 200
     assert b'disabled' in rv.data.lower()
 
@@ -147,7 +148,7 @@ def test_admin_toggle_disables_access(client):
 
 
 def test_non_admin_cannot_toggle(client):
-    rv = client.get('/admin/toggle/some-id', follow_redirects=True)
+    rv = client.post('/admin/toggle/some-id', follow_redirects=True)
     assert rv.status_code == 403
 
 

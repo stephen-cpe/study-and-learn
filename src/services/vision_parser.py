@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import logging
 import os
@@ -12,6 +13,23 @@ from src.services.exceptions import AIModelUnavailableError
 from src.services.vector_store import get_collection_name
 
 logger = logging.getLogger(__name__)
+
+
+def _encode_image(image_path: str) -> Optional[str]:
+    """Read an image file and return its base64-encoded string.
+
+    This is required for Ollama vision models — the ``/api/generate``
+    endpoint expects an ``images`` array of base64 strings. Embedding a
+    file path in the prompt text does NOT work; the model cannot read
+    local files. Returns None if the file cannot be read (caller should
+    skip the vision call in that case).
+    """
+    try:
+        with open(image_path, 'rb') as f:
+            return base64.b64encode(f.read()).decode('utf-8')
+    except Exception as e:
+        logger.warning("Failed to base64-encode image %s: %s", image_path, str(e))
+        return None
 
 
 # Vision model default. Migrated from the deprecated qwen3-vl:235b-cloud
@@ -184,7 +202,6 @@ def render_pdf_pages(file_path: str, output_dir: str) -> List[str]:
 def extract_docx_images(file_path: str, output_dir: str) -> List[str]:
     try:
         from docx import Document
-        from docx.opc.constants import RELATIONSHIP_TYPE as RT
     except ImportError:
         logger.warning("python-docx not available for image extraction")
         return []
@@ -293,19 +310,22 @@ def ocr_page(image_path: str, mode: str = "text") -> str:
     abs_path = os.path.abspath(image_path)
 
     mode_prompts = {
-        "text": f"Text Recognition: {abs_path}",
-        "table": f"Table Recognition: {abs_path}",
-        "figure": f"Figure Recognition: {abs_path}",
+        "text": "Extract all text visible in this image. Return only the extracted text, no commentary.",
+        "table": "Extract any tables visible in this image. Preserve row/column structure. Return only the table content.",
+        "figure": "Describe the figure, diagram, or chart visible in this image. Focus on visual elements, labels, and structure.",
     }
     if mode not in mode_prompts:
         raise ValueError(f"Unknown OCR mode: {mode}. Use 'text', 'table', or 'figure'.")
 
     prompt = mode_prompts[mode]
     model = os.environ.get("OLLAMA_OCR_MODEL", "glm-ocr")
-    timeout = int(os.environ.get("OCR_TIMEOUT_PER_PAGE", "120"))
+
+    b64_image = _encode_image(abs_path)
+    if not b64_image:
+        return ""
 
     try:
-        result = call_ollama(prompt, model=model, force_local=True)
+        result = call_ollama(prompt, model=model, force_local=True, images=[b64_image])
         return result.strip() if result else ""
     except Exception as e:
         logger.warning("OCR %s mode failed for %s: %s", mode, image_path, str(e))
@@ -343,14 +363,17 @@ def describe_figure(image_path: str) -> str:
     probe_vision_model_availability(model)
 
     prompt = (
-        f"Image: {abs_path}\n\n"
         "Describe what this figure explains in 2-3 sentences, focusing on the key concepts "
         "and how they relate to each other. Include any labels, axis titles, or annotations "
         "visible in the figure."
     )
 
+    b64_image = _encode_image(abs_path)
+    if not b64_image:
+        return ""
+
     try:
-        result = call_ollama(prompt, model=model)
+        result = call_ollama(prompt, model=model, images=[b64_image])
         return result.strip() if result else ""
     except Exception as e:
         logger.warning("Figure description failed for %s: %s", image_path, str(e))

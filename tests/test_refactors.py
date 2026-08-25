@@ -3,14 +3,15 @@ Tests for refactors covering:
 - lesson_orchestrator.build_module_artifacts
 - grader._grade_single_question and _get_correct_answer
 """
-import pytest
 import tempfile
 from unittest.mock import patch
 
+import pytest
 from cachelib import FileSystemCache
+
 from src import create_app
+from src.services.grader import _get_correct_answer, _grade_single_question
 from src.services.lesson_orchestrator import build_module_artifacts, make_retriever
-from src.services.grader import _grade_single_question, _get_correct_answer
 
 
 @pytest.fixture

@@ -18,7 +18,7 @@ def admin():
     return render_template('admin.html', users=users)
 
 
-@bp.route('/admin/toggle/<user_id>')
+@bp.route('/admin/toggle/<user_id>', methods=['POST'])
 @login_required
 def admin_toggle_generation(user_id):
     if not current_user.is_admin:

@@ -14,8 +14,10 @@ POST /lessons/<i>/grade → quiz grading
 import io
 import json
 import tempfile
+
 import pytest
 from cachelib import FileSystemCache
+
 from src import create_app, db
 from src.models import User
 from src.repositories.lesson_repo import get_lessons
@@ -86,7 +88,6 @@ def test_full_happy_path_mocked(client):
     # 3) Trigger lesson generation
     rv = client.post('/generate-lessons')
     assert rv.status_code == 200
-    import json
     redirect_url = rv.get_json().get('redirect', '')
     assert redirect_url, 'Expected redirect URL in generate-lessons response'
     rv = client.get(redirect_url)
@@ -139,8 +140,8 @@ def test_full_happy_path_mocked(client):
 
     # The final-quiz submission (answers present) must persist completion
     # status — guards the checkpoint-vs-final-quiz distinction.
-    from src.repositories.lesson_repo import get_lessons as _get_lessons
     from src.models import User as _U
+    from src.repositories.lesson_repo import get_lessons as _get_lessons
     _user = _U.query.filter_by(username='smoker').first()
     _lessons = _get_lessons(_user)
     assert _lessons[0]['completed'] is True, (

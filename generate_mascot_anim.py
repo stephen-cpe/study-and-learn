@@ -336,7 +336,6 @@ def add_warning_particles(base: Image.Image, t: float, count: int = 4) -> Image.
     radius_x = 250
     radius_y = 100
     for i in range(count):
-        phase = (t + i / count) % 1.0
         # Slow horizontal drift, gentle vertical bob.
         x = 380 + radius_x * math.cos(2 * math.pi * (i / count + t * 0.5))
         y = cy + radius_y * math.sin(2 * math.pi * (i / count + t * 0.5))

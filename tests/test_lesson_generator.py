@@ -1,10 +1,13 @@
 """
 Unit tests for the lesson generator service.
 """
-import pytest
+import json
+
 from src.services.lesson_generator import (
-    generate_lesson, _validate_slides, _fallback_lesson,
-    generate_narration_script, _build_narration_fallback,
+    _fallback_lesson,
+    _validate_slides,
+    generate_lesson,
+    generate_narration_script,
 )
 
 

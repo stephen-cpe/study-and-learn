@@ -8,10 +8,11 @@ Covers:
   - Navbar avatar in base.html renders the user's avatar, not avatar-0.png
   - Avatar assets exist on disk in the new images/avatars/ subdirectory
 """
-import pytest
 import tempfile
-from cachelib import FileSystemCache
 from pathlib import Path
+
+import pytest
+from cachelib import FileSystemCache
 
 from src import create_app, db
 from src.models import User
@@ -27,7 +28,6 @@ from src.services.settings_service import (
     validate_difficulty,
     validate_tts_speaker,
 )
-
 
 # ── Shared app fixture (mirrors existing test patterns) ────────────────────
 

@@ -21,7 +21,7 @@ import pytest
 from cachelib import FileSystemCache
 
 from src import create_app, db
-from src.models import User, StudyPath
+from src.models import StudyPath, User
 
 
 @pytest.fixture
@@ -184,7 +184,7 @@ def test_retake_resets_deck_position_to_zero(mock_lesson, mock_quiz, mock_tts, r
     # Re-fetch the lesson and check deck_position is now 0.
     with app.app_context():
         from src.repositories.lesson_repo import get_lessons
-        path = StudyPath.query.filter_by(id=real_path_id).first()
+        StudyPath.query.filter_by(id=real_path_id).first()
         lessons = get_lessons(user, path_id=real_path_id)
         assert lessons[0].get('deck_position', 0) == 0, (
             f"Expected deck_position reset to 0, got {lessons[0].get('deck_position')!r}"

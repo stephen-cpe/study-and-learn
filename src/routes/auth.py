@@ -1,6 +1,8 @@
 """
 Authentication routes — signup, login, logout, password reset.
 """
+from urllib.parse import urlparse
+
 from flask import flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
@@ -14,6 +16,24 @@ from src.services.settings_service import (
     TTS_SPEAKERS,
     apply_settings,
 )
+
+
+def _is_safe_redirect(target: str) -> bool:
+    """Return True if *target* is a safe relative URL for post-login redirect.
+
+    Rejects absolute URLs (``https://evil.com``), protocol-relative URLs
+    (``//evil.com``), and anything that doesn't start with a single ``/``.
+    This prevents open-redirect / phishing attacks via the ``next`` query
+    parameter.
+    """
+    if not target:
+        return False
+    if not target.startswith('/'):
+        return False
+    if target.startswith('//'):
+        return False
+    parsed = urlparse(target)
+    return parsed.scheme == '' and parsed.netloc == ''
 
 
 @bp.route('/signup', methods=['GET', 'POST'])
@@ -61,7 +81,7 @@ def login():
             login_user(user, remember=True)
             flash('Welcome back!', 'success')
             next_page = request.args.get('next')
-            if next_page:
+            if next_page and _is_safe_redirect(next_page):
                 return redirect(next_page)
             return redirect(url_for('main.index'))
 

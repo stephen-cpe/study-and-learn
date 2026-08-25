@@ -11,14 +11,12 @@ After Task 4:
   - The deck layout is exposed as lesson['deck_layout'] for the template.
 """
 import json
-import pytest
 
-from src.services.lesson_orchestrator import build_deck_layout
 from src.services.lesson_generator import (
-    generate_narration_script,
     _build_narration_fallback,
+    generate_narration_script,
 )
-
+from src.services.lesson_orchestrator import build_deck_layout
 
 # ── Deck layout builder ───────────────────────────────────────────────
 
@@ -323,7 +321,7 @@ def test_build_module_artifacts_attaches_deck_layout():
     so the template can iterate over it instead of building the layout itself."""
     from src.services.lesson_orchestrator import build_module_artifacts
 
-    slides = [
+    _slides = [
         {'type': 'title', 'title': 'T', 'subtitle': ''},
         {'type': 'content', 'heading': 'C', 'bullets': ['a']},
     ]
@@ -373,9 +371,10 @@ def test_build_module_artifacts_deck_layout_indices_unique():
 def test_tts_manifest_keys_match_deck_indices():
     """TTS service must build the manifest with deck_index keys
     (not content slide indices), so the audio route can serve them by deck index."""
-    from src.services.tts_service import generate_lesson_audio
-    import tempfile
     import pathlib
+    import tempfile
+
+    from src.services.tts_service import generate_lesson_audio
 
     with tempfile.TemporaryDirectory() as temp_dir:
         tmp_path = pathlib.Path(temp_dir)

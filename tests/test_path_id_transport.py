@@ -16,7 +16,7 @@ import pytest
 from cachelib import FileSystemCache
 
 from src import create_app, db
-from src.models import User, StudyPath
+from src.models import StudyPath, User
 
 
 @pytest.fixture
@@ -119,7 +119,7 @@ def test_retake_accepts_path_id_from_json_body(mock_lesson, mock_quiz, mock_tts_
         c.post('/login', data={'username': 'pathtester', 'password': 'pass'})
         # JS sends path_id in the JSON body (no query string)
         response = c.post(
-            f'/lessons/0/retake',
+            '/lessons/0/retake',
             data=json.dumps({'path_id': real_path_id}),
             content_type='application/json',
         )

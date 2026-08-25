@@ -33,7 +33,7 @@ import pytest
 from cachelib import FileSystemCache
 
 from src import create_app, db
-from src.models import User, StudyPath
+from src.models import StudyPath, User
 from src.repositories.lesson_repo import get_lessons
 
 

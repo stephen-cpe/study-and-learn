@@ -23,19 +23,31 @@ OLLAMA_MODEL           (optional)  Default: gemma4:31b-cloud. Override via the
                       Cloud instance serves.
 OLLAMA_TIMEOUT         (optional)  Default: 300 seconds
 """
-import os
 import logging
+import os
+
 import requests
 
 from src.services.exceptions import (
-    AIModelUnavailableError, AICloudAPIError, AITimeoutError,
+    AICloudAPIError,
+    AIModelUnavailableError,
+    AITimeoutError,
 )
 
 logger = logging.getLogger(__name__)
 
 
-def call_ollama(prompt: str, model: str = None) -> str:
-    """Call Ollama Cloud API (OpenAI-compatible endpoint)."""
+def call_ollama(prompt: str, model: str = None, images: list = None) -> str:
+    """Call Ollama Cloud API (OpenAI-compatible endpoint).
+
+    Args:
+        prompt: The text prompt to send to the model.
+        model: The cloud model name. Defaults to the OLLAMA_MODEL env var.
+        images: Optional list of base64-encoded image strings for vision
+            models. When provided, the message payload includes an
+            ``image_url`` content entry (data URI) so the cloud vision
+            model can process the image.
+    """
     if os.environ.get('AI_MOCK', '').lower() == 'true':
         logger.info("Using MOCK response")
         return f"Mock response for prompt: {prompt[:50]}..."
@@ -53,11 +65,26 @@ def call_ollama(prompt: str, model: str = None) -> str:
         "Content-Type": "application/json"
     }
 
-    payload = {
-        "model": model,
-        "messages": [{"role": "user", "content": prompt}],
-        "stream": False
-    }
+    if images:
+        user_content = [
+            {"type": "text", "text": prompt},
+        ]
+        for b64 in images:
+            user_content.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:image/png;base64,{b64}"},
+            })
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": user_content}],
+            "stream": False
+        }
+    else:
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "stream": False
+        }
 
     logger.info(f"Calling Ollama Cloud model='{model}' timeout={timeout}s")
     try:
@@ -78,7 +105,7 @@ def call_ollama(prompt: str, model: str = None) -> str:
             f"Cloud model '{model}' took too long to respond ({timeout}s timeout). "
             f"Try again or use a smaller model."
         )
-    except requests.exceptions.HTTPError as e:
+    except requests.exceptions.HTTPError:
         status = response.status_code
         logger.error(f"Ollama Cloud HTTP ERROR: {status} {response.text}")
         if status == 400:

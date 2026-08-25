@@ -1,8 +1,13 @@
-import pytest
 from src.services.progress_tracker import (
-    STAGES, GENERATE_STAGES, PROCESS_STAGES,
-    create_task, update_progress, update_cosmetic, mark_error, get_progress,
+    GENERATE_STAGES,
+    PROCESS_STAGES,
+    STAGES,
     cleanup_task,
+    create_task,
+    get_progress,
+    mark_error,
+    update_cosmetic,
+    update_progress,
 )
 
 

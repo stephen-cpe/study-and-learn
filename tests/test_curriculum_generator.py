@@ -1,8 +1,6 @@
 """
 Unit tests for the curriculum generator service.
 """
-import os
-import pytest
 from src.services.curriculum_generator import generate_study_path
 
 

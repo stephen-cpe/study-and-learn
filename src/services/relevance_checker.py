@@ -3,6 +3,7 @@ Relevance checking service for the Study-and-Learn MVP.
 """
 import json
 import logging
+
 from src.services.ai_client import call_ollama
 from src.services.exceptions import AIServiceError, StudyAndLearnError
 

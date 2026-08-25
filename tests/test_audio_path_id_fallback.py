@@ -13,13 +13,12 @@ clearly had lessons with audio files on disk.
 """
 import json
 import tempfile
-from unittest.mock import patch
 
 import pytest
 from cachelib import FileSystemCache
 
 from src import create_app, db
-from src.models import User, StudyPath
+from src.models import StudyPath, User
 
 
 @pytest.fixture
@@ -113,7 +112,7 @@ def test_audio_route_falls_back_to_active_path_when_path_id_empty(audio_fallback
     most recent active StudyPath."""
     app, user = audio_fallback_client
     monkeypatch.setattr('src.services.tts_service.TTS_DIR', tmp_path)
-    real_path_id = _seed_path_with_lessons_and_audio(app, user, tmp_path, num_modules=1)
+    _seed_path_with_lessons_and_audio(app, user, tmp_path, num_modules=1)
 
     with app.test_client() as c:
         c.post('/login', data={'username': 'audiofallback', 'password': 'pass'})
@@ -189,7 +188,7 @@ def test_audio_route_uses_most_recent_active_path(audio_fallback_client, monkeyp
             'difficulty': 'Normal', 'tts_enabled': True, 'tts_speaker': 'Ava',
             'completed': False, 'score': None, 'passed': False,
         }]
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta, timezone
         older = StudyPath(
             user_id=user.id, title='Older', learning_goal='Old',
             status='active', content_data=json.dumps(lessons),

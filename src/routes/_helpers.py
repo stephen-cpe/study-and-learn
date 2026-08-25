@@ -8,13 +8,15 @@ import json
 from typing import Any, List, Optional
 
 from flask import request, session
-
 from flask_login import current_user
 
 from src.repositories.lesson_repo import (
     get_extracted_texts as _db_get_texts,
+)
+from src.repositories.lesson_repo import (
     get_file_names as _db_get_filenames,
-    get_learning_goal as _db_get_goal,
+)
+from src.repositories.lesson_repo import (
     get_most_recent_active_path,
 )
 

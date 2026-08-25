@@ -3,8 +3,10 @@ Unit tests for the document parser service.
 """
 import os
 import tempfile
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
+
 from src.services.document_parser import extract_text
 
 
@@ -144,9 +146,9 @@ def test_extract_text_with_vision_unknown_ext(tmp_path):
 
 def test_extract_text_with_vision_pdf_dedup(tmp_path, monkeypatch):
     monkeypatch.setenv("AI_MOCK", "true")
-    from src.services.document_parser import extract_text_with_vision
-
     import os
+
+    from src.services.document_parser import extract_text_with_vision
     fixtures = os.path.join(os.path.dirname(__file__), "fixtures", "sample.pdf")
 
     with patch("src.services.vision_parser.is_content_registered") as mock_is_reg, \

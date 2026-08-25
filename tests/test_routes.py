@@ -1,10 +1,13 @@
 import io
 import tempfile
-import pytest
 from unittest.mock import patch
+
+import pytest
 from cachelib import FileSystemCache
+
 from src import create_app, db
 from src.models import User
+
 
 @pytest.fixture
 def client(monkeypatch):
@@ -118,7 +121,7 @@ def test_process_max_files(client):
 
 
 def test_cloze_dropdown_grader():
-    from src.services.grader import _grade_single_question, _get_correct_answer
+    from src.services.grader import _get_correct_answer, _grade_single_question
     q = {
         'id': 'q1', 'type': 'cloze_dropdown',
         'prompt': 'Water is ___.',
@@ -142,8 +145,8 @@ def test_lesson_stores_difficulty_from_user(mock_quiz_ollama, mock_lesson_ollama
         sess['study_path'] = {'modules': [{'title': 'M1', 'estimated_effort': '1h'}]}
         sess['extracted_texts'] = ['text']
 
-    from src.repositories.lesson_repo import get_lessons
     from src.models import User
+    from src.repositories.lesson_repo import get_lessons
 
     response = logged_in_client.post('/generate-lessons')
     assert response.status_code == 200
@@ -173,8 +176,8 @@ def test_save_position_stores_deck_position(mock_quiz_ollama, mock_lesson_ollama
     assert rv.status_code == 200
     assert rv.get_json()['ok'] is True
 
-    from src.repositories.lesson_repo import get_lessons
     from src.models import User
+    from src.repositories.lesson_repo import get_lessons
     user = User.query.filter_by(username='difftester').first()
     lessons = get_lessons(user)
     assert lessons[0].get('deck_position') == 3
@@ -193,8 +196,8 @@ def test_save_position_does_not_overwrite_completed(mock_quiz_ollama, mock_lesso
 
     logged_in_client.post('/generate-lessons')
 
-    from src.repositories.lesson_repo import get_lessons, save_lessons
     from src.models import User
+    from src.repositories.lesson_repo import get_lessons, save_lessons
     user = User.query.filter_by(username='difftester').first()
     lessons = get_lessons(user)
     lessons[0]['deck_position'] = 2
@@ -260,8 +263,8 @@ def test_generate_lessons_tts_enabled(mock_tts, mock_quiz_ollama, mock_lesson_ol
     response = tts_enabled_client.post('/generate-lessons')
     assert response.status_code == 200
 
-    from src.repositories.lesson_repo import get_lessons
     from src.models import User
+    from src.repositories.lesson_repo import get_lessons
     user = User.query.filter_by(username='ttstester').first()
     lessons = get_lessons(user)
     assert len(lessons) > 0
@@ -283,8 +286,8 @@ def test_generate_lessons_tts_disabled(mock_quiz_ollama, mock_lesson_ollama, log
     response = logged_in_client.post('/generate-lessons')
     assert response.status_code == 200
 
-    from src.repositories.lesson_repo import get_lessons
     from src.models import User
+    from src.repositories.lesson_repo import get_lessons
     user = User.query.filter_by(username='difftester').first()
     lessons = get_lessons(user)
     assert len(lessons) > 0
@@ -318,8 +321,8 @@ def test_generate_lessons_tts_failure_graceful(mock_tts, mock_quiz_ollama, mock_
     # New contract: response includes a task_id for polling.
     assert 'task_id' in data, f"Response missing task_id: {data!r}"
 
-    from src.repositories.lesson_repo import get_lessons
     from src.models import User
+    from src.repositories.lesson_repo import get_lessons
     user = User.query.filter_by(username='ttstester').first()
     lessons = get_lessons(user)
     assert len(lessons) > 0
@@ -381,7 +384,7 @@ def test_extracted_texts_nullified_after_generation(mock_quiz_ollama, mock_lesso
 
     logged_in_client.post('/generate-lessons')
 
-    from src.models import User, StudyPath
+    from src.models import StudyPath, User
     user = User.query.filter_by(username='difftester').first()
     path = StudyPath.query.filter_by(user_id=user.id, status='active').first()
     assert path is not None

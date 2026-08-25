@@ -19,7 +19,7 @@ The application features a retro-cyberpunk themed custom slide-deck engine, inli
 The application follows a service-oriented web architecture that separates HTTP routing from complex AI and document-processing logic.
 
 * **Frontend:** Bootstrap 5 paired with a custom CSS/JS retro-themed slide-deck engine.
-* **Backend:** Flask (Python 3.13) utilizing a strict Service Layer and Repository pattern.
+* **Backend:** Flask (Python 3.14) utilizing a strict Service Layer and Repository pattern.
 * **Data Layer:** PostgreSQL for relational data (users, study paths, progress) and ChromaDB (local or cloud) for vector storage.
 * **AI Integration:** Configurable local (Ollama) or cloud-based LLMs for summarization, curriculum generation, and OCR. A deterministic mock mode guarantees reliable offline testing.
 

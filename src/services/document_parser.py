@@ -1,8 +1,8 @@
 """
 Document parser service for extracting text from uploaded files.
 """
-import os
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -92,8 +92,12 @@ def extract_text_with_vision(file_path: str, progress_callback=None) -> str:
         Enriched text corpus with OCR and figure descriptions merged in
     """
     from src.services.vision_parser import (
-        hash_file, is_content_registered, register_content,
         extract_text_with_vision as _vision_extract,
+    )
+    from src.services.vision_parser import (
+        hash_file,
+        is_content_registered,
+        register_content,
     )
 
     _, ext = os.path.splitext(file_path)

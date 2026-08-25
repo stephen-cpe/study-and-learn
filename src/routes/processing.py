@@ -3,17 +3,28 @@ Processing routes — document upload, text extraction, AI pipeline, and results
 """
 import logging
 import os
+import uuid
 
-from flask import (current_app, flash, jsonify, redirect,
-                   render_template, request, session, url_for)
+from flask import (
+    current_app,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
 from flask_login import current_user
+from werkzeug.utils import secure_filename
 
 from src.repositories.lesson_repo import (
     create_study_path,
+)
+from src.repositories.lesson_repo import (
     get_learning_goal as _db_get_goal,
 )
 from src.routes import MAX_FILES, bp
-from src.routes._helpers import _resolve_hashes, _resolve_texts
 from src.services import progress_tracker
 from src.services.curriculum_generator import generate_study_path
 from src.services.document_parser import extract_text_with_vision
@@ -131,26 +142,35 @@ def process():
             flash(f'Skipping invalid file type: {file.filename}', 'warning')
             continue
 
-        filename = file.filename
-        file_path = os.path.join(upload_folder, filename)
+        # Sanitize the filename to prevent path traversal (e.g. "../../app.py")
+        # and collision between concurrent uploads of the same name. The
+        # original display name is preserved separately in ``filenames`` for
+        # the UI; the on-disk name uses a uuid prefix so two users uploading
+        # "notes.pdf" never overwrite each other.
+        original_filename = file.filename
+        safe_name = secure_filename(original_filename)
+        if not safe_name:
+            safe_name = "upload"
+        disk_filename = f"{uuid.uuid4().hex}_{safe_name}"
+        file_path = os.path.join(upload_folder, disk_filename)
         file.save(file_path)
 
         file_hash = hash_file(file_path)
         file_hashes.append(file_hash)
 
-        ext = os.path.splitext(filename)[1].lower()
+        ext = os.path.splitext(original_filename)[1].lower()
         if ext in ('.txt', '.md'):
             try:
                 text = extract_text_with_vision(file_path)
                 extracted_texts.append(text)
-                filenames.append(filename)
+                filenames.append(original_filename)
             except ValueError as e:
                 if is_ajax and task_id:
                     progress_tracker.mark_error(task_id, mascot_msg='Couldn\'t read a file')
                 if is_ajax:
                     progress_tracker.cleanup_task(task_id)
-                    return jsonify({'error': f'Error extracting {filename}: {str(e)}'}), 400
-                flash(f'Error extracting {filename}: {str(e)}', 'error')
+                    return jsonify({'error': f'Error extracting {original_filename}: {str(e)}'}), 400
+                flash(f'Error extracting {original_filename}: {str(e)}', 'error')
                 return redirect(url_for('main.index'))
             continue
 
@@ -162,7 +182,7 @@ def process():
                 entry = ContentRegistry.query.filter_by(file_hash=file_hash).first()
                 if entry and entry.extracted_text:
                     extracted_texts.append(entry.extracted_text)
-                    filenames.append(filename)
+                    filenames.append(original_filename)
                     continue
         except Exception as e:
             logger.warning("ContentRegistry lookup failed for hash %s: %s", file_hash[:8], str(e))
@@ -177,14 +197,14 @@ def process():
         try:
             text = extract_text_with_vision(file_path, progress_callback=ocr_progress)
             extracted_texts.append(text)
-            filenames.append(filename)
+            filenames.append(original_filename)
         except ValueError as e:
             if is_ajax and task_id:
                 progress_tracker.mark_error(task_id, mascot_msg='Couldn\'t read a file')
             if is_ajax:
                 progress_tracker.cleanup_task(task_id)
-                return jsonify({'error': f'Error extracting {filename}: {str(e)}'}), 400
-            flash(f'Error extracting {filename}: {str(e)}', 'error')
+                return jsonify({'error': f'Error extracting {original_filename}: {str(e)}'}), 400
+            flash(f'Error extracting {original_filename}: {str(e)}', 'error')
             return redirect(url_for('main.index'))
 
     if not extracted_texts:
@@ -260,7 +280,7 @@ def process():
             return jsonify({'error': str(e)}), 500
         flash(str(e), 'error')
         return redirect(url_for('main.index'))
-    except Exception as e:
+    except Exception:
         logger.error("Unexpected processing error", exc_info=True)
         if is_ajax and task_id:
             progress_tracker.mark_error(task_id, mascot_msg='Unexpected error — please retry')

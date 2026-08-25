@@ -26,9 +26,6 @@ After this fix:
     can serve audio for them.
 """
 import json
-from unittest.mock import patch
-
-import pytest
 
 from src.services.lesson_orchestrator import build_module_artifacts
 
@@ -229,7 +226,7 @@ def test_narration_script_keys_exactly_match_deck_layout_indices(monkeypatch):
     def retriever(q):
         return {'context_text': '', 'sources': []}
 
-    artifacts = build_module_artifacts(
+    build_module_artifacts(
         {'title': 'M'},
         'Learn M',
         retriever,
@@ -280,13 +277,13 @@ def test_narration_script_keys_exactly_match_deck_layout_indices(monkeypatch):
     # version. In the BUGGY version, none are present because the layout
     # was built with empty checkpoints.
     assert has_checkpoint_slot, (
-        f"DECK LAYOUT section of narration prompt does not include a "
-        f"checkpoint slot. (See captured prompt above for the exact "
-        f"prompt that was sent to the AI.)"
+        "DECK LAYOUT section of narration prompt does not include a "
+        "checkpoint slot. (See captured prompt above for the exact "
+        "prompt that was sent to the AI.)"
     )
     assert has_quiz_slot, (
-        f"DECK LAYOUT section missing Final Quiz slot"
+        "DECK LAYOUT section missing Final Quiz slot"
     )
     assert has_results_slot, (
-        f"DECK LAYOUT section missing Results slot"
+        "DECK LAYOUT section missing Results slot"
     )

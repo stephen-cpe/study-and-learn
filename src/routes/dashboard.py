@@ -5,8 +5,7 @@ import io
 import logging
 from datetime import datetime, timezone
 
-from flask import (Response, flash, redirect, render_template, request,
-                   session, url_for)
+from flask import Response, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
 
 logger = logging.getLogger(__name__)
@@ -218,8 +217,9 @@ def _clean_filename(name: str) -> str:
 
 
 def _build_pdf(lesson, slides, quiz_questions, checkpoints, sources, score, now) -> bytes:
-    from fpdf import FPDF
     import unicodedata
+
+    from fpdf import FPDF
 
     def _clean(text):
         s = str(text)

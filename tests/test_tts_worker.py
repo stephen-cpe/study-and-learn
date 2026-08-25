@@ -16,21 +16,17 @@ After Task 5:
 """
 import json
 import tempfile
-import threading
-import time
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 from cachelib import FileSystemCache
 
 from src import create_app, db
-from src.models import User, StudyPath
-from src.services.tts_service import TTS_DIR as REAL_TTS_DIR
+from src.models import StudyPath, User
 from src.services.tts_worker import (
-    run_tts_generation_for_path,
-    is_module_audio_ready,
     get_path_audio_status,
+    is_module_audio_ready,
+    run_tts_generation_for_path,
 )
 
 
@@ -402,7 +398,7 @@ def test_generate_lessons_returns_task_id(mock_lesson, mock_quiz, mock_tts, work
     thread is a daemon (so it never blocks process shutdown).
     """
     app, user = worker_client
-    real_path_id = _seed_path(app, user, num_modules=0)  # no lessons yet, just a path
+    _seed_path(app, user, num_modules=0)  # no lessons yet, just a path
     _patch_tts_dir(monkeypatch, tmp_path)
 
     # Slow TTS: simulate a 2-second generation so we can verify the
@@ -473,6 +469,7 @@ def test_generation_status_returns_true_after_column_set(
     polls to decide when to redirect from the results page.
     """
     from datetime import datetime, timezone
+
     from src.models import StudyPath
 
     app, user = worker_client
@@ -537,10 +534,9 @@ def test_route_sets_completion_column_when_tts_disabled(
     has TTS off, clicks Generate, and the route's else branch sets
     generation_completed_at before returning.
     """
-    from datetime import datetime, timezone
-    from src.models import StudyPath
-    from src.services.tts_service import TTS_DIR as REAL_TTS_DIR
     from unittest.mock import patch
+
+    from src.models import StudyPath
 
     # Disable TTS for this user (re-enable later in a fresh test).
     app, user = worker_client
@@ -623,7 +619,11 @@ def test_route_sets_completion_column_when_tts_disabled(
 from src.services import progress_tracker
 from src.services.progress_tracker import (
     GENERATE_STAGES,
+)
+from src.services.progress_tracker import (
     create_task as pt_create_task,
+)
+from src.services.progress_tracker import (
     get_progress as pt_get_progress,
 )
 
@@ -923,8 +923,8 @@ def test_worker_publishes_error_cosmetic_on_module_failure(
         f"mascot_state={entry.get('mascot_state')!r}"
     )
     assert entry.get('error') is True, (
-        f"Worker did not set error=True flag on failure; "
-        f"the JS sticky-error window would not engage."
+        "Worker did not set error=True flag on failure; "
+        "the JS sticky-error window would not engage."
     )
 
 

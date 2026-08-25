@@ -1,22 +1,27 @@
 """
 Flask application factory for the Study-and-Learn MVP.
 """
-import os
 import logging
-from flask import Flask
+import os
+
 from cachelib import FileSystemCache
+from flask import Flask
+from flask_login import LoginManager
+from flask_migrate import Migrate
 
 # ── Extensions (imported here for blueprint access patterns) ─────────────────
 from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
-from flask_login import LoginManager
-
 
 db = SQLAlchemy()  # noqa: F401
 migrate = Migrate()  # noqa: F401
 login_manager = LoginManager()
 
 logger = logging.getLogger(__name__)
+
+
+def _bool_env(name: str) -> bool:
+    """Return True if env var *name* is set to a truthy string."""
+    return os.environ.get(name, '').strip().lower() in ('1', 'true', 'yes', 'on')
 
 
 def create_app():
@@ -27,6 +32,22 @@ def create_app():
     from config import Config
     app.config.from_object(Config)
     logger.info(Config.summary())
+
+    # ── SECRET_KEY validation ────────────────────────────────────────────
+    # The config default is a known dev-only key. In production (real AI
+    # backend, no debug, no CI/mock), a weak SECRET_KEY makes session
+    # cookies forgeable. Fail fast in that case. Test/CI/mock environments
+    # are exempted because they either set SECRET_KEY via config.update()
+    # after create_app() returns, or don't need session security.
+    _is_debug = _bool_env('FLASK_DEBUG')
+    _is_mock = _bool_env('AI_MOCK')
+    _is_ci = _bool_env('CI')
+    if app.config['SECRET_KEY'] == 'dev-key-for-testing-only' and not _is_debug and not _is_mock and not _is_ci:
+        raise RuntimeError(
+            "SECRET_KEY is set to the insecure default 'dev-key-for-testing-only'. "
+            "Set the SECRET_KEY environment variable to a strong random string "
+            "(e.g. via `python -c \"import secrets; print(secrets.token_hex(32))\"`)."
+        )
 
     # ── PostgreSQL-only database (strict validation) ────────────────────
     if not app.config['SQLALCHEMY_DATABASE_URI']:

@@ -1,8 +1,6 @@
 """
 Unit tests for the relevance checker service.
 """
-import os
-import pytest
 from src.services.relevance_checker import check_relevance
 
 

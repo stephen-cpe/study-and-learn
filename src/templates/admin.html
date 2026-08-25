@@ -41,9 +41,11 @@
                 <td style="white-space: nowrap;">{{ user.created_at.strftime('%b %d, %Y') if user.created_at else 'N/A' }}</td>
                 <td>
                     <div class="d-flex gap-2 flex-wrap">
-                        <a href="{{ url_for('main.admin_toggle_generation', user_id=user.id) }}" class="btn btn-sm btn-outline-primary">
-                            {% if user.can_generate_lessons %}Revoke{% else %}Allow{% endif %}
-                        </a>
+                        <form method="POST" action="{{ url_for('main.admin_toggle_generation', user_id=user.id) }}" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-outline-primary">
+                                {% if user.can_generate_lessons %}Revoke{% else %}Allow{% endif %}
+                            </button>
+                        </form>
                         <button class="btn btn-sm btn-outline-warning"
                                 onclick="showResetForm('{{ user.id }}', '{{ user.username }}')">
                             Reset PW

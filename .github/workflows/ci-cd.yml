@@ -20,7 +20,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version: "3.14"
           cache: "pip"
 
       - name: Install system dependencies
@@ -32,6 +32,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install ruff
+
+      - name: Lint (ruff)
+        run: ruff check src/ tests/ app.py config.py gunicorn.conf.py generate_mascot_anim.py
 
       - name: Run tests
         env:

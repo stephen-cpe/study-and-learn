@@ -4,11 +4,13 @@ Tests for the DB-backed LessonRepository.
 Uses the SQLite in-memory fixture pattern established in test_lesson_models.py.
 """
 import json
-import pytest
 import tempfile
+
+import pytest
 from cachelib import FileSystemCache
+
 from src import create_app, db
-from src.models import User, StudyPath, LessonProgress
+from src.models import LessonProgress, StudyPath, User
 from src.repositories.lesson_repo import get_lessons, save_lessons
 
 

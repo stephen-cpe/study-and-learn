@@ -2,20 +2,38 @@
 Lesson routes — generation, slide deck, grading, and retake.
 """
 import logging
-from flask import (current_app, flash, jsonify, redirect, render_template,
-                   request, session, url_for)
+
+from flask import (
+    current_app,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
 from flask_login import current_user, login_required
 
 from src.repositories.lesson_repo import (
     get_active_path,
-    get_learning_goal as _db_get_goal,
     get_lessons,
     get_most_recent_active_path,
     get_study_path_data,
     save_lessons,
 )
+from src.repositories.lesson_repo import (
+    get_learning_goal as _db_get_goal,
+)
 from src.routes import PASS_THRESHOLD, bp
-from src.routes._helpers import _build_retriever, _resolve_goal, _resolve_hashes, _resolve_path_id, _resolve_texts, _resolve_filenames
+from src.routes._helpers import (
+    _build_retriever,
+    _resolve_filenames,
+    _resolve_goal,
+    _resolve_hashes,
+    _resolve_path_id,
+    _resolve_texts,
+)
 from src.services import progress_tracker
 from src.services.grader import _get_correct_answer, _grade_single_question
 from src.services.lesson_orchestrator import build_module_artifacts
@@ -154,7 +172,6 @@ def generate_lessons():
     # handler's stage 4 (max GENERATE_STAGES) with its own max
     # stage 3 (TTS_STAGES), causing the JS poll-based redirect
     # (``data.stage >= 4``) to never fire.
-    from datetime import datetime, timezone
     from src import db
     from src.models import StudyPath
 
@@ -211,9 +228,10 @@ def _set_generation_completed(path_id: str, user_id: str) -> None:
     polling with a "still working" message rather than redirecting
     — this covers the worst case where the column is never set.)
     """
+    from datetime import datetime, timezone
+
     from src import db
     from src.models import StudyPath
-    from datetime import datetime, timezone
     if not path_id:
         return
     try:
@@ -608,7 +626,10 @@ def save_lesson_position(module_index):
     if not lessons_data or module_index >= len(lessons_data):
         return jsonify({'ok': False}), 404
     data = request.get_json(silent=True) or {}
-    slide_index = int(data.get('slide_index', 0))
+    try:
+        slide_index = int(data.get('slide_index', 0))
+    except (TypeError, ValueError):
+        slide_index = 0
     if not lessons_data[module_index].get('completed', False):
         lessons_data[module_index]['deck_position'] = slide_index
         save_lessons(lessons_data, current_user, path_id=path_id)

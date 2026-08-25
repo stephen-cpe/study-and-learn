@@ -1,5 +1,5 @@
 # DigitalOcean Deployment Guide
-## For $48/month Ubuntu 25.10 Droplet + DuckDNS + Let's Encrypt SSL
+## For $48/month Ubuntu 26.04 Droplet + DuckDNS + Let's Encrypt SSL
 ### Complete Guide for Windows 11 Users
 
 ## Disclaimer
@@ -46,7 +46,7 @@ This guide walks you through deploying the Study-and-Learn Flask application to 
 1. Log in to https://cloud.digitalocean.com
 2. Click **Create** → **Droplets**
 3. Choose the following configuration:
-   - **Image**: Ubuntu 25.10
+   - **Image**: Ubuntu 26.04
    - **Size**: 4 vCPU / 8 GB RAM / 160 GB SSD ($48/month)
    - **Authentication**: SSH key (recommended) or password
    - **SSH Key**: Add your existing SSH key or create a new one (see below)
@@ -110,7 +110,8 @@ If SSH fails:
 sudo apt update && sudo apt upgrade -y
 
 # Install required packages
-sudo apt install -y python3-full python3.13-venv python3.13-dev python3-pip python3-certbot-nginx build-essential libssl-dev nginx certbot curl git postgresql postgresql-contrib poppler-utils
+sudo apt install -y python3-full python3-venv python3-dev python3-pip python3-certbot-nginx build-essential libssl-dev nginx certbot curl git postgresql postgresql-contrib poppler-utils
+
 ```
 
 > **Note:** `poppler-utils` provides `pdftoppm` which the OCR pipeline needs for PDF rendering. On Linux it is auto-detected — no `POPPLER_PATH` env var needed (unlike Windows).

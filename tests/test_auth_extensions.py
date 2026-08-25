@@ -2,10 +2,12 @@
 Tests verifying Flask-Login, Flask-SQLAlchemy,
 Flask-Migrate, and psycopg2 are wired into the app factory without errors.
 """
-import pytest
 import tempfile
+
+import pytest
 from cachelib import FileSystemCache
 from flask import current_app
+
 from src import create_app
 
 

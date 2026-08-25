@@ -5,9 +5,11 @@ The fixture below overrides SQLALCHEMY_DATABASE_URI to an in-memory SQLite DB
 so auth tests run quickly and in isolation. The real DATABASE_URL is still
 set first so the app factory's PostgreSQL validation passes at startup.
 """
-import pytest
 import tempfile
+
+import pytest
 from cachelib import FileSystemCache
+
 from src import create_app, db
 from src.models import User
 

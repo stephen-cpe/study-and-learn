@@ -23,8 +23,6 @@ from src import create_app, db
 from src.models import User
 from src.services import progress_tracker
 from src.services.progress_tracker import (
-    GENERATE_STAGES,
-    create_task as pt_create_task,
     get_progress as pt_get_progress,
 )
 

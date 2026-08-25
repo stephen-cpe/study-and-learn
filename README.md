@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-1. Install Python 3.13 from https://python.org
+1. Install Python 3.14 from https://python.org
 2. Install Ollama from https://ollama.com/download
 3. Install PostgreSQL from https://www.postgresql.org/download/windows
 

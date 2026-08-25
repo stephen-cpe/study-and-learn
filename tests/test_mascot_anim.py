@@ -16,7 +16,6 @@ The mascot is a key piece of UX – these tests guard the user's
   error frame (we choreograph the error, we don't re-paint the mascot).
 * The template/JS wires the error state up.
 """
-import os
 from pathlib import Path
 
 import pytest
@@ -223,8 +222,11 @@ def test_generator_choreographies_have_expected_frame_counts():
     frames (matches the GIFs saved on disk).  Runs the generator
     in-memory with no I/O."""
     from generate_mascot_anim import (
-        build_idle_frames, build_busy_frames, build_happy_frames,
-        build_error_frames, load_base,
+        build_busy_frames,
+        build_error_frames,
+        build_happy_frames,
+        build_idle_frames,
+        load_base,
     )
     base = load_base()
     assert len(build_idle_frames(base)) == 14
@@ -238,8 +240,11 @@ def test_generator_frames_have_transparent_background():
     RGBA image with a transparent background, ready for the GIF
     prep step."""
     from generate_mascot_anim import (
-        build_idle_frames, build_busy_frames, build_happy_frames,
-        build_error_frames, load_base,
+        build_busy_frames,
+        build_error_frames,
+        build_happy_frames,
+        build_idle_frames,
+        load_base,
     )
     base = load_base()
     for build_fn in (
@@ -265,6 +270,7 @@ def test_error_state_preserves_base_mascot_pixels():
     bounding box still match the base PNG (allowing for per-frame
     choreography like X-eyes and dimmed chest lights)."""
     import numpy as np
+
     from generate_mascot_anim import build_error_frames, load_base
 
     base = load_base()

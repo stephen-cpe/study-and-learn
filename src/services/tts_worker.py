@@ -30,13 +30,11 @@ Key contract:
 """
 import logging
 import threading
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from src.services import progress_tracker
 from src.services.tts_service import (
     TTS_DIR,
-    get_audio_manifest,
     generate_lesson_audio,
 )
 
@@ -100,9 +98,9 @@ def get_path_audio_status(user_id: str, path_id: str) -> Dict[str, Any]:
             - 'ready_count': number of modules with status='ready'
             - 'total': total number of modules in the path
     """
-    from src.models import StudyPath, LessonProgress
-    from src import db
     import json
+
+    from src.models import StudyPath
 
     path = StudyPath.query.filter_by(id=path_id, user_id=user_id).first()
     if not path or not path.content_data:
@@ -187,9 +185,10 @@ def run_tts_generation_for_path(
             - 'modules': list of {module_index, status, error, skipped}
             - 'all_ready': True when every TTS-enabled module is 'ready'
     """
-    from src.models import StudyPath
-    from src import db
     import json
+
+    from src import db
+    from src.models import StudyPath
 
     try:
         if task_id:
@@ -397,6 +396,7 @@ def spawn_tts_background_task(
                 # function uses) rather than the cache.
                 try:
                     from datetime import datetime, timezone
+
                     from src.models import StudyPath
                     path = StudyPath.query.filter_by(
                         id=path_id, user_id=user_id,

@@ -1,9 +1,7 @@
 """
 Unit tests for RAG services: chunker and vector_store.
 """
-import os
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 
 def test_chunk_text_basic():

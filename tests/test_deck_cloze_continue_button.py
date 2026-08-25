@@ -14,19 +14,15 @@ consistent behavior:
     learner selects a value from the dropdown.
   * No `.checkpoint-check-btn` is rendered for cloze_dropdown checkpoints.
 """
-import io
-import json
 import re
 import tempfile
 
 import pytest
 from cachelib import FileSystemCache
-from unittest.mock import patch
 
 from src import create_app, db
 from src.models import User
 from src.repositories.lesson_repo import save_lessons
-
 
 # ── Fixtures ──────────────────────────────────────────────────────────────
 

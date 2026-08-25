@@ -27,8 +27,18 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
 
-def _call_ollama_local(prompt: str, model: str = None) -> str:
-    """Call local Ollama API to generate a response from a prompt."""
+def _call_ollama_local(prompt: str, model: str = None, images: list = None) -> str:
+    """Call local Ollama API to generate a response from a prompt.
+
+    Args:
+        prompt: The text prompt to send to the model.
+        model: The Ollama model name. Defaults to the OLLAMA_MODEL env var.
+        images: Optional list of base64-encoded image strings (for vision
+            models). When provided, the Ollama ``/api/generate`` payload
+            includes an ``images`` array so the model can actually see
+            the image content. Without this, a file path embedded in the
+            prompt text is never read by the model.
+    """
     if model is None:
         model = os.environ.get('OLLAMA_MODEL', 'qwen3:0.6b')
 
@@ -42,6 +52,8 @@ def _call_ollama_local(prompt: str, model: str = None) -> str:
         "stream": False,
         "options": {"num_ctx": 4096}
     }
+    if images:
+        payload["images"] = images
 
     logger.info(f"Calling Ollama model='{model}' timeout={timeout}s")
     try:
@@ -63,7 +75,7 @@ def _call_ollama_local(prompt: str, model: str = None) -> str:
             f"Model '{model}' took too long to respond ({timeout}s timeout). "
             f"Try a smaller model or reduce input size."
         )
-    except requests.exceptions.HTTPError as e:
+    except requests.exceptions.HTTPError:
         logger.error(f"Ollama HTTP ERROR: {response.status_code} {response.text}")
         raise AIServiceError(
             f"Local Ollama returned error {response.status_code}. "
@@ -80,27 +92,39 @@ def _call_ollama_local(prompt: str, model: str = None) -> str:
         raise AIModelUnavailableError(f"Failed to reach Ollama at {url}: {str(e)}")
 
 
-def call_ollama(prompt: str, model: str = None, force_local: bool = False) -> str:
+def call_ollama(prompt: str, model: str = None, force_local: bool = False,
+                images: list = None) -> str:
     """Return an AI response for *prompt*, checking AI_MOCK at call time.
 
     * If ``AI_MOCK=true`` -> deterministic stub (used in CI/tests).
     * If ``force_local=True`` -> always uses local Ollama via :func:`_call_ollama_local`.
     * If ``AI_BACKEND=cloud`` -> delegates to :func:`ai_client_cloud.call_ollama`.
     * Otherwise -> local Ollama via :func:`_call_ollama_local`.
+
+    Args:
+        prompt: The text prompt to send to the model.
+        model: The Ollama model name. If None, uses the backend's default.
+        force_local: If True, always use the local Ollama backend regardless
+            of ``AI_BACKEND``. Used by the OCR pipeline (Ollama Cloud does
+            not serve the local OCR model).
+        images: Optional list of base64-encoded image strings for vision
+            models. Passed through to the underlying backend so the model
+            receives the actual image bytes, not just a file path in the
+            prompt text.
     """
     if os.environ.get('AI_MOCK', '').lower() == 'true':
         logger.info("Using MOCK response")
         return f"Mock response for prompt: {prompt[:50]}..."
 
     if force_local:
-        return _call_ollama_local(prompt, model)
+        return _call_ollama_local(prompt, model, images=images)
 
     backend = os.environ.get('AI_BACKEND', 'local').lower()
     if backend == 'cloud':
         from .ai_client_cloud import call_ollama as cloud_call
-        return cloud_call(prompt, model)
+        return cloud_call(prompt, model, images=images)
 
-    return _call_ollama_local(prompt, model)
+    return _call_ollama_local(prompt, model, images=images)
 
 
 

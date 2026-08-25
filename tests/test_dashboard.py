@@ -3,12 +3,13 @@ Tests for Learner Dashboard + Cancel/Abandon + 3-Lesson Cap UI.
 
 Uses the SQLite in-memory fixture pattern established in test_integration.py.
 """
-import io
 import tempfile
+
 import pytest
 from cachelib import FileSystemCache
+
 from src import create_app, db
-from src.models import User, StudyPath, LessonProgress
+from src.models import LessonProgress, StudyPath, User
 
 
 @pytest.fixture
@@ -422,7 +423,7 @@ def test_confirm_modal_markup_present_on_dashboard(client):
 
 
 def test_cancel_form_uses_data_confirm_not_onsubmit(client):
-    path = _make_active_path(client)
+    _make_active_path(client)
     rv = client.get('/dashboard')
     assert rv.status_code == 200
     assert b'data-confirm="true"' in rv.data

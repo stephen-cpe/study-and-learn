@@ -2,14 +2,12 @@
 Unit tests for the TTS audio generation service.
 """
 import json
-import pytest
-from unittest.mock import patch, MagicMock
-from pathlib import Path
 
 from src.services.tts_service import (
-    _get_voice, generate_lesson_audio, get_audio_manifest,
-    delete_lesson_audio, delete_module_audio,
-    SPEAKER_VOICES, DEFAULT_VOICE, TTS_DIR,
+    DEFAULT_VOICE,
+    _get_voice,
+    delete_lesson_audio,
+    generate_lesson_audio,
 )
 
 
@@ -65,8 +63,8 @@ def test_generate_lesson_audio_drains_asyncgens_before_loop_close(monkeypatch, t
     release lingering aiohttp SSL sockets. Without this, file descriptors
     leak on each module's TTS generation, eventually causing
     OSError: [Errno 24] Too many open files in production."""
-    import asyncio
     from asyncio.base_events import BaseEventLoop
+
     from src.services import tts_service as tts_module
 
     monkeypatch.setattr(tts_module, 'TTS_DIR', tmp_path)

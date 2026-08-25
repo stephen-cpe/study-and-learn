@@ -1,8 +1,6 @@
 """
 Unit tests for the AI client service.
 """
-import os
-import pytest
 from src.services.ai_client import call_ollama
 
 
