@@ -18,7 +18,9 @@ Environment variables
 ---------------------
 OLLAMA_CLOUD_API_KEY   (required)  Ollama Cloud API key
 OLLAMA_CLOUD_BASE_URL  (optional)  Default: https://ollama.com
-OLLAMA_MODEL           (optional)  Default: gemma4:31b-cloud
+OLLAMA_MODEL           (optional)  Default: gemma4:31b-cloud. Override via the
+                      OLLAMA_MODEL env var to use any chat model your Ollama
+                      Cloud instance serves.
 OLLAMA_TIMEOUT         (optional)  Default: 300 seconds
 """
 import os

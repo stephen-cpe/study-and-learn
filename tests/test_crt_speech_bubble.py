@@ -239,7 +239,7 @@ def test_old_long_mascot_messages_removed():
 # ``window.location.href = '/lessons'`` — which 302-bounced to
 # /results (lessons not yet saved) and made it LOOK like the
 # server-side redirect was firing prematurely. With cloud AI
-# (gemma3:27b-cloud) and 3+ modules, generation can take 15-25
+# and 3+ modules, generation can take 15-25
 # minutes; the 10-minute cap was too aggressive. The new
 # contract: when the hard cap expires the JS simply stops polling
 # and shows a "still working" message; the user can navigate
@@ -282,7 +282,7 @@ def test_progress_js_hard_timeout_does_not_redirect():
 def test_progress_js_hard_timeout_is_at_least_2_hours():
     """HARD_TIMEOUT_MS must be at least 2 hours (7,200,000 ms).
 
-    With cloud AI (gemma3:27b-cloud) and 3+ modules, a full
+    With cloud AI and 3+ modules, a full
     generation (lessons + checkpoints + quiz + narration
     script + edge-tts audio) can take 45-90 minutes end-to-end.
     The cap was raised to 2 hours to accommodate the slowest

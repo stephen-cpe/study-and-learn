@@ -1,5 +1,5 @@
 """
-Tests for Sprint 5 Phase 2.3 — Learner Dashboard + Cancel/Abandon + 3-Lesson Cap UI.
+Tests for Learner Dashboard + Cancel/Abandon + 3-Lesson Cap UI.
 
 Uses the SQLite in-memory fixture pattern established in test_integration.py.
 """

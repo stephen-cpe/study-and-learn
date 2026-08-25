@@ -1,5 +1,5 @@
 """
-Tests for Sprint 5 Phase 1.1 — verify Flask-Login, Flask-SQLAlchemy,
+Tests verifying Flask-Login, Flask-SQLAlchemy,
 Flask-Migrate, and psycopg2 are wired into the app factory without errors.
 """
 import pytest

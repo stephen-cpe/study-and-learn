@@ -1,5 +1,5 @@
 """
-Tests for Sprint 5 Phase 1.2 — User SQLAlchemy model.
+Tests for the User SQLAlchemy model.
 
 The fixture below overrides SQLALCHEMY_DATABASE_URI to an in-memory SQLite DB
 so model unit tests run quickly and in isolation. The real DATABASE_URL is still

@@ -1,5 +1,5 @@
 """
-Tests for Sprint 5 Phase 2.2 — DB-backed LessonRepository.
+Tests for the DB-backed LessonRepository.
 
 Uses the SQLite in-memory fixture pattern established in test_lesson_models.py.
 """

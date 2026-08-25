@@ -3,7 +3,7 @@
 ### Complete Guide for Windows 11 Users
 
 ## Disclaimer
-_This guide documents the deployed production configuration (Sprint 8, capstone submission). Reproduces the live DigitalOcean droplet hosting https://studyandlearn.duckdns.org._
+_This guide documents the DigitalOcean production deployment configuration. The original droplet has been decommissioned; this guide is retained as a reference for future redeployments._
 
 ---
 
@@ -191,7 +191,7 @@ This creates three seed accounts for testing:
 | bob      | BOBpassword   | USER  | Yes                  |
 | alice    | ALICEpassword | USER  | Yes                  |
 
-> **Security note:** Change these seed passwords or remove the seed users from `init_db.sql` before deploying to the public internet. For a 3-4 week temporary capstone demo, the seed accounts are fine for testing.
+> **Security note:** Change these seed passwords or remove the seed users from `init_db.sql` before deploying to the public internet. For a short demo window, the seed accounts are acceptable for testing.
 
 ### Step 6.3: Install Ollama and Pull the Embedding Model
 
@@ -221,7 +221,7 @@ curl http://localhost:11434/api/tags
 > **Why local Ollama for embeddings when AI_BACKEND=cloud?**  
 > Ollama Cloud's API only supports the OpenAI-compatible `/v1/chat/completions` endpoint. The `langchain_ollama.OllamaEmbeddings` class uses the native Ollama `/api/embed` endpoint, which is not exposed by Ollama Cloud. So embedding calls must go to a local Ollama instance. The `qwen3-embedding:0.6b` model is tiny (~600 MB) and runs in CPU-only mode — it won't compete with the app for resources.
 >
-> **What about the chat model?** Chat/completion calls (lesson generation, quiz generation, relevance checks) go through `ai_client_cloud.py` to Ollama Cloud (`AI_BACKEND=cloud`, `OLLAMA_MODEL=gemma4:31b-cloud`). You do NOT need to pull `gemma4:31b-cloud` locally — only the embedding model.
+> **What about the chat model?** Chat/completion calls (lesson generation, quiz generation, relevance checks) go through `ai_client_cloud.py` to Ollama Cloud (`AI_BACKEND=cloud`, `OLLAMA_MODEL=gemma4:31b-cloud`). You do NOT need to pull the chat model locally — only the embedding model. `gemma4:31b-cloud` is the default; override `OLLAMA_MODEL` to use any other cloud chat model your Ollama Cloud instance serves.
 
 ### Step 6.4: Create Environment File
 
@@ -386,7 +386,7 @@ pidfile = "/tmp/study-and-learn.pid"
 > The app uses `cachelib.FileSystemCache` for Flask sessions (`data/flask_session/`) and progress tracking (`data/progress_cache/`). These are per-process filesystem caches. Multiple Gunicorn workers would split the cache and break session/progress consistency. A single worker with 8 threads keeps all caching in one process and trivially handles 3 concurrent users.
 >
 > **Why `--timeout 7200` (2 hours)?**  
-> Lesson generation with cloud AI (gemma4:31b-cloud) and 3+ modules can take 45-90 minutes end-to-end (lessons + checkpoints + quiz + narration script + edge-tts audio). The 2-hour timeout ensures Gunicorn doesn't kill long-running generation requests. The app's own JS hard-timeout is also 2 hours and stops polling without redirecting.
+> Lesson generation with cloud AI (default model `gemma4:31b-cloud`, override via `OLLAMA_MODEL`) and 3+ modules can take 45-90 minutes end-to-end (lessons + checkpoints + quiz + narration script + edge-tts audio). The 2-hour timeout ensures Gunicorn doesn't kill long-running generation requests. The app's own JS hard-timeout is also 2 hours and stops polling without redirecting.
 >
 > **Why `--bind 127.0.0.1:5000`?**  
 > Gunicorn binds to localhost only. Nginx (the public-facing reverse proxy) forwards external traffic to Gunicorn. This means port 5000 is never exposed to the internet directly.
@@ -774,13 +774,13 @@ sudo systemctl status study-and-learn
 curl http://127.0.0.1:5000/health
 ```
 
-**Your app is deployed with CI/CD.** Every `git push origin main` automatically tests, deploys, and verifies (verified live during Sprint 8).
+**Your app is deployed with CI/CD.** Every `git push origin main` automatically tests, deploys, and verifies.
 
 ---
 
 ## 12. Concurrency Test (3 Simultaneous Users)
 
-This is the capstone-specific test — verify 3 users can use the app at the same time.
+This is a concurrency test — verify 3 users can use the app at the same time.
 
 ### Manual Test (3 Browser Sessions):
 
@@ -798,30 +798,6 @@ This is the capstone-specific test — verify 3 users can use the app at the sam
 - **No 500 errors:** Check `logs/error.log` and `journalctl -u study-and-learn`
 
 > **If progress bars flicker or sessions cross:** This would indicate a multi-worker issue. Verify the systemd service is using `--workers 1` (single process). Run `sudo systemctl cat study-and-learn` to confirm.
-
----
-
-## 13. Shutdown Plan (Post-Capstone)
-
-Since this is a temporary 3-4 week deployment:
-
-1. **Power off the droplet** (not destroy) if you might need it again:
-   - DigitalOcean Dashboard → Droplets → Power Off
-   - You stop paying for CPU/RAM but keep the disk (small charge)
-
-2. **Destroy the droplet** when completely done:
-   - DigitalOcean Dashboard → Droplets → Destroy
-   - Stops all charges
-
-3. **Optional: Take a snapshot** before destroying:
-   - DigitalOcean Dashboard → Droplets → Snapshots → Take Snapshot
-   - Lets you restore the exact state later (snapshot storage is cheap)
-
-4. **Revoke credentials when done:**
-   - Rotate or revoke the Ollama Cloud API key
-   - Rotate or revoke the Chroma Cloud API key
-   - Remove the `DO_SSH_PRIVATE_KEY` from GitHub Secrets
-   - Delete the DuckDNS domain if no longer needed
 
 ---
 
@@ -908,7 +884,7 @@ pytest -v tests/
 
 **Symptom:** Progress page stays at "Building lesson..." for a long time
 
-**This is expected with cloud AI.** Full generation with `gemma4:31b-cloud` and 3+ modules can take 45-90 minutes. The JS hard-timeout is 2 hours and will show a "still working" message without redirecting. Check:
+**This is expected with cloud AI.** Full generation with the default cloud chat model (`gemma4:31b-cloud`, override via `OLLAMA_MODEL`) and 3+ modules can take 45-90 minutes. The JS hard-timeout is 2 hours and will show a "still working" message without redirecting. Check:
 
 1. Is Ollama Cloud reachable? `curl -H "Authorization: Bearer $OLLAMA_CLOUD_API_KEY" https://ollama.com/api/tags`
 2. Check app logs: `tail -50 /home/study-and-learn/logs/error.log`

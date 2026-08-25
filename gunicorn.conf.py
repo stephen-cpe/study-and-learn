@@ -8,7 +8,7 @@
 # the app uses cachelib.FileSystemCache for Flask sessions and progress
 # tracking — these are per-process filesystem caches that would split across
 # multiple Gunicorn workers, breaking session/progress consistency.
-# 8 threads trivially handle 3 concurrent users (the capstone target).
+# 8 threads trivially handle 3 concurrent users.
 
 bind = "127.0.0.1:5000"
 workers = 1

@@ -1,7 +1,5 @@
 """
-Tests for Sprint 5 Phase 0.2 refactors.
-
-Covers:
+Tests for refactors covering:
 - lesson_orchestrator.build_module_artifacts
 - grader._grade_single_question and _get_correct_answer
 """

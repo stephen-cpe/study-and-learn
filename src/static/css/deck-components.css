@@ -228,8 +228,8 @@
 }
 
 /* ── Cloze "Check Answer" button ── */
-/* (Removed in Sprint 8 QA: cloze_dropdown checkpoints now reuse the shared
-   .btn-submit-quiz Continue button so styling matches mcq / true_false.) */
+/* cloze_dropdown checkpoints now reuse the shared
+   .btn-submit-quiz Continue button so styling matches mcq / true_false. */
 
 .btn-submit-quiz {
     background: var(--deck-accent);

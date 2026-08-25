@@ -1,5 +1,5 @@
 """
-Tests for the mascot GIF generator (Sprint 7 animation polish).
+Tests for the mascot GIF generator (animation polish).
 
 The mascot is a key piece of UX – these tests guard the user's
 "make idle/busy/happy/error obviously distinct" requirement by enforcing:
@@ -318,7 +318,7 @@ def test_mascot_template_wires_error_state():
 
 
 def test_mascot_template_uses_new_state_subdirectory_layout():
-    """After the images/ reorganization (Sprint 7), each mascot state's
+    """After the images/ reorganization, each mascot state's
     GIF must live under mascots/{state}/, not directly in images/."""
     template = (ROOT / 'src' / 'templates' / '_mascot.html').read_text()
     expected_substrings = [

@@ -1,17 +1,5 @@
 # Study-and-Learn
 
-## Links
-
-- [Public Task Board](https://stephen-cpe.github.io/task-board-v1/)
-- ~~[Deployed App](https://studyandlearn.duckdns.org/)~~ *(Droplet being decommissioned Aug 8 — credit exhausted)*
-- [Design and Testing Document](https://github.com/stephen-cpe/study-and-learn/blob/main/docs/DESIGN_AND_TESTING.md)
-- [1st Set of Demo Documents](https://github.com/stpnpl/azthreus-systems/tree/main/demo-documents/1st-set)
-- [2nd Set of Demo Documents](https://github.com/stpnpl/azthreus-systems/tree/main/demo-documents/2nd-set)
-
-## Demo Access
-
-The deployed app is at [https://studyandlearn.duckdns.org/](https://studyandlearn.duckdns.org/). For security, production credentials differ from the local seed defaults and are provided in the recorded demo/presentation. To run locally with the seeded accounts below, follow the "Setup" section.
-
 ## Prerequisites
 
 1. Install Python 3.13 from https://python.org
@@ -105,11 +93,11 @@ ollama pull qwen3-embedding:0.6b
 ollama pull glm-ocr
 ```
 
-The default models are placeholders. For better results, use larger models such as `qwen3:8b` or `gemma3:4b` if your hardware can accommodate them.
+The default models are working placeholders — override `OLLAMA_MODEL` with any chat model from the Ollama library that fits your hardware (e.g. a larger model for better quality). The embedding (`qwen3-embedding:0.6b`) and OCR (`glm-ocr`) models are also overridable via `OLLAMA_EMBEDDING_MODEL` and `OLLAMA_OCR_MODEL`.
 
-Note: `config.py` ships `OLLAMA_MODEL=gemma4:31b-cloud` as the package default — to run locally without a `.env`, set `AI_BACKEND=local` and `OLLAMA_MODEL=qwen3:0.6b` in your `.env` (see `.env.example`).
+Note: `config.py` ships `OLLAMA_MODEL=gemma4:31b-cloud` as the package default (used in cloud mode). To run locally, set `AI_BACKEND=local` and `OLLAMA_MODEL=qwen3:0.6b` in your `.env` (see `.env.example`). Any chat model can be substituted via `OLLAMA_MODEL`.
 
-**For cloud deployment (`AI_BACKEND=cloud`):** You only need to pull `qwen3-embedding:0.6b` locally — the embedding model runs on the server for ChromaDB RAG retrieval. The chat model (`gemma4:31b-cloud`) runs on Ollama Cloud and does NOT need to be pulled locally. See `digitalocean-deployment-guide.md` for full deployment instructions.
+**For cloud deployment (`AI_BACKEND=cloud`):** You only need to pull `qwen3-embedding:0.6b` locally — the embedding model runs on the server for ChromaDB RAG retrieval (Ollama Cloud does not expose the `/api/embed` endpoint). The chat model runs on Ollama Cloud and does NOT need to be pulled locally. The default cloud chat model is `gemma4:31b-cloud`; override `OLLAMA_MODEL` to use any other cloud chat model. See `digitalocean-deployment-guide.md` for full deployment instructions.
 
 `glm-ocr` (0.9B) is the local OCR model. Pulling it alone does NOT enable OCR — OCR is additionally gated by `OCR_FULL=true` (default `false`). With `OCR_FULL=false` the app uses traditional text-layer extraction even if `glm-ocr` is installed; set `OCR_FULL=true` to run AI-powered OCR on PDFs and images. Set `OCR_FIGURE_DESCRIPTION=true` to additionally generate cloud figure descriptions. Note: figure descriptions use `OLLAMA_VISION_MODEL` (default `qwen3.5:397b-cloud`) and require `AI_BACKEND=cloud` with valid `OLLAMA_CLOUD_API_KEY` — they do not run on a purely local setup.
 
@@ -149,6 +137,7 @@ The `AI_BACKEND` env var selects the AI provider. The default is `local` (Ollama
    OLLAMA_CLOUD_API_KEY=your-api-key-here
    OLLAMA_MODEL=gemma4:31b-cloud
    ```
+   The default cloud chat model is `gemma4:31b-cloud`; substitute any other cloud chat model you prefer.
 
 2. Restart the application. All AI calls will route through the Ollama Cloud API instead of your local Ollama instance.
 
@@ -158,12 +147,9 @@ Set `AI_MOCK=true` in your `.env` file to use mock responses. This is useful for
 
 ## Documentation
 
-- SRS.md - Software requirements and user stories
-- TODO.md - Sprint plan and task backlog
-- DESIGN_AND_TESTING.md - Design and testing document
-- STATUS.md - Current sprint state and known issues
-- AI_AGENT_PROTOCOL.md - AI agent execution protocol and guardrails
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) — system architecture and engineering overview
+- [DigitalOcean Deployment Guide](digitalocean-deployment-guide.md) — production deployment reference
 
 ## License
 
-MIT - For educational purposes only.
+MIT

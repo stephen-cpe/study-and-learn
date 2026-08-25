@@ -7,7 +7,7 @@ Creates variants for idle animation, processing, happy, and error states.
 Cross-platform: resolves paths relative to this script's location, so the
 script works identically on Windows 11 (dev) and Ubuntu/Linux (prod).
 
-Frame plan (Sprint 7 mascot animation polish):
+Frame plan (mascot animation polish):
   IDLE  = 14 frames @ 250ms  (slow breathing + occasional blink + chest cycle)
   BUSY  = 16 frames @ 140ms  (fast light chase + rapid blink + gear orbit)
   HAPPY = 14 frames @ 220ms  (bouncy hop + eye sparkles + rising particles)

@@ -1,5 +1,5 @@
 """
-Tests for Sprint 5 Phase 2.4 — Admin Role, Per-User Lesson Generation Toggle,
+Tests for the Admin Role, Per-User Lesson Generation Toggle,
 and Demo Account Seeding.
 
 Uses the SQLite in-memory fixture pattern established in test_dashboard.py.

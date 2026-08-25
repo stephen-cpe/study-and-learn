@@ -1,5 +1,5 @@
 """
-Tests for Sprint 5 Phase 1.4 — Sign-up, login, logout routes.
+Tests for Sign-up, login, logout routes.
 
 The fixture below overrides SQLALCHEMY_DATABASE_URI to an in-memory SQLite DB
 so auth tests run quickly and in isolation. The real DATABASE_URL is still

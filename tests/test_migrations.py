@@ -1,5 +1,5 @@
 """
-Tests for Sprint 5 Phase 1.3 — Alembic migration for User model.
+Tests for the Alembic migration for the User model.
 
 The fixture below overrides SQLALCHEMY_DATABASE_URI to an in-memory SQLite DB
 so migration tests run quickly and in isolation. The real DATABASE_URL is still

@@ -141,7 +141,7 @@
     var STALE_TIMEOUT_MS = 60000;
     // The hard cap was originally 10 minutes (600000ms), then 30
     // minutes (1800000ms). Both were too aggressive for cloud AI:
-    // 3+ modules with gemma3:27b-cloud can take 45-90 minutes end-
+    // 3+ modules with a cloud chat model can take 45-90 minutes end-
     // to-end (lessons + checkpoints + quiz + narration script +
     // edge-tts audio generation). The cap is now 2 hours
     // (7,200,000 ms). With this cap the user can reliably wait for
