@@ -142,21 +142,45 @@ def process():
             flash(f'Skipping invalid file type: {file.filename}', 'warning')
             continue
 
-        # Sanitize the filename to prevent path traversal (e.g. "../../app.py")
-        # and collision between concurrent uploads of the same name. The
-        # original display name is preserved separately in ``filenames`` for
-        # the UI; the on-disk name uses a uuid prefix so two users uploading
-        # "notes.pdf" never overwrite each other.
+        # ── Two-step save for path-traversal safety + on-disk dedup ───────────
+        # Step 1: Save to a uuid-prefixed temp path (prevents path traversal
+        # via crafted filenames like "../../app.py").
         original_filename = file.filename
         safe_name = secure_filename(original_filename)
         if not safe_name:
             safe_name = "upload"
-        disk_filename = f"{uuid.uuid4().hex}_{safe_name}"
-        file_path = os.path.join(upload_folder, disk_filename)
-        file.save(file_path)
+        temp_filename = f"_tmp_{uuid.uuid4().hex}_{safe_name}"
+        temp_path = os.path.join(upload_folder, temp_filename)
+        file.save(temp_path)
 
-        file_hash = hash_file(file_path)
+        file_hash = hash_file(temp_path)
         file_hashes.append(file_hash)
+
+        # Step 2: Check the content registry for deduplication BEFORE committing
+        # the file to its permanent location. If the same content was
+        # previously uploaded (by any user), delete the temp file — the
+        # extracted text is cached in ContentRegistry and the ChromaDB
+        # collection already exists. No need to keep the raw upload.
+        from src.models import ContentRegistry
+        try:
+            existing_collection = is_content_registered(file_hash)
+            if existing_collection:
+                entry = ContentRegistry.query.filter_by(file_hash=file_hash).first()
+                if entry and entry.extracted_text:
+                    extracted_texts.append(entry.extracted_text)
+                    filenames.append(original_filename)
+                    os.remove(temp_path)
+                    continue
+        except Exception as e:
+            logger.warning("ContentRegistry lookup failed for hash %s: %s", file_hash[:8], str(e))
+
+        # Step 3: New content — move the temp file to a deterministic
+        # hash-based name so the same content always maps to the same
+        # on-disk path. A re-upload of the same file overwrites itself
+        # instead of accumulating duplicates.
+        disk_filename = f"{file_hash[:16]}_{safe_name}"
+        file_path = os.path.join(upload_folder, disk_filename)
+        os.replace(temp_path, file_path)
 
         ext = os.path.splitext(original_filename)[1].lower()
         if ext in ('.txt', '.md'):
@@ -173,19 +197,6 @@ def process():
                 flash(f'Error extracting {original_filename}: {str(e)}', 'error')
                 return redirect(url_for('main.index'))
             continue
-
-        # Check content registry for deduplication
-        from src.models import ContentRegistry
-        try:
-            existing_collection = is_content_registered(file_hash)
-            if existing_collection:
-                entry = ContentRegistry.query.filter_by(file_hash=file_hash).first()
-                if entry and entry.extracted_text:
-                    extracted_texts.append(entry.extracted_text)
-                    filenames.append(original_filename)
-                    continue
-        except Exception as e:
-            logger.warning("ContentRegistry lookup failed for hash %s: %s", file_hash[:8], str(e))
 
         def ocr_progress(stage_name, current, total):
             if is_ajax and task_id:
