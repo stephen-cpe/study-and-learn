@@ -60,11 +60,11 @@ This guide walks you through deploying the Study-and-Learn Flask application to 
 
 ### Initialization Script (User Data)
 
-Copy this script to the User data field during launch. It installs all system packages (Python, PostgreSQL, Nginx, Certbot, Poppler), creates the PostgreSQL database and user, installs Ollama and pulls the embedding model, clones the repository, creates the virtual environment, installs Python dependencies, copies the systemd service and Nginx config into place, and reboots the instance to finalize.
+Copy this script to the User data field during launch. It installs all system packages (Python, PostgreSQL, Nginx, Certbot, Poppler), configures the firewall, clones the repository, creates the virtual environment, and installs Python dependencies. The remaining steps (database setup, Ollama, service configs) are done manually after connecting — they involve service-user permissions and readiness checks that are fragile in an automated script.
 
 ```bash
 #!/bin/bash
-# ── Update system and install core packages ─────────────────────────────────
+# ── Install system packages ─────────────────────────────────────────────────
 apt update -y
 apt install -y python3 python3-venv python3-pip python3-dev \
     build-essential libssl-dev \
@@ -77,19 +77,6 @@ ufw allow OpenSSH
 ufw allow 'Nginx Full'
 ufw --force enable
 
-# ── Set up PostgreSQL ───────────────────────────────────────────────────────
-systemctl start postgresql
-systemctl enable postgresql
-# Wait for PostgreSQL to be fully ready before running SQL commands.
-# On a fresh boot, the cluster needs a few seconds to initialize.
-sleep 5
-
-sudo -u postgres psql << 'EOF'
-CREATE USER study_user WITH PASSWORD 'study_pass';
-CREATE DATABASE study_and_learn OWNER study_user;
-GRANT CREATE ON SCHEMA public TO study_user;
-EOF
-
 # ── Clone repository and install dependencies ───────────────────────────────
 cd /home/ubuntu
 git clone https://github.com/stephen-cpe/study-and-learn.git
@@ -99,16 +86,10 @@ python3 -m venv venv
 /home/ubuntu/study-and-learn/venv/bin/pip install --upgrade pip
 /home/ubuntu/study-and-learn/venv/bin/pip install --no-cache-dir -r requirements.txt
 
-# ── Initialize database schema ───────────────────────────────────────────────
-sudo -u postgres psql -d study_and_learn -f /home/ubuntu/study-and-learn/init_db.sql
-
-# ── Install Ollama and pull embedding model ──────────────────────────────────
+# ── Install Ollama (the service starts automatically after install) ─────────
 curl -fsSL https://ollama.com/install.sh | sh
 systemctl enable ollama
-# Wait for Ollama to start, then pull the embedding model.
-# The pull downloads ~600 MB and can take 30-60 seconds.
-sleep 10
-ollama pull qwen3-embedding:0.6b
+systemctl start ollama
 
 # ── Create logs and data directories ─────────────────────────────────────────
 mkdir -p /home/ubuntu/study-and-learn/logs
@@ -119,7 +100,7 @@ mkdir -p /home/ubuntu/study-and-learn/data/flask_session \
          /home/ubuntu/study-and-learn/data/tts \
          /home/ubuntu/study-and-learn/data/chroma_db
 
-# ── Copy systemd service (adjusted for ubuntu user) ─────────────────────────
+# ── Write systemd service file ──────────────────────────────────────────────
 # The repo's deploy/study-and-learn.service uses User=root and
 # WorkingDirectory=/home/study-and-learn. On AWS the app lives at
 # /home/ubuntu/study-and-learn and runs as ubuntu. We write a corrected
@@ -140,80 +121,48 @@ ExecStart=/home/ubuntu/study-and-learn/venv/bin/gunicorn -c gunicorn.conf.py app
 Restart=on-failure
 RestartSec=10
 
-# Security hardening
 NoNewPrivileges=true
 PrivateTmp=true
-
-# Raise the file descriptor limit from the Linux default (1024) to 65536.
-# The default 1024 is too low for a Gunicorn gthread worker doing async I/O:
-# the two-poll JS design opens 2 HTTP connections per 2s tick, TTS generation
-# opens WebSocket+SSL sockets to Microsoft Edge-TTS (1 per slide), and
-# FileSystemCache + PostgreSQL hold FDs open. Without this, the worker
-# crashes with OSError: [Errno 24] Too many open files during long
-# TTS-enabled lesson generations.
 LimitNOFILE=65536
 
 [Install]
 WantedBy=multi-user.target
 SERVICE
 
-# ── Create a gunicorn.conf.py with AWS-correct paths ────────────────────────
-# The repo's gunicorn.conf.py hardcodes /home/study-and-learn paths.
-# Overwrite it with AWS-correct paths.
+# ── Write gunicorn.conf.py with AWS-correct paths ────────────────────────────
 cat > /home/ubuntu/study-and-learn/gunicorn.conf.py << 'GUNICORN'
 bind = "127.0.0.1:5000"
 workers = 1
 worker_class = "gthread"
 threads = 8
-timeout = 7200  # 2 hours — lesson generation with cloud AI can take 45-90 min
+timeout = 7200
 
-# NOTE: max_requests / max_requests_jitter are deliberately omitted.
-# The two-poll JS design fires ~1-2 HTTP requests per second (cosmetic
-# /progress + redirect /lessons/generation-status). With max_requests=1000,
-# the worker would auto-restart every ~15-20 minutes — killing the daemon
-# TTS background thread mid-generation. TTS-enabled generation takes 45-90
-# minutes; the worker must stay alive for the entire duration. The TTS
-# worker's finally block sets generation_completed_at; if the worker dies
-# first, that never runs and the user is stuck on the results page forever.
-
-# Logging
 accesslog = "/home/ubuntu/study-and-learn/logs/access.log"
 errorlog = "/home/ubuntu/study-and-learn/logs/error.log"
 loglevel = "info"
-
-# Process naming
 proc_name = "study-and-learn"
-
-# Server mechanics
 daemon = False
 pidfile = "/tmp/study-and-learn.pid"
 GUNICORN
 
-# ── Copy Nginx config (adjusted for ubuntu user) ────────────────────────────
-# The repo's deploy/nginx.conf references /home/study-and-learn paths.
-# Write an AWS-correct version directly.
+# ── Write Nginx config ──────────────────────────────────────────────────────
 cat > /etc/nginx/sites-available/study-and-learn << 'NGINX'
 server {
     listen 80;
     listen [::]:80;
-    server_name studyandlearn.duckdns.org;  # Replace with your DuckDNS domain or EC2 IP
+    server_name studyandlearn.duckdns.org;
 
-    # Upload size limit — must be >= your max PDF upload size.
-    # The app caps at 5 files per upload; set this generously.
     client_max_body_size 50M;
 
-    # Logging
     access_log /var/log/nginx/study-and-learn-access.log;
     error_log /var/log/nginx/study-and-learn-error.log;
 
-    # Static files served directly by Nginx (faster than Flask)
     location /static/ {
         alias /home/ubuntu/study-and-learn/src/static/;
         expires 30d;
         add_header Cache-Control "public, immutable";
     }
 
-    # All other requests → Gunicorn
     location / {
         proxy_pass http://127.0.0.1:5000;
         proxy_set_header Host $host;
@@ -221,7 +170,6 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # Timeouts for long-running lesson generation (up to 2 hours)
         proxy_connect_timeout 300s;
         proxy_send_timeout 7200s;
         proxy_read_timeout 7200s;
@@ -232,23 +180,32 @@ NGINX
 ln -sf /etc/nginx/sites-available/study-and-learn /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 
-# ── Fix ownership ───────────────────────────────────────────────────────────
+# ── Fix ownership and permissions ──────────────────────────────────────────
 chown -R ubuntu:ubuntu /home/ubuntu/study-and-learn
-
-# ── Restart services to pick up configs ─────────────────────────────────────
-systemctl daemon-reload
-systemctl restart postgresql
+# Make /home/ubuntu traversable by Nginx (www-data) and PostgreSQL (postgres).
+# On AWS, /home/ubuntu defaults to 700 (only ubuntu can access). Nginx needs
+# to read static files and PostgreSQL needs to read init_db.sql. chmod 755
+# allows traversal without making files writable by others.
+chmod 755 /home/ubuntu
 ```
 
 6. Click **Launch instance**.
-7. Wait 5-8 minutes for the User Data script to finish (it installs packages, clones the repo, runs `pip install`, initializes the database, installs Ollama, and pulls the embedding model — this takes several minutes).
+7. Wait 3-5 minutes for the User Data script to finish.
 8. Note the **Public IPv4 address** from the EC2 instance details (e.g., `3.123.45.67`).
 
+> **What the User Data script does:**
+> - Installs all system packages (Python, PostgreSQL, Nginx, Certbot, Poppler, Ollama)
+> - Configures the firewall (SSH + HTTP/HTTPS)
+> - Clones the repository and creates the virtual environment with all dependencies
+> - Creates data/log directories
+> - Writes the systemd service file, gunicorn config, and Nginx config (with AWS-correct paths)
+>
 > **What the User Data script does NOT do:**
-> - It does NOT create the `.env` file (you'll do this in Step 3 — it contains API keys that shouldn't be in a script).
-> - It does NOT start the Gunicorn service (the `.env` file must exist first).
-> - It does NOT obtain the SSL certificate (the DuckDNS domain must be configured first).
-> - It does NOT reboot the instance (rebooting would kill the `ollama pull` and `init_db.sql` steps before they complete).
+> - It does NOT create the PostgreSQL database/user (done manually in Step 3 — needs `postgres` user permissions)
+> - It does NOT run `init_db.sql` (done manually in Step 3 — `postgres` user can't read files in `/home/ubuntu/`)
+> - It does NOT pull the Ollama embedding model (done manually in Step 3 — needs the `ollama` service to be fully started)
+> - It does NOT create the `.env` file (done manually in Step 3 — contains API keys)
+> - It does NOT start the Gunicorn or Nginx services (done after the `.env` file exists)
 
 ---
 
@@ -295,36 +252,78 @@ Type `yes` and press Enter.
 ### Verify the User Data script completed successfully:
 
 ```bash
-# Check PostgreSQL is running
-sudo systemctl status postgresql
-
-# Check Ollama is running and the embedding model is available
-curl http://localhost:11434/api/tags
-
 # Check the app code was cloned
 ls /home/ubuntu/study-and-learn/app.py
 
 # Check the venv was created
 ls /home/ubuntu/study-and-learn/venv/bin/gunicorn
+```
 
-# Check the database was initialized
+Both commands should return file paths (no errors). The User Data script installs packages, clones the repo, creates the venv, and writes the service configs — but it does NOT set up the database or pull the Ollama model (those are the next steps).
+
+### Step 3.1: Set Up PostgreSQL Database
+
+The app requires PostgreSQL (it refuses to start with any other database). These commands must be run manually because the `postgres` system user needs to run `psql` and read `init_db.sql`.
+
+```bash
+# Create the database user and database
+sudo -u postgres psql << 'EOF'
+CREATE USER study_user WITH PASSWORD 'study_pass';
+CREATE DATABASE study_and_learn OWNER study_user;
+GRANT CREATE ON SCHEMA public TO study_user;
+EOF
+```
+
+```bash
+# Copy init_db.sql to /tmp so the postgres user can read it
+# (the postgres user cannot traverse /home/ubuntu/ due to its permissions)
+sudo cp /home/ubuntu/study-and-learn/init_db.sql /tmp/init_db.sql
+
+# Initialize the database schema (tables, indexes, seed users)
+sudo -u postgres psql -d study_and_learn -f /tmp/init_db.sql
+
+# Clean up (file is owned by root since we used sudo cp)
+sudo rm /tmp/init_db.sql
+```
+
+> **Why `sudo -u postgres`?** On Ubuntu, PostgreSQL uses *peer authentication* for local socket connections — the OS user running `psql` must match the database username. The `postgres` OS user is the PostgreSQL superuser.
+
+Verify the tables were created:
+
+```bash
 sudo -u postgres psql -d study_and_learn -c "\dt"
 ```
 
-You should see:
-- PostgreSQL: `active (running)`
-- Ollama tags: `{"models":[{"name":"qwen3-embedding:0.6b", ...}]}`
-- App files present
-- Gunicorn binary present
-- Database tables: `users`, `study_paths`, `content_registry`, `lesson_progress`, `alembic_version`
+You should see: `users`, `study_paths`, `content_registry`, `lesson_progress`, `alembic_version`
 
-> **If Ollama isn't running yet**, the reboot may still be in progress. Wait 1-2 minutes and retry:
-> ```bash
-> sudo systemctl status ollama
-> ollama pull qwen3-embedding:0.6b
-> ```
+This creates three seed accounts for testing:
 
-### Create the .env file:
+| Username | Password       | Role  | Can generate lessons |
+|----------|---------------|-------|----------------------|
+| admin    | ADMINpassword | ADMIN | Yes                  |
+| bob      | BOBpassword   | USER  | Yes                  |
+| alice    | ALICEpassword | USER  | Yes                  |
+
+### Step 3.2: Pull the Ollama Embedding Model
+
+The User Data script installed Ollama, but the embedding model must be pulled manually (the `ollama pull` command needs the Ollama service to be fully started, which can take 10-15 seconds after install).
+
+```bash
+# Pull the embedding model (tiny, ~600 MB, CPU-only)
+ollama pull qwen3-embedding:0.6b
+
+# Verify it's available
+curl http://localhost:11434/api/tags
+```
+
+**Expected output:**
+```json
+{"models":[{"name":"qwen3-embedding:0.6b", ...}]}
+```
+
+> **Why a local Ollama for embeddings?** Ollama Cloud's API only supports the OpenAI-compatible `/v1/chat/completions` endpoint. The `langchain_ollama.OllamaEmbeddings` class uses the native Ollama `/api/embed` endpoint, which is not exposed by Ollama Cloud. So embedding calls must go to a local Ollama instance.
+
+### Step 3.3: Create the .env file
 
 ```bash
 cd /home/ubuntu/study-and-learn
@@ -375,11 +374,8 @@ chmod 600 .env
 
 > **Why `AI_BACKEND=cloud` and `CHROMA_DB=cloud`?**
 > Running local AI models (e.g., a 27B parameter LLM) on the EC2 instance would consume all RAM. Ollama Cloud offloads all LLM inference to Ollama's hosted infrastructure. Chroma Cloud offloads vector storage and similarity search. The instance only orchestrates HTTP requests, DB reads/writes, and the background TTS worker thread — all lightweight CPU work.
->
-> **Why a local Ollama for embeddings?**
-> Ollama Cloud's API only supports the OpenAI-compatible `/v1/chat/completions` endpoint. The `langchain_ollama.OllamaEmbeddings` class uses the native Ollama `/api/embed` endpoint, which is not exposed by Ollama Cloud. So embedding calls must go to a local Ollama instance. The `qwen3-embedding:0.6b` model is tiny (~600 MB) and runs in CPU-only mode — it won't compete with the app for resources. The User Data script already installed Ollama and pulled this model.
 
-### Verify the app loads:
+### Step 3.4: Verify the app loads
 
 ```bash
 cd /home/ubuntu/study-and-learn
@@ -659,7 +655,9 @@ sudo systemctl restart study-and-learn
    CREATE DATABASE study_and_learn OWNER study_user;
    GRANT CREATE ON SCHEMA public TO study_user;
    \q
-   sudo -u postgres psql -d study_and_learn -f /home/ubuntu/study-and-learn/init_db.sql
+   sudo cp /home/ubuntu/study-and-learn/init_db.sql /tmp/init_db.sql
+   sudo -u postgres psql -d study_and_learn -f /tmp/init_db.sql
+   sudo rm /tmp/init_db.sql
    ```
 
 ### Gunicorn 502 Bad Gateway
@@ -700,31 +698,21 @@ curl http://localhost:11434/api/tags
 
 ### User Data Script Didn't Complete
 
-**Symptom:** Missing files, services, or database tables after connecting.
+**Symptom:** Missing app files or venv after connecting.
 
-**Fix:** The script may have failed partway through. Check the log:
+**Fix:** Check the log:
 ```bash
 cat /var/log/cloud-init-output.log
 ```
 
-Look for errors and re-run the failed steps manually. The most common issues are:
-
-**1. Database tables missing** (PostgreSQL wasn't ready when `init_db.sql` ran):
+The most common cause is a transient `apt` lock during the initial boot — wait a few minutes and retry. If the repo clone or `pip install` failed, re-run manually:
 ```bash
-sudo -u postgres psql -d study_and_learn -f /home/ubuntu/study-and-learn/init_db.sql
-```
-
-**2. Ollama model not pulled** (the `ollama pull` was interrupted):
-```bash
-ollama pull qwen3-embedding:0.6b
-curl http://localhost:11434/api/tags
-```
-
-**3. pip install didn't complete:**
-```bash
-cd /home/ubuntu/study-and-learn
-source venv/bin/activate
-pip install --no-cache-dir -r requirements.txt
+cd /home/ubuntu
+git clone https://github.com/stephen-cpe/study-and-learn.git
+cd study-and-learn
+python3 -m venv venv
+/home/ubuntu/study-and-learn/venv/bin/pip install --upgrade pip
+/home/ubuntu/study-and-learn/venv/bin/pip install --no-cache-dir -r requirements.txt
 ```
 
 ### "View Sources" Button Missing
