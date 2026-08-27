@@ -119,16 +119,25 @@ V --> O
 ### 5.1 Global Content-Addressable Deduplication
 To prevent redundant, expensive OCR and embedding operations, the system computes SHA-256 hashes of all uploaded files. These hashes map to a `ContentRegistry` and dictate the naming convention of ChromaDB collections. If two users upload the same proprietary manual, the system processes it once and shares the vector index, drastically reducing latency and compute costs.
 
-### 5.2 Source Provenance Pipeline
+On-disk deduplication is enforced at the upload layer: files are saved with a hash-based filename (`<hash_prefix>_<safe_name>`), so a re-upload of the same content overwrites the same path rather than accumulating duplicate copies. If the hash is already registered in `ContentRegistry`, the uploaded file is deleted immediately and the cached extracted text is reused — no extraction, chunking, or embedding runs for duplicate uploads.
+
+### 5.2 Source Provenance Pipeline & Cross-Module Chunk Dedup
 A common failure mode in RAG systems is "lost provenance," where retrieved text is stripped of its metadata before reaching the LLM. A pipeline preserves chunk-level metadata (source hash, filename, chunk ID) through the LangChain retriever, into the lesson JSON, and finally to the frontend. This allows the "View Sources" modal to display exact document excerpts with zero risk of LLM hallucination.
 
-### 5.3 Asynchronous TTS & Atomic Redirects
-Generating neural audio for 5+ modules can take 45–90 minutes. Running this in the HTTP request thread causes timeouts; running it in a background thread introduced race conditions with the frontend's polling mechanism, which previously relied on shared cache state.
+To prevent content repetition across modules, a cross-module chunk dedup mechanism tracks which chunk IDs have been used by earlier modules. When generating lesson N+1, the retriever excludes chunks already consumed by modules 1..N, forcing each module to cover different document content. This directly addresses the problem of modules overlapping or repeating verbatim.
 
-The resolution is an **atomic database signal**. The background worker updates lesson statuses idempotently and sets a `generation_completed_at` timestamp in its `finally` block. The frontend polls this specific DB column via a dedicated endpoint, entirely decoupling the UI redirect logic from the volatile cache state. This eliminates the race condition where the user could be stranded on a loading screen if the cache was cleared before the redirect fired.
+The RAG retrieval depth is configurable via the `RAG_TOP_K` environment variable (default 20 chunks per retrieval). The processing route uses a higher value (40) for summary and curriculum generation to give the model a broader view of the document's scope when deciding how many modules to create.
 
-### 5.4 Configuration-Gated OCR Pipeline
-Running local Vision models on every PDF page is memory-prohibitive in production. The extraction pipeline is multi-tiered: standard text-layer extraction runs universally, while AI-powered OCR (GLM-OCR) and Cloud Figure Description (Qwen3.5) are strictly gated behind environment flags. This allows the system to gracefully degrade based on the host environment's hardware constraints. ChromaDB cloud storage uses a fallback-tolerant toggle that reverts to local storage if cloud credentials fail, enabling cloud deployment without sacrificing local reliability.
+### 5.3 Configurable Context Window
+The local Ollama API context window is configurable via the `OLLAMA_NUM_CTX` environment variable (default 131072, i.e. 128K tokens). This works across all Ollama Cloud models, which range from 128K to 1M context windows. The value controls how much document text the model can process per call.
+
+### 5.4 Asynchronous TTS & Atomic Redirects
+Generating neural audio for 5+ modules can take 45–90 minutes. Running this in the HTTP request thread causes timeouts; running it in a background thread requires a reliable completion signal so the frontend knows when to redirect.
+
+The resolution is an **atomic database signal**. The background worker updates lesson statuses idempotently and sets a `generation_completed_at` timestamp in its `finally` block. The frontend polls this specific DB column via a dedicated endpoint, entirely decoupling the UI redirect logic from any shared cache state. This ensures the user is never stranded on a loading screen.
+
+### 5.5 Configuration-Gated OCR Pipeline
+Running local Vision models on every PDF page is memory-prohibitive in production. The extraction pipeline is multi-tiered: standard text-layer extraction runs universally, while AI-powered OCR (GLM-OCR) and Cloud Figure Description (Qwen3.5) are strictly gated behind environment flags. OCR images are passed to the model as base64-encoded `images` arrays in the Ollama API payload — not as file paths in the prompt text — ensuring the vision model actually receives the image content. ChromaDB cloud storage uses a fallback-tolerant toggle that reverts to local storage if cloud credentials fail, enabling cloud deployment without sacrificing local reliability.
 
 ---
 

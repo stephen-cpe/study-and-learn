@@ -152,4 +152,4 @@ Set `AI_MOCK=true` in your `.env` file to use mock responses. This is useful for
 
 ## License
 
-MIT
+MIT License — see [LICENSE](LICENSE) for details.
