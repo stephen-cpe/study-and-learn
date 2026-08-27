@@ -245,18 +245,21 @@ def retrieve_with_scores(query: str, collection_name: str, top_k: int = 5) -> Li
 def retrieve_from_multiple_collections(
     query: str,
     collection_names: List[str],
-    top_k: int = 5
+    top_k: int = None
 ) -> str:
     """Query multiple ChromaDB collections and merge results by similarity score.
     
     Args:
         query: The search query (learning goal)
         collection_names: List of collection names to query
-        top_k: Number of top results to return total
+        top_k: Number of top results to return total. If None, uses the
+            RAG_TOP_K env var (default 20).
     
     Returns:
         Joined top_k most relevant chunks across all collections.
     """
+    if top_k is None:
+        top_k = int(os.environ.get('RAG_TOP_K', '20'))
     all_results = []
     
     for coll_name in collection_names:
@@ -279,7 +282,7 @@ def retrieve_from_multiple_collections(
 def retrieve_from_multiple_collections_with_sources(
     query: str,
     collection_names: List[str],
-    top_k: int = 5
+    top_k: int = None
 ) -> Dict[str, Any]:
     """Query multiple collections and return context text + source metadata.
 
@@ -290,12 +293,16 @@ def retrieve_from_multiple_collections_with_sources(
     Args:
         query: The search query.
         collection_names: ChromaDB collection names to query.
-        top_k: Total number of top results across all collections.
+        top_k: Total number of top results across all collections. If None,
+            uses the RAG_TOP_K env var (default 20).
 
     Returns:
         Dict with ``context_text`` (str) and ``sources`` (list of dicts
         each containing chunk_id, source_hash, score, and text).
     """
+    if top_k is None:
+        top_k = int(os.environ.get('RAG_TOP_K', '20'))
+
     all_results = []
 
     for coll_name in collection_names:

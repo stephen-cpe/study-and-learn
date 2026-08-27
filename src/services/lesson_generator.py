@@ -50,6 +50,7 @@ def build_rag_context_for_module(
     module_title: str,
     learning_goal: str,
     retriever: Optional[Callable[[str], Dict[str, Any]]],
+    exclude_chunks: set = None,
 ) -> Dict[str, Any]:
     """Query the retriever for context relevant to a module.
 
@@ -58,6 +59,9 @@ def build_rag_context_for_module(
         learning_goal: The learner's stated goal.
         retriever: A callable that accepts a query string and returns a dict
             with ``context_text`` (str) and ``sources`` (list), or None.
+        exclude_chunks: Optional set of chunk IDs to exclude from results
+            (used by the cross-module dedup mechanism to prevent the same
+            document content from appearing in multiple modules).
 
     Returns:
         Dict with ``context_text`` (str) and ``sources`` (list).
@@ -65,7 +69,10 @@ def build_rag_context_for_module(
     try:
         if retriever:
             query = f"{learning_goal} {module_title}"
-            return retriever(query) or {"context_text": "", "sources": []}
+            kwargs = {}
+            if exclude_chunks is not None:
+                kwargs['exclude_chunks'] = exclude_chunks
+            return retriever(query, **kwargs) or {"context_text": "", "sources": []}
     except Exception as e:
         logger.warning("RAG retrieval failed for module '%s': %s", module_title, str(e))
     return {"context_text": "", "sources": []}
@@ -76,6 +83,7 @@ def generate_lesson(
     learning_goal: str,
     retriever: Optional[Callable[[str], Dict[str, Any]]],
     difficulty: str = 'Normal',
+    exclude_chunks: set = None,
 ) -> Dict[str, Any]:
     """Generate an interactive slide-based lesson for a single module.
 
@@ -90,6 +98,8 @@ def generate_lesson(
             with ``context_text`` and ``sources``, or None if unavailable.
         difficulty: One of 'Easy', 'Normal', 'Hard'. Controls vocabulary,
             sentence complexity, and depth. Defaults to 'Normal'.
+        exclude_chunks: Optional set of chunk IDs to exclude from retrieval
+            (prevents the same document content from repeating across modules).
 
     Returns:
         A dict with keys ``module_title`` (str), ``slides`` (list), and
@@ -100,7 +110,7 @@ def generate_lesson(
     if not module_title or not module_title.strip():
         return _fallback_lesson("Untitled Module")
 
-    rag_result = build_rag_context_for_module(module_title, learning_goal, retriever)
+    rag_result = build_rag_context_for_module(module_title, learning_goal, retriever, exclude_chunks=exclude_chunks)
     rag_context = rag_result.get("context_text", "") if isinstance(rag_result, dict) else str(rag_result)
     sources = rag_result.get("sources", []) if isinstance(rag_result, dict) else []
 
@@ -135,6 +145,9 @@ PEDAGOGICAL REQUIREMENTS:
 3. Every example slide must include a concrete, real-world scenario — not abstract descriptions.
 4. The summary slide must recap learning objectives and key takeaways.
 5. Use plain, jargon-free language. When a technical term is unavoidable, define it on first use.
+6. CRITICAL: This module is part of a series. The Context provided is SPECIFIC to this module
+   and is DIFFERENT from other modules' content. Teach ONLY what is in this module's Context.
+   Do NOT repeat content from other modules — each module covers a distinct topic.
 
 {HUMOR_NOTE}
 OUTPUT RULES:

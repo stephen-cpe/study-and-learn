@@ -46,6 +46,20 @@ def health():
     return jsonify({'status': 'healthy'})
 
 
+@bp.route('/test/set-model', methods=['POST'])
+def test_set_model():
+    """TEMPORARY: Set the OLLAMA_MODEL at runtime for model comparison testing.
+    This endpoint is for testing only and should be removed after testing.
+    """
+    data = request.get_json(silent=True) or {}
+    model = data.get('model')
+    if not model:
+        return jsonify({'error': 'model parameter required'}), 400
+    os.environ['OLLAMA_MODEL'] = model
+    logger.info("Test endpoint: OLLAMA_MODEL set to '%s'", model)
+    return jsonify({'ok': True, 'model': model})
+
+
 @bp.route('/')
 def index():
     from src.models import StudyPath
@@ -230,11 +244,17 @@ def process():
             progress_tracker.update_progress(task_id, 4)
 
         if file_hashes:
-            rag_context = build_rag_context_from_hashes(goal, file_hashes)
+            rag_context = build_rag_context_from_hashes(goal, file_hashes, top_k=40)
         else:
             rag_context = build_rag_context(goal, extracted_texts)
         if not rag_context:
             rag_context = "\n\n".join(extracted_texts)
+            if is_ajax and task_id:
+                progress_tracker.update_cosmetic(
+                    task_id,
+                    mascot='RAG retrieval failed — using full document text instead.',
+                    mascot_state='error',
+                )
 
         if is_ajax:
             progress_tracker.update_progress(task_id, 5)

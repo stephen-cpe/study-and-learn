@@ -45,14 +45,15 @@ def build_rag_context(goal: str, files_data: List[str]) -> str:
     
     try:
         store_chunks(all_chunks, collection_name)
-        context = retrieve_context(goal, collection_name, top_k=5)
+        top_k = int(__import__('os').environ.get('RAG_TOP_K', '20'))
+        context = retrieve_context(goal, collection_name, top_k=top_k)
         return context
     except Exception as e:
         logger.warning("RAG pipeline failed, falling back to concatenated text: %s", str(e))
         return ""
 
 
-def build_rag_context_from_hashes(goal: str, file_hashes: List[str]) -> str:
+def build_rag_context_from_hashes(goal: str, file_hashes: List[str], top_k: int = None) -> str:
     """Build RAG context by querying content-keyed ChromaDB collections.
     
     For each file hash, checks if a ChromaDB collection exists. If it does,
@@ -142,7 +143,7 @@ def build_rag_context_from_hashes(goal: str, file_hashes: List[str]) -> str:
         return ""
 
     try:
-        context = retrieve_from_multiple_collections(goal, valid_names, top_k=5)
+        context = retrieve_from_multiple_collections(goal, valid_names, top_k=top_k)
         return context
     except Exception as e:
         logger.warning("Multi-collection retrieval failed: %s", str(e))
@@ -150,7 +151,8 @@ def build_rag_context_from_hashes(goal: str, file_hashes: List[str]) -> str:
 
 
 def build_rag_context_from_hashes_with_sources(
-    goal: str, file_hashes: List[str], file_names: List[str] = None
+    goal: str, file_hashes: List[str], file_names: List[str] = None,
+    top_k: int = None, exclude_chunks: set = None
 ) -> Dict[str, Any]:
     """Build RAG context with source provenance metadata.
 
@@ -247,7 +249,18 @@ def build_rag_context_from_hashes_with_sources(
         return {"context_text": "", "sources": []}
 
     try:
-        result = retrieve_from_multiple_collections_with_sources(goal, valid_names, top_k=5)
+        result = retrieve_from_multiple_collections_with_sources(goal, valid_names, top_k=top_k)
+        if exclude_chunks:
+            filtered_sources = []
+            filtered_docs = []
+            for source in result.get("sources", []):
+                chunk_id = source.get("chunk_id", "")
+                if chunk_id and chunk_id in exclude_chunks:
+                    continue
+                filtered_sources.append(source)
+                filtered_docs.append(source.get("text", ""))
+            result["sources"] = filtered_sources
+            result["context_text"] = "\n\n".join(filtered_docs)
         for source in result.get("sources", []):
             sh = source.get("source_hash", "")
             source["filename"] = hash_to_name.get(sh, sh[:12] + "...")

@@ -51,8 +51,10 @@ class Config:
     OLLAMA_CLOUD_BASE_URL = os.environ.get(
         "OLLAMA_CLOUD_BASE_URL", "https://ollama.com"
     )
-    OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gemma4:31b-cloud")
+    OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "deepseek-v4-flash:cloud")
     OLLAMA_TIMEOUT = _int(os.environ.get("OLLAMA_TIMEOUT"), 300)
+    OLLAMA_NUM_CTX = _int(os.environ.get("OLLAMA_NUM_CTX"), 131072)
+    RAG_TOP_K = _int(os.environ.get("RAG_TOP_K"), 20)
 
     # ── Local Ollama (alternative backend) ──────────────────────────────
     OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")

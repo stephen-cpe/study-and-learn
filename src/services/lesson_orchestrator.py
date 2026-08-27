@@ -149,10 +149,16 @@ def make_retriever_from_hashes_with_names(
 
     Returns:
         Callable that returns dict with ``context_text`` and ``sources``.
+        The callable accepts an optional ``exclude_chunks`` keyword arg
+        (a set of chunk IDs to exclude from results) used by the
+        cross-module dedup mechanism.
     """
-    def retrieve(query: str) -> Dict[str, Any]:
+    def retrieve(query: str, exclude_chunks: set = None) -> Dict[str, Any]:
         try:
-            result = build_rag_context_from_hashes_with_sources(goal, file_hashes, file_names)
+            result = build_rag_context_from_hashes_with_sources(
+                goal, file_hashes, file_names,
+                top_k=20, exclude_chunks=exclude_chunks,
+            )
             return result
         except Exception:
             return {"context_text": "", "sources": []}
@@ -172,6 +178,7 @@ def build_module_artifacts(
     is_last_module: bool = False,
     path_id: str = None,
     module_index: int = 0,
+    used_chunk_ids: set = None,
 ) -> Dict[str, Any]:
     """
     Generate (or reuse) lesson slides, inline checkpoints, and a final quiz
@@ -193,6 +200,11 @@ def build_module_artifacts(
         is_last_module: True if this is the final module.
         path_id: Study path ID (for TTS audio storage).
         module_index: Index of this module within the study path.
+        used_chunk_ids: Set of chunk IDs already used by previous modules.
+            Passed to the retriever to exclude already-used content, forcing
+            each module to cover different document content. The set is
+            mutated in-place — new chunk IDs from this module's retrieval
+            are added so subsequent modules see them.
 
     Returns:
         dict with keys: 'lesson', 'quiz', 'checkpoints', 'sources'.
@@ -202,10 +214,22 @@ def build_module_artifacts(
     if existing_slides is not None:
         lesson_data = {"slides": existing_slides, "sources": []}
     else:
-        lesson_data = generate_lesson(module_title, learning_goal, retriever, difficulty=difficulty)
+        lesson_data = generate_lesson(
+            module_title, learning_goal, retriever,
+            difficulty=difficulty,
+            exclude_chunks=used_chunk_ids,
+        )
 
     slides = lesson_data.get("slides", [])
     sources = lesson_data.get("sources", [])
+
+    # Track chunk IDs used by this module so subsequent modules get
+    # different content (cross-module dedup).
+    if used_chunk_ids is not None:
+        for src in sources:
+            chunk_id = src.get("chunk_id", "") if isinstance(src, dict) else ""
+            if chunk_id:
+                used_chunk_ids.add(chunk_id)
 
     # Build checkpoints BEFORE the deck layout / narration. The deck
     # layout is the single source of truth for slide ordering and is

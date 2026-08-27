@@ -249,3 +249,22 @@
   })();
 </script>
 {% endblock %}
+
+{% block extra_footer %}
+{% include '_mascot.html' %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/mascot.js') }}"></script>
+<script>
+  // Show the happy mascot on the lessons page — the user just completed
+  // generation and is looking at their finished module grid. The mascot
+  // disappears when they click into a lesson deck (lesson_deck.html has
+  // no mascot).
+  document.addEventListener('DOMContentLoaded', function () {
+    if (typeof window.setMascotState === 'function') {
+      window.setMascotState('happy');
+    }
+  });
+</script>
+{% endblock %}

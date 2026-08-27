@@ -34,7 +34,7 @@ def generate_study_path(learning_goal: str, extracted_text: str, summary: str) -
             'modules': [{'title': 'Please upload study materials', 'estimated_effort': 'N/A'}]
         }
 
-    prompt = f"""You are an AI assistant that creates structured study plans.
+    prompt = f"""You are an expert educator that creates structured study plans.
 Based on the following information, generate a recommended study path:
 
 Learning Goal: {learning_goal}
@@ -43,8 +43,28 @@ Extracted Text from Documents: {extracted_text}
 
 Summary of Documents: {summary}
 
-Create a sequenced study plan with modules/lessons. For each module, provide:
-1. A clear, descriptive title
+MODULE SCALING RULES:
+1. Scale the number of modules to the breadth of the document content AND the
+   specificity of the learning goal. Fewer pages or a narrow/specific goal
+   means fewer modules. More content or a broad goal means more modules.
+2. For a short document (under 10 pages) or a very specific learning goal,
+   create 2-4 modules. For a medium document (10-50 pages), create 4-7 modules.
+   For a large document (50+ pages), create 5-10 modules. Never exceed 10 modules.
+3. If the document does not contain enough content to justify multiple modules,
+   create fewer modules rather than padding with repetitive content.
+
+ANTI-OVERLAP RULES:
+4. Each module MUST cover a DISTINCT topic or concept. Do NOT create modules
+   that overlap in content — if two modules would teach the same concept,
+   merge them into one.
+5. Sequence modules so that each builds on the previous one without repeating
+   it. Module N+1 should introduce NEW concepts, not rehash Module N.
+6. If the learning goal is very specific (e.g., "Learn about X algorithm"),
+   focus the modules on that specific topic rather than creating a broad
+   survey of the entire document.
+
+For each module, provide:
+1. A clear, descriptive title that reflects its DISTINCT content
 2. Estimated effort to complete (e.g., "2 hours", "1 week", "3 days")
 
 Provide your study plan in the following JSON format:
@@ -58,7 +78,6 @@ Provide your study plan in the following JSON format:
       "title": "Module 2 Title", 
       "estimated_effort": "Time estimate"
     }}
-    // ... additional modules as needed
   ]
 }}
 

@@ -248,6 +248,9 @@ PEDAGOGICAL REQUIREMENTS:
 6. VARY the position of the correct answer across questions. No two consecutive mcq/multi_select
    questions should share the same answer index. For true_false, ensure a mix of True and False answers —
    do NOT make all answers the same boolean value.
+7. CRITICAL: Each question MUST test a UNIQUE concept from this module. Do NOT repeat or rephrase
+   questions from other modules. If this module covers the same topic as a previous module, test a
+   DIFFERENT aspect or detail — never the same question with slightly different wording.
 
 {HUMOR_INSTRUCTIONS}
 Create exactly {n_questions} questions with the following type distribution:

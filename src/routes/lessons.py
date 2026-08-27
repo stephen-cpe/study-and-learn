@@ -85,6 +85,11 @@ def generate_lessons():
     difficulty = getattr(current_user, 'lesson_difficulty', 'Normal') or 'Normal'
     username = current_user.username
 
+    # Track chunk IDs used across modules to prevent content repetition.
+    # Each module's retrieval excludes chunks already used by earlier modules,
+    # forcing the LLM to cover different document content per module.
+    used_chunk_ids = set()
+
     progress_tracker.update_progress(task_id, 1)
 
     try:
@@ -102,6 +107,7 @@ def generate_lessons():
                 is_last_module=(i == len(modules) - 1),
                 path_id=path_id_val,
                 module_index=i,
+                used_chunk_ids=used_chunk_ids,
             )
             progress_tracker.update_progress(task_id, 3)
 
