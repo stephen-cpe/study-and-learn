@@ -1,28 +1,34 @@
 #!/usr/bin/env python3
 """
-Generate animated mascot frames and sprite sheets for the Study Robot.
-Uses the original mascot-robot.png as exact base reference.
-Creates variants for idle animation, processing, happy, and error states.
+Generate animated mascot frames, sprite sheets, and GIFs for the Study Robot.
+
+Uses the original mascot-robot.png as exact base reference.  Creates
+variants for idle, busy (3 escalation stages), happy, error, talk, and
+wave states.
 
 Cross-platform: resolves paths relative to this script's location, so the
 script works identically on Windows 11 (dev) and Ubuntu/Linux (prod).
 
 Frame plan (mascot animation polish):
-  IDLE  = 14 frames @ 250ms  (slow breathing + occasional blink + chest cycle)
-  BUSY  = 16 frames @ 140ms  (fast light chase + rapid blink + gear orbit)
-  HAPPY = 14 frames @ 220ms  (bouncy hop + eye sparkles + rising particles)
-  ERROR = 14 frames @ 220ms  (drooping bob + X-eyes + dimmed chest + slow
-                              red/orange warning particle drift)
+  IDLE   = 14 frames @ 250ms  (sway + chest LED chase + 3-frame blink + pulse)
+  BUSY_A = 14 frames @ 150ms  (scanline sweep, green eyes  — parsing stage)
+  BUSY_B = 14 frames @ 150ms  (scanline sweep, amber eyes — generating stage)
+  BUSY_C = 14 frames @ 150ms  (scanline sweep, red eyes   — final intense)
+  HAPPY  = 14 frames @ 220ms  (anticipation squash + hop + diamond sparkles)
+  ERROR  = 14 frames @ 220ms  (sag + red eye/antenna blink + dim chest + warns)
+  TALK   = 12 frames @ 110ms  (bounce + mouth flap + chest heartbeat + antenna)
+  WAVE   = 16 frames @ 140ms  (squash + whole right-arm swings up from shoulder)
 
-All four animations share the same 759x759 canvas and the same transparent
-palette-index-255 trick so they all composite cleanly over the cyberpunk UI.
+All animations share the same 759x759 canvas and transparent
+palette-index-255 trick so they composite cleanly over the cyberpunk UI.
 The base ``mascot-robot.png`` is never re-painted – error frames still
 recognisably show the original mascot (we communicate "error" through
 choreography, not by drawing a different robot on top).
 
-All GIFs are written with palette index 255 mapped to fully-transparent
-pixels and disposal=2 so every frame clears to the transparent background
-before drawing the next.  See ``_prepare_frame_for_gif`` for the rationale.
+Outputs per state (into src/static/images/mascots/<state>/):
+  mascot-<state>.gif              animated GIF (legacy fallback)
+  mascot-<state>-sprite.png       1-row sprite sheet for CSS steps()
+  mascot-<state>-frame<N>.png     individual frames (debugging)
 """
 from __future__ import annotations
 
@@ -40,8 +46,12 @@ MASCOTS_DIR = IMAGES_DIR / 'mascots'
 STATE_DIRS = {
     'idle': MASCOTS_DIR / 'idle',
     'busy': MASCOTS_DIR / 'busy',
+    'busyB': MASCOTS_DIR / 'busyB',
+    'busyC': MASCOTS_DIR / 'busyC',
     'happy': MASCOTS_DIR / 'happy',
     'error': MASCOTS_DIR / 'error',
+    'talk': MASCOTS_DIR / 'talk',
+    'wave': MASCOTS_DIR / 'wave',
 }
 for _state_dir in STATE_DIRS.values():
     _state_dir.mkdir(parents=True, exist_ok=True)
@@ -59,16 +69,21 @@ CHEST_LIGHTS = [
     ('green', CHEST_GREEN),
 ]
 ANTENNA_BALL = (348, 70, 417, 119)
+# Face screen white area (for scanline sweep)
+SCREEN = (243, 210, 565, 397)
 DARK_EYE = (5, 10, 25, 255)
+HALF_EYE_GRAY = (58, 66, 78, 255)
 
 # Canvas size (square) – every frame is 759x759 to match the source PNG.
 CANVAS_SIZE = (759, 759)
 
 # Animation tuning
 IDLE_FRAMES = 14
-BUSY_FRAMES = 16
+BUSY_FRAMES = 14
 HAPPY_FRAMES = 14
 ERROR_FRAMES = 14
+TALK_FRAMES = 12
+WAVE_FRAMES = 16
 
 
 # --------------------------------------------------------------------------- #
@@ -318,7 +333,7 @@ def red_chest_flicker(base: Image.Image, strength: float = 1.6) -> Image.Image:
 def add_warning_particles(base: Image.Image, t: float, count: int = 4) -> Image.Image:
     """Slow red/orange warning squares that drift horizontally around
     the mascot's mid-line.  This is the error-state signature – unlike
-    the busy gear orbit (cyan, fast) or the happy rising particles
+    the busy scanline (on-screen) or the happy rising particles
     (multi-coloured, upward), these are red/orange and drift sideways
     at half the speed of the busy orbit.
 
@@ -344,6 +359,144 @@ def add_warning_particles(base: Image.Image, t: float, count: int = 4) -> Image.
         for dx, dy in ((0, 0), (-4, 0), (4, 0), (0, -4), (0, 4)):
             _draw_pixel(draw, x + dx, y + dy, colour, size=3)
     return img
+
+
+# --------------------------------------------------------------------------- #
+# New effect helpers (v2 choreography)                                        #
+# --------------------------------------------------------------------------- #
+def recolor_eyes(base: Image.Image, rgb: tuple) -> Image.Image:
+    """Recolour both eye rectangles' green pixels toward ``rgb``."""
+    img = base.copy()
+    arr = np.array(img)
+    for (x0, y0, x1, y1) in (EYE_LEFT, EYE_RIGHT):
+        # Expand slightly to catch anti-aliased fringe
+        rx0, ry0 = max(0, x0 - 6), max(0, y0 - 6)
+        rx1, ry1 = min(759, x1 + 6), min(759, y1 + 6)
+        region = arr[ry0:ry1, rx0:rx1]
+        r = region[:, :, 0].astype(int)
+        g = region[:, :, 1].astype(int)
+        b = region[:, :, 2].astype(int)
+        mask = (g > 100) & (r < 110) & (b < 130) & (region[:, :, 3] > 150)
+        if not mask.any():
+            continue
+        lum = (r * 0.3 + g * 0.6 + b * 0.1) / 255.0
+        for c, w in ((0, rgb[0]), (1, rgb[1]), (2, rgb[2])):
+            ch = region[:, :, c].astype(int)
+            ch[mask] = np.clip(w * lum[mask] + ch[mask] * 0.08, 0, 255).astype(np.uint8)
+            region[:, :, c] = ch
+        arr[ry0:ry1, rx0:rx1] = region
+    return Image.fromarray(arr)
+
+
+def scanline_sweep(base: Image.Image, t: float, rgb: tuple) -> Image.Image:
+    """A horizontal bright band sweeping down the face screen."""
+    img = base.copy()
+    arr = np.array(img)
+    x0, y0, x1, y1 = SCREEN
+    band_h = 24
+    span = y1 - y0 - band_h
+    yy = int(y0 + (t % 1.0) * span)
+    region = arr[yy:yy + band_h, x0:x1]
+    vis = region[:, :, 3] > 150
+    boost = np.clip(region[:, :, :3].astype(int) * 1.12 + 20, 0, 255).astype(np.uint8)
+    region[:, :, :3][vis] = boost[vis]
+    arr[yy:yy + band_h, x0:x1] = region
+    # 3px tinted leading edge
+    edge = arr[yy:yy + 3, x0:x1]
+    evis = edge[:, :, 3] > 150
+    e = edge[:, :, :3].astype(int)
+    for c in range(3):
+        e[:, :, c] = np.clip(e[:, :, c] * 0.25 + rgb[c] * 0.75, 0, 255)
+    edge[:, :, :3][evis] = e[evis]
+    arr[yy:yy + 3, x0:x1] = edge
+    return Image.fromarray(arr)
+
+
+def diamond_sparkle(base: Image.Image, x: int, y: int, alpha: float = 1.0) -> Image.Image:
+    """Small diamond twinkle (NOT a plus/cross — that reads as a
+    sniper crosshair at 120px).  Used by the happy state."""
+    img = base.copy()
+    draw = ImageDraw.Draw(img)
+    a = int(230 * alpha)
+    s = 4 + int(3 * alpha)
+    draw.rectangle((x - s // 2, y - s // 2, x + s // 2, y + s // 2),
+                    fill=(255, 255, 255, a))
+    return img
+
+
+def paste_squash(base: Image.Image, dy: int, sx: float = 1.0, sy: float = 1.0) -> Image.Image:
+    """Bottom-centre anchored squash/stretch: feet stay planted."""
+    if abs(sx - 1) < 0.004 and abs(sy - 1) < 0.004:
+        return paste_with_bob(base, dy)
+    arr = np.array(base)
+    alphas = arr[:, :, 3]
+    ys, xs = np.where(alphas > 8)
+    if len(ys) == 0:
+        return paste_with_bob(base, dy)
+    anchor_x = (xs.min() + xs.max()) / 2.0
+    anchor_y = ys.max()
+    nw = max(2, int(759 * sx))
+    nh = max(2, int(759 * sy))
+    scaled = base.resize((nw, nh), Image.LANCZOS)
+    canvas = Image.new('RGBA', base.size, (0, 0, 0, 0))
+    px = int(round(anchor_x - anchor_x * sx))
+    py = int(round(anchor_y - anchor_y * sy))
+    canvas.paste(scaled, (px, py), scaled)
+    return paste_with_bob(canvas, dy)
+
+
+# Right-arm chain geometry (probed from mascot-robot.png):
+#   mitt (y441-499), wrist+silver forearm (y500-548), elbow ring (y558-596)
+#   The bright-blue block below (y603+) is the FOOT — excluded.
+#   x-window starts at 482: torso edge columns (x480-481) must be excluded
+#   or they swing with the arm (diagonal "line" artifact) and leave a ghost
+#   outline in the torso ("spirit" residue).
+ARM_CHAIN = (482, 435, 575, 599)
+SHOULDER = (543, 448)
+
+
+def _arm_chain_mask(arr: np.ndarray) -> np.ndarray:
+    """Arm pixels incl. the base art's AA fringe (alpha>=15).
+    Threshold justification: within the arm window the artwork's soft
+    fringe sits at alpha 18-40, while anything below 15 is pure background.
+    The mask drives both extraction AND clearing, so missing fringe leaves
+    faint 'spirit' lines behind once the arm swings away."""
+    x0, y0, x1, y1 = ARM_CHAIN
+    m = np.zeros(arr.shape[:2], bool)
+    win = arr[y0:y1 + 1, x0:x1 + 1]
+    m[y0:y1 + 1, x0:x1 + 1] = win[:, :, 3] >= 15
+    return m
+
+
+def swing_arm(base: Image.Image, angle_deg: float) -> Image.Image:
+    """Rotate ALL right-arm segments about the shoulder pivot.
+
+    POSITIVE angle = arm swings OUTWARD (away from the body, screen-right).
+    Internal padding: rotation happens on an expanded canvas so the swung
+    arm can never clip, then the canvas is restored to 759x759.
+    """
+    arr = np.array(base)
+    mask = _arm_chain_mask(arr)
+    px, py = SHOULDER
+    arm_only = arr.copy()
+    arm_only[~mask] = 0
+    cleared = arr.copy()
+    cleared[mask] = 0
+    pad = 200
+    h, w = arm_only.shape[:2]
+    padded = np.zeros((h + 2 * pad, w + 2 * pad, 4), np.uint8)
+    padded[pad:pad + h, pad:pad + w] = arm_only
+    rot = np.array(Image.fromarray(padded).rotate(
+        angle_deg, resample=Image.BICUBIC, center=(px + pad, py + pad)))
+    rot = rot[pad:pad + h, pad:pad + w]
+    # Kill sub-visible AA dust (alpha<=40) from bicubic resampling.
+    rot[rot[:, :, 3] <= 40] = 0
+    out = Image.fromarray(cleared)
+    out.alpha_composite(Image.fromarray(rot))
+    result = np.array(out)
+    # Final guard: nuke any pixel under 6% opacity anywhere in the frame.
+    result[result[:, :, 3] <= 15] = 0
+    return Image.fromarray(result)
 
 
 # --------------------------------------------------------------------------- #
@@ -425,141 +578,133 @@ def save_individual_frames(frames: list[Image.Image], prefix: str,
 # Animation choreography                                                      #
 # --------------------------------------------------------------------------- #
 def build_idle_frames(base: Image.Image) -> list[Image.Image]:
-    """14 unique frames – slow breathing bob + blink + chest cycle + pulse.
+    """14 unique frames – sway + chest LED chase + 3-frame blink + pulse.
 
-    The signature is "low energy": small vertical bob (±3 px), a blink
-    frame, a chest-light cycle through yellow→blue→green, and an antenna
-    pulse at the end.  Every frame is intentionally distinct (no two
-    frames share the same pixel content) so GIF optimizers do not merge
-    them and the user sees the full 14-frame cycle.
-
-    To guarantee pixel-uniqueness even when two frames share a Y-offset
-    we apply a barely-perceptible antenna brightness nudge per frame
-    (see :func:`antenna_tint`).  Each factor is in the 0.97–1.03 range
-    so the change is invisible at 120x120 display size.
+    The blink is staged like the original GIF: wink (one eye half-close)
+    → full dark (both eyes, screen-off look) → half-gray recovery → open.
+    This reads as a natural blink at 120px, unlike the old single-frame
+    wink which looked like a twitch.
     """
-    sub_states = [
-        # (kind, shift, antenna_factor)
-        ('bob', 0, 1.000),                # 0  rest
-        ('bob', -1, 0.985),               # 1  inhale
-        ('bob', -2, 1.020),               # 2  hold top
-        ('bob', -3, 0.992),               # 3  deeper hold
-        ('bob', -2, 1.010),               # 4  partial release
-        ('antenna_soft', 0, 1.300),       # 5  antenna pulse (subtle)
-        ('blink', 0, 1.000),              # 6  blink (eyes dark)
-        ('blink_half', 0, 1.000),         # 7  eyes half-recovered
-        ('chest_yellow', 0, 1.000),       # 8  chest yellow bright
-        ('chest_blue', 0, 1.000),         # 9  chest blue bright
-        ('chest_green', 0, 1.000),        # 10 chest green bright
-        ('chest_blue', -1, 0.975),        # 11 chest blue + tiny bob
-        ('antenna_strong', -2, 1.600),    # 12 antenna glow + tiny bob
-        ('sparkle', -1, 1.005),           # 13 eye sparkle + tiny bob
-    ]
-
+    n = IDLE_FRAMES
     frames: list[Image.Image] = []
-    for kind, shift, ant in sub_states:
-        if kind == 'bob':
-            frame = paste_with_bob(base, shift)
-        elif kind == 'antenna_soft':
-            frame = antenna_glow(paste_with_bob(base, shift), ant)
-        elif kind == 'antenna_strong':
-            frame = antenna_glow(paste_with_bob(base, shift), ant)
-        elif kind == 'blink':
-            frame = blink(paste_with_bob(base, shift))
-        elif kind == 'blink_half':
-            # Draw a small lighter band across the bottom of each eye
-            # so the recovery frame is visually distinct from full base.
-            frame = base.copy()
-            draw = ImageDraw.Draw(frame)
-            band = (5, 10, 25, 220)
+    for i in range(n):
+        frame = base.copy()
+        order = ('yellow', 'blue', 'green')
+        frame = chest_cycle(frame, order[i % 3], dim_factor=0.4, boost=1.3)
+        if i in (6, 13):
+            frame = antenna_glow(frame, 1.35)
+        # 3-frame blink sequence (frames 8-10)
+        if i == 8:
+            # wink: right eye lower half gray
+            img = frame.copy()
+            draw = ImageDraw.Draw(img)
+            x0, y0, x1, y1 = EYE_RIGHT
+            cut = y0 + (y1 - y0) // 2
+            draw.rectangle((x0, cut, x1, y1), fill=HALF_EYE_GRAY)
+            frame = img
+        elif i == 9:
+            # full close: both eyes dark (screen-off)
+            frame = blink(frame)
+        elif i == 10:
+            # half recovery: both eyes bottom half gray
+            img = frame.copy()
+            draw = ImageDraw.Draw(img)
             for (x0, y0, x1, y1) in (EYE_LEFT, EYE_RIGHT):
-                draw.rectangle(
-                    (x0, y0 + (y1 - y0) // 2, x1, y1),
-                    fill=band,
-                )
-            frame = paste_with_bob(frame, shift)
-        elif kind == 'chest_yellow':
-            frame = chest_cycle(paste_with_bob(base, shift), 'yellow')
-        elif kind == 'chest_blue':
-            frame = chest_cycle(paste_with_bob(base, shift), 'blue')
-        elif kind == 'chest_green':
-            frame = chest_cycle(paste_with_bob(base, shift), 'green')
-        elif kind == 'sparkle':
-            # Tiny sparkles in the eye area (different from happy's sparkles
-            # which are paired with all-chest-lights on and a bouncy bob).
-            frame = base.copy()
-            draw = ImageDraw.Draw(frame)
-            for (x0, y0, x1, y1) in (EYE_LEFT, EYE_RIGHT):
-                cx, cy = (x0 + x1) // 2, (y0 + y1) // 2
-                for dx, dy in ((-4, -4), (4, 4)):
-                    sx, sy = cx + dx, cy + dy
-                    if y0 < sy < y1 and x0 < sx < x1:
-                        draw.rectangle(
-                            (sx - 1, sy - 1, sx + 1, sy + 1),
-                            fill=(255, 255, 255, 255),
-                        )
-            frame = paste_with_bob(frame, shift)
-        else:  # pragma: no cover - defensive
-            frame = paste_with_bob(base, shift)
-        # Apply the antenna uniqueness nudge for any frame that does not
-        # already call antenna_glow (those frames already change the
-        # antenna and are therefore unique on their own).
-        if kind not in ('antenna_soft', 'antenna_strong') and ant != 1.0:
-            frame = antenna_tint(frame, ant)
-        frames.append(frame)
+                cut = y0 + (y1 - y0) // 2
+                draw.rectangle((x0, cut, x1, y1), fill=HALF_EYE_GRAY)
+            frame = img
+        # Antenna uniqueness nudge for frames that don't already change it.
+        # Without this, the GIF optimizer merges similar frames and the
+        # user sees fewer frames than intended.
+        if i not in (6, 13):
+            factors = [1.000, 0.985, 1.020, 0.992, 1.010, 0.995,
+                       1.000, 1.005, 0.998, 1.000, 1.003, 0.997,
+                       1.008, 1.000]
+            factor = factors[i]
+            if factor != 1.0:
+                frame = antenna_glow(frame, factor)
+        frames.append(paste_with_bob(frame, 0))
     return frames
 
 
-def build_busy_frames(base: Image.Image) -> list[Image.Image]:
-    """16 frames – rapid chest-light chase + rapid blink + gear orbit.
+def build_busy_frames(base: Image.Image, variant: str = 'a') -> list[Image.Image]:
+    """14 frames – screen scanline sweep + LED chase + micro-bob.
 
-    Busy signature is "active": chest lights cycle yellow→blue→green twice
-    in 16 frames, the eyes blink twice (frames 5 and 12), the antenna
-    strobes (frames 3 and 11), and a 3-particle cyan gear orbit rotates
-    around the head to make the activity obvious even at 120x120.
+    Three variants escalate the visual intensity so a 45-90 min job
+    doesn't look stuck on the same loop:
+
+    a = green eyes, 1 scan/loop   (parsing stage — calm)
+    b = amber eyes, 2 scans/loop  (generating stage — warming up)
+    c = red eyes, 3 scans/loop     (final intense stage — almost done)
+
+    The scanline sweeps DOWN the face screen (CRT checking), eyes are
+    recoloured per variant, and chest LEDs chase.  No more floating
+    orbit squares (they read as noise at 120px).
     """
-    cycle = ['yellow', 'blue', 'green']
+    eye_rgb = {'a': (40, 225, 100), 'b': (255, 190, 60),
+               'c': (255, 70, 80)}[variant]
+    scan_speed = {'a': 1, 'b': 2, 'c': 3}[variant]
+    n = BUSY_FRAMES
+    dy = [0, -1, -1, 0, 0, 1, 1, 0, 0, -1, -1, 0, 0, 1]
     frames: list[Image.Image] = []
-    for i in range(BUSY_FRAMES):
-        active = cycle[i % 3]
-        frame = chest_cycle(base, active, dim_factor=0.25, boost=1.6)
-        # 2 quick blinks in the loop
-        if i in (5, 12):
-            frame = blink(frame)
-        # Antenna strobe on 2 beats
-        if i in (3, 11):
-            frame = antenna_glow(frame, 2.2)
-        else:
-            frame = antenna_glow(frame, 1.3)
-        # Gear orbit overlay
-        t = i / BUSY_FRAMES
-        frame = add_gear_orbit(frame, t, count=3)
+    for i in range(n):
+        frame = base.copy()
+        frame = recolor_eyes(frame, eye_rgb)
+        scan_t = (i / n) * scan_speed
+        frame = scanline_sweep(frame, scan_t, eye_rgb)
+        active = ('yellow', 'blue', 'green')[i % 3]
+        frame = chest_cycle(frame, active, dim_factor=0.25, boost=1.6)
+        if i % 2:
+            frame = antenna_glow(frame, 1.2)
+        frame = paste_with_bob(frame, dy[i])
         frames.append(frame)
     return frames
 
 
 def build_happy_frames(base: Image.Image) -> list[Image.Image]:
-    """14 frames – bouncy hop + sparkle eyes + rising particles.
+    """14 frames – anticipation squash → hop with diamond sparkles → land.
 
-    Happy signature is "celebratory": ±6 px vertical bounce, sparkle eyes
-    on every other frame, all three chest lights brightened, and a
-    continuous stream of multi-coloured particles rising from the base.
+    The happy signature is "celebratory": a deep anticipation squash
+    (sy 0.88, like crouching before a jump), then a bouncy hop with
+    rising particles, then a land squash.  Sparkles are small diamond
+    dots (NOT plus-shaped — a plus reads as a sniper crosshair at 120px).
+    All three chest lights brighten during the hop.
     """
-    bounce = [0, -3, -6, -6, -3, 0, 0, 0, 0, -2, -4, -4, -2, 0]
+    pose = [
+        # (dy, sx, sy, sparkle_phase)
+        (2, 0.965, 0.900, 0.0),    # 0  anticipation squash
+        (1, 0.955, 0.885, 0.0),     # 1  deeper squash
+        (-2, 1.045, 1.085, 0.15),   # 2  launch (stretch)
+        (-6, 1.025, 1.040, 0.30),   # 3  rising
+        (-10, 1.000, 1.000, 0.45),  # 4  apex
+        (-10, 1.000, 1.000, 0.55),  # 5  apex hold
+        (-6, 1.020, 1.025, 0.70),   # 6  falling
+        (-2, 1.020, 1.020, 0.85),   # 7  touchdown
+        (3, 0.960, 0.890, 0.0),     # 8  land squash
+        (1, 1.010, 1.000, 0.0),     # 9  recover
+        (0, 1.000, 1.000, 0.0),     # 10 rest
+        (0, 1.000, 1.000, 0.0),     # 11 rest
+        (0, 1.000, 1.000, 0.0),     # 12 rest
+        (0, 1.000, 1.000, 0.0),     # 13 rest
+    ]
+    sparkle_spots = [(320, 240), (470, 330), (400, 190), (520, 250)]
     frames: list[Image.Image] = []
-    for i, shift in enumerate(bounce):
-        frame = paste_with_bob(base, shift)
-        # Sparkle eyes on every other frame
-        if i % 2 == 0:
-            frame = sparkle_eyes(frame)
-        # All chest lights on while bouncing
-        if shift < 0:
-            frame = all_chest_on(frame, boost=1.5)
-        else:
-            frame = all_chest_on(frame, boost=1.25)
-        # Rising particles
-        t = i / HAPPY_FRAMES
-        frame = add_rising_particles(frame, t, count=6)
+    for i, (dyi, sxi, syi, sph) in enumerate(pose):
+        frame = base.copy()
+        frame = recolor_eyes(frame, (45, 235, 100))
+        frame = all_chest_on(frame, boost=1.45)
+        if sph:
+            frame = add_rising_particles(frame, sph, count=5)
+        if i in (3, 5):
+            spot = sparkle_spots[i % len(sparkle_spots)]
+            frame = diamond_sparkle(frame, spot[0], spot[1], 1.0)
+        # Per-frame antenna nudge to prevent GIF optimizer merging
+        # otherwise-similar rest frames (10-13 are all identical base).
+        ant_factors = [1.000, 1.000, 1.000, 1.015, 1.025, 1.030,
+                       1.020, 1.010, 1.000, 0.995, 1.008, 1.012, 0.998, 1.005]
+        if ant_factors[i] != 1.0:
+            frame = antenna_glow(frame, ant_factors[i])
+        frame = paste_squash(frame, dyi, sxi, syi)
         frames.append(frame)
     return frames
 
@@ -616,38 +761,103 @@ def build_error_frames(base: Image.Image) -> list[Image.Image]:
     return frames
 
 
+def build_talk_frames(base: Image.Image) -> list[Image.Image]:
+    """12 frames – quick bounce + LED heartbeat + antenna blip + eye flicker.
+
+    The talk state plays while the CRT speech bubble types its message.
+    Signature: fast vertical bounce (±2px), chest LEDs pulse in a
+    heartbeat pattern (2 on, 2 off), antenna blips every 3rd frame, and
+    eyes brighten on even frames.  Reads as "speaking" without a mouth.
+    """
+    n = TALK_FRAMES
+    dy = [0, -1, -2, -1, 0, 1, 0, -1, -1, 0, 1, 0]
+    frames: list[Image.Image] = []
+    for i in range(n):
+        frame = base.copy()
+        # Heartbeat chest: all LEDs bright on beats 0-1, dim on 2-3
+        if i % 4 in (0, 1):
+            frame = all_chest_on(frame, boost=1.5)
+        else:
+            frame = dim_chest(frame, factor=0.7)
+        if i % 3 == 0:
+            frame = antenna_glow(frame, 1.5)
+        if i % 2 == 0:
+            frame = recolor_eyes(frame, (40, 225, 95))
+        frame = paste_with_bob(frame, dy[i])
+        frames.append(frame)
+    return frames
+
+
+def build_wave_frames(base: Image.Image) -> list[Image.Image]:
+    """16 frames – anticipation squash → whole right arm swings up from
+    the shoulder (mitt beside the head, like the reference video) →
+    wave waggles → arm lowers → land → rest.
+
+    The arm chain (mitt + wrist + silver forearm + elbow ring) is a set
+    of floating segments in the artwork with deliberate gaps.  All
+    segments rotate together about the outer shoulder corner (543, 448)
+    so the mitt ends up beside the TV screen's upper-right corner — the
+    classic Tamagotchi wave pose.  POSITIVE angles swing outward.
+    """
+    pose = [
+        # (dy, sx, sy, arm_angle)
+        (0, 1.000, 1.000, 0),      # 0  neutral
+        (3, 0.962, 0.900, 0),      # 1  anticipation squash
+        (0, 1.030, 1.060, 30),     # 2  arm starts outward
+        (-3, 1.000, 1.000, 70),    # 3  swinging up-out
+        (-4, 1.000, 1.000, 95),    # 4  raised: mitt out beside head
+        (-3, 1.000, 1.000, 108),   # 5  waggle out
+        (-4, 1.000, 1.000, 88),    # 6  waggle in
+        (-3, 1.000, 1.000, 110),   # 7
+        (-4, 1.000, 1.000, 88),    # 8
+        (-2, 1.000, 1.000, 98),    # 9  settle
+        (-1, 1.000, 1.000, 50),    # 10 lowering
+        (2, 0.990, 0.995, 0),      # 11 land squash, arm docked
+        (0, 1.000, 1.000, 0),
+        (0, 1.000, 1.000, 0),
+        (0, 1.000, 1.000, 0),
+        (0, 1.000, 1.000, 0),
+    ]
+    frames: list[Image.Image] = []
+    for (dyi, sxi, syi, ang) in pose:
+        frame = base.copy()
+        frame = all_chest_on(frame, boost=1.35)
+        if ang:
+            frame = swing_arm(frame, ang)
+        frame = paste_squash(frame, dyi, sxi, syi)
+        frames.append(frame)
+    return frames
+
+
 # --------------------------------------------------------------------------- #
 # Main                                                                        #
 # --------------------------------------------------------------------------- #
 def main() -> None:
     base = load_base()
 
-    print(f"\n=== Generating IDLE animation ({IDLE_FRAMES} frames) ===")
-    idle_frames = build_idle_frames(base)
-    create_sprite_sheet(idle_frames, 'mascot-idle-sprite.png', STATE_DIRS['idle'])
-    create_gif(idle_frames, 'mascot-idle.gif', duration=250, out_dir=STATE_DIRS['idle'])
-    save_individual_frames(idle_frames, 'mascot-idle', out_dir=STATE_DIRS['idle'])
+    states = [
+        ('idle',  'mascot-idle',  build_idle_frames(base),       250),
+        ('busy',  'mascot-busy',  build_busy_frames(base, 'a'),   150),
+        ('busyB', 'mascot-busyB', build_busy_frames(base, 'b'),   150),
+        ('busyC', 'mascot-busyC', build_busy_frames(base, 'c'),   150),
+        ('happy', 'mascot-happy', build_happy_frames(base),      220),
+        ('error', 'mascot-error', build_error_frames(base),      220),
+        ('talk',  'mascot-talk',  build_talk_frames(base),       110),
+        ('wave',  'mascot-wave',  build_wave_frames(base),       140),
+    ]
 
-    print(f"\n=== Generating BUSY animation ({BUSY_FRAMES} frames) ===")
-    busy_frames = build_busy_frames(base)
-    create_sprite_sheet(busy_frames, 'mascot-busy-sprite.png', STATE_DIRS['busy'])
-    create_gif(busy_frames, 'mascot-busy.gif', duration=140, out_dir=STATE_DIRS['busy'])
-    save_individual_frames(busy_frames, 'mascot-busy', out_dir=STATE_DIRS['busy'])
-
-    print(f"\n=== Generating HAPPY animation ({HAPPY_FRAMES} frames) ===")
-    happy_frames = build_happy_frames(base)
-    create_sprite_sheet(happy_frames, 'mascot-happy-sprite.png', STATE_DIRS['happy'])
-    create_gif(happy_frames, 'mascot-happy.gif', duration=220, out_dir=STATE_DIRS['happy'])
-    save_individual_frames(happy_frames, 'mascot-happy', out_dir=STATE_DIRS['happy'])
-
-    print(f"\n=== Generating ERROR animation ({ERROR_FRAMES} frames) ===")
-    error_frames = build_error_frames(base)
-    create_sprite_sheet(error_frames, 'mascot-error-sprite.png', STATE_DIRS['error'])
-    create_gif(error_frames, 'mascot-error.gif', duration=220, out_dir=STATE_DIRS['error'])
-    save_individual_frames(error_frames, 'mascot-error', out_dir=STATE_DIRS['error'])
+    for state_key, prefix, frames, duration in states:
+        out_dir = STATE_DIRS[state_key]
+        print(f"\n=== {state_key} ({len(frames)} frames @ {duration}ms) ===")
+        # Sprite sheet (1-row, for CSS steps() playback — primary delivery)
+        create_sprite_sheet(frames, f'{prefix}-sprite.png', out_dir)
+        # GIF (legacy fallback for browsers without CSS steps() support)
+        create_gif(frames, f'{prefix}.gif', duration=duration, out_dir=out_dir)
+        # Individual frames (debugging)
+        save_individual_frames(frames, prefix, out_dir)
 
     base.save(os.path.join(str(MASCOTS_DIR), 'mascot-robot-static.png'))
-    print("\nDone! Generated frames, sprites, and GIFs in", MASCOTS_DIR)
+    print("\nDone! Generated sprite sheets, GIFs, and frames in", MASCOTS_DIR)
 
 
 if __name__ == '__main__':

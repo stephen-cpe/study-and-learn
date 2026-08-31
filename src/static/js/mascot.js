@@ -1,5 +1,10 @@
 /**
- * Mascot manager — idle/state animation, CRT speech bubble, click-to-talk.
+ * Mascot manager — sprite-sheet state animation, CRT speech bubble,
+ * click-to-talk, greeting wave on load.
+ *
+ * The mascot is a <div class="mascot-sprite"> whose background-image is
+ * a 1-row sprite sheet animated via CSS steps().  Switching states is
+ * just a CSS class swap — no <img src> change, no GIF-restart jank.
  *
  * Speech bubble is styled as a 4:3 CRT monitor (see retro.css). Text is
  * rendered with a fast per-character "typewriter" effect using the
@@ -8,10 +13,12 @@
 (function () {
   'use strict';
 
-  var VALID_MASCOT_STATES = ['idle', 'busy', 'happy', 'error'];
+  var VALID_MASCOT_STATES = [
+    'idle', 'busy', 'busyB', 'busyC', 'happy', 'error', 'talk', 'wave'
+  ];
   var _currentMascotState = null;
-  var _mascotGifFailed = false;
   var _mascotIntervalId = null;
+  var _wavePlayed = false;
 
   // CRT typewriter settings (kept in one place so progress.js can match).
   var TYPEWRITER_CHAR_DELAY_MS = 25;   // "really quickly" feel
@@ -61,19 +68,26 @@
     }
     if (_currentMascotState === normalized) return;
 
-    var src = mascot.getAttribute('data-' + normalized + '-src');
-    if (src && mascot.src.indexOf(src) === -1) {
-      _currentMascotState = normalized;
-      mascot.classList.remove(
-        'mascot-state-idle',
-        'mascot-state-busy',
-        'mascot-state-happy',
-        'mascot-state-error'
-      );
-      mascot.classList.add('mascot-state-' + normalized);
-      var wrapper = mascot.parentElement;
-      if (wrapper) wrapper.setAttribute('data-mascot-state', normalized);
-      mascot.src = src;
+    _currentMascotState = normalized;
+    // Remove all state classes
+    var states = VALID_MASCOT_STATES;
+    for (var s = 0; s < states.length; s++) {
+      mascot.classList.remove('mascot-state-' + states[s]);
+    }
+    // Add the new one
+    mascot.classList.add('mascot-state-' + normalized);
+    var wrapper = mascot.parentElement;
+    if (wrapper) wrapper.setAttribute('data-mascot-state', normalized);
+
+    // Wave is a one-shot: when it finishes, fall back to idle.
+    if (normalized === 'wave') {
+      var onEnd = function () {
+        mascot.removeEventListener('animationend', onEnd);
+        if (_currentMascotState === 'wave') {
+          window.setMascotState('idle');
+        }
+      };
+      mascot.addEventListener('animationend', onEnd);
     }
   };
 
@@ -82,19 +96,6 @@
     var bubble = document.getElementById('speech-bubble');
     var bubbleText = document.getElementById('bubble-text');
     if (!mascot || !bubble || !bubbleText) return;
-
-    if (!_mascotGifFailed) {
-      mascot.addEventListener('error', function onMascotErr() {
-        var fallback = mascot.getAttribute('data-fallback-src');
-        if (fallback && mascot.src.indexOf(fallback) === -1) {
-          _mascotGifFailed = true;
-          mascot.removeEventListener('error', onMascotErr);
-          mascot.src = fallback;
-        }
-      });
-    }
-
-    window.setMascotState('idle');
 
     // Short, witty idle/click lines that read well in a 4:3 CRT frame.
     var messages = [
@@ -121,14 +122,16 @@
       var msg = customMsg || messages[Math.floor(Math.random() * messages.length)];
       var token = ++_typewriterToken;
       els.bubble.classList.add('active');
+      // Switch to talk state while typing (syncs the robot's body language)
+      window.setMascotState('talk');
       typewriteInto(els.text, msg).then(function () {
-        // Ignore the result if a newer call has started typing.
         if (token !== _typewriterToken) return;
-        // Auto-hide after 4s only if no progress has started.
+        // After typing finishes, return to idle (or the previous state)
         setTimeout(function () {
           if (token !== _typewriterToken) return;
           if (window._progressActive) return;
           els.bubble.classList.remove('active');
+          window.setMascotState('idle');
         }, 4000);
       });
     };
@@ -139,8 +142,20 @@
       }
     }
 
+    // Greeting: play the wave one-shot on page load, then settle to idle.
+    if (!_wavePlayed) {
+      _wavePlayed = true;
+      window.setMascotState('wave');
+    } else {
+      window.setMascotState('idle');
+    }
+
+    // Idle chatter after the wave settles
     _mascotIntervalId = setInterval(idleTalk, 15000);
-    setTimeout(idleTalk, 1500);
+    setTimeout(function () {
+      if (!_wavePlayed) _wavePlayed = true;
+      idleTalk();
+    }, 3500);
 
     // Expose the typewriter so progress.js can reuse it.
     window._bubbleTypewrite = function (text) { return typewriteInto(bubbleText, text); };

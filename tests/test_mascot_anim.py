@@ -1,5 +1,5 @@
 """
-Tests for the mascot GIF generator (animation polish).
+Tests for the mascot sprite-sheet generator (animation polish).
 
 The mascot is a key piece of UX – these tests guard the user's
 "make idle/busy/happy/error obviously distinct" requirement by enforcing:
@@ -8,13 +8,15 @@ The mascot is a key piece of UX – these tests guard the user's
 * Frames are pixel-unique (the GIF optimizer must not merge them).
 * Transparency is preserved on every frame.
 * Dimensions match the source ``mascot-robot.png`` (759x759).
-* The four states are visually distinct from each other at every
+* The four core states are visually distinct from each other at every
   sampled frame, not just frame 0.
 * The generator module is import-safe and never relies on a live AI
   call – it uses pure PIL/Numpy.
 * The base mascot-robot.png artwork remains recognisable in every
   error frame (we choreograph the error, we don't re-paint the mascot).
 * The template/JS wires the error state up.
+* The new talk and wave states exist and have the right frame counts.
+* Sprite sheets are emitted for CSS steps() playback.
 """
 from pathlib import Path
 
@@ -25,23 +27,30 @@ ROOT = Path(__file__).resolve().parent.parent
 IMG_DIR = ROOT / 'src' / 'static' / 'images'
 MASCOTS_DIR = IMG_DIR / 'mascots'
 
+# Core four states (backend contract) + new states (frontend-only)
 GIF_STATES = {
-    'mascot-idle.gif':   {'min_frames': 10, 'duration': 250, 'tolerance': 0},
-    'mascot-busy.gif':   {'min_frames': 10, 'duration': 140, 'tolerance': 0},
-    'mascot-happy.gif':  {'min_frames': 10, 'duration': 220, 'tolerance': 0},
-    'mascot-error.gif':  {'min_frames': 10, 'duration': 220, 'tolerance': 0},
+    'mascot-idle.gif':   {'min_frames': 10, 'duration': 250, 'tolerance': 0, 'dir': 'idle'},
+    'mascot-busy.gif':   {'min_frames': 10, 'duration': 150, 'tolerance': 0, 'dir': 'busy'},
+    'mascot-happy.gif':  {'min_frames': 10, 'duration': 220, 'tolerance': 0, 'dir': 'happy'},
+    'mascot-error.gif':  {'min_frames': 10, 'duration': 220, 'tolerance': 0, 'dir': 'error'},
 }
 
-# Each state's assets (gif + sprite + frames) live in their own subdirectory
-# under src/static/images/mascots/ — see ADR-TBD in DESIGN_AND_TESTING.md.
+# New states (sprite-sheet only, no legacy GIF duration contract)
+SPRITE_STATES = {
+    'talk':  {'sprite': 'mascot-talk-sprite.png',  'gif': 'mascot-talk.gif',  'min_frames': 10},
+    'wave':  {'sprite': 'mascot-wave-sprite.png',  'gif': 'mascot-wave.gif',  'min_frames': 10},
+    'busyB': {'sprite': 'mascot-busyB-sprite.png', 'gif': 'mascot-busyB.gif', 'min_frames': 10},
+    'busyC': {'sprite': 'mascot-busyC-sprite.png', 'gif': 'mascot-busyC.gif', 'min_frames': 10},
+}
+
+SOURCE_PNG = MASCOTS_DIR / 'mascot-robot.png'
+
 GIF_STATE_DIRS = {
     'mascot-idle.gif':   MASCOTS_DIR / 'idle',
     'mascot-busy.gif':   MASCOTS_DIR / 'busy',
     'mascot-happy.gif':  MASCOTS_DIR / 'happy',
     'mascot-error.gif':  MASCOTS_DIR / 'error',
 }
-
-SOURCE_PNG = MASCOTS_DIR / 'mascot-robot.png'
 
 
 # --------------------------------------------------------------------------- #
@@ -213,6 +222,8 @@ def test_generator_module_is_importable():
         'build_busy_frames',
         'build_happy_frames',
         'build_error_frames',
+        'build_talk_frames',
+        'build_wave_frames',
     ):
         assert hasattr(mod, name), f'generate_mascot_anim.{name} missing'
 
@@ -226,13 +237,20 @@ def test_generator_choreographies_have_expected_frame_counts():
         build_error_frames,
         build_happy_frames,
         build_idle_frames,
+        build_talk_frames,
+        build_wave_frames,
         load_base,
     )
     base = load_base()
     assert len(build_idle_frames(base)) == 14
-    assert len(build_busy_frames(base)) == 16
+    assert len(build_busy_frames(base)) == 14
+    assert len(build_busy_frames(base, 'a')) == 14
+    assert len(build_busy_frames(base, 'b')) == 14
+    assert len(build_busy_frames(base, 'c')) == 14
     assert len(build_happy_frames(base)) == 14
     assert len(build_error_frames(base)) == 14
+    assert len(build_talk_frames(base)) == 12
+    assert len(build_wave_frames(base)) == 16
 
 
 def test_generator_frames_have_transparent_background():
@@ -312,44 +330,56 @@ def test_error_state_preserves_base_mascot_pixels():
 # Template / JS wiring                                                        #
 # --------------------------------------------------------------------------- #
 def test_mascot_template_wires_error_state():
-    """The _mascot.html partial must register the error GIF via a
-    data-error-src attribute so setMascotState('error') can switch to it."""
+    """The _mascot.html partial must include the mascot-sprite class so
+    setMascotState('error') can switch to the error sprite via CSS class."""
     template = (ROOT / 'src' / 'templates' / '_mascot.html').read_text()
-    assert 'mascot-error.gif' in template, (
-        '_mascot.html does not reference mascot-error.gif'
-    )
-    assert 'data-error-src' in template, (
-        '_mascot.html does not declare a data-error-src attribute on the <img>'
+    assert 'mascot-sprite' in template, (
+        '_mascot.html does not include the mascot-sprite class'
     )
 
 
-def test_mascot_template_uses_new_state_subdirectory_layout():
-    """After the images/ reorganization, each mascot state's
-    GIF must live under mascots/{state}/, not directly in images/."""
+def test_mascot_template_uses_sprite_div_not_img():
+    """The mascot must be a <div> sprite player, not an <img>.  The old
+    <img> approach swapped GIF src on state change (causing restart jank
+    and ~500KB downloads); the sprite <div> swaps a CSS class."""
     template = (ROOT / 'src' / 'templates' / '_mascot.html').read_text()
-    expected_substrings = [
-        'images/mascots/idle/mascot-idle.gif',
-        'images/mascots/busy/mascot-busy.gif',
-        'images/mascots/happy/mascot-happy.gif',
-        'images/mascots/error/mascot-error.gif',
-        'images/mascots/mascot-robot.png',
-    ]
-    for needle in expected_substrings:
-        assert needle in template, (
-            f'_mascot.html is missing the new path: {needle}'
-        )
+    assert '<img' not in template, (
+        '_mascot.html still uses <img> — should be <div class="mascot-sprite">'
+    )
 
 
 def test_mascot_js_supports_error_state():
     """mascot.js must accept 'error' as a valid state in setMascotState
-    and add/remove the mascot-state-error CSS class accordingly."""
+    and construct the mascot-state-error CSS class dynamically."""
     js = (ROOT / 'src' / 'static' / 'js' / 'mascot.js').read_text()
-    assert "'error'" in js or '"error"' in js, (
-        "mascot.js does not list 'error' as a valid mascot state"
+    assert "'error'" in js, "mascot.js does not list 'error' as a valid mascot state"
+    # The JS builds class names as 'mascot-state-' + state, so check for
+    # the class-name prefix pattern rather than a literal substring.
+    assert "'mascot-state-' + " in js or 'mascot-state-\' + ' in js, (
+        "mascot.js does not construct mascot-state-* CSS class names"
     )
-    assert 'mascot-state-error' in js, (
-        "mascot.js does not toggle the mascot-state-error CSS class"
+
+
+def test_mascot_js_supports_new_states():
+    """mascot.js must accept the new 'talk' and 'wave' states."""
+    js = (ROOT / 'src' / 'static' / 'js' / 'mascot.js').read_text()
+    assert "'talk'" in js, "mascot.js does not list 'talk' as a valid state"
+    assert "'wave'" in js, "mascot.js does not list 'wave' as a valid state"
+
+
+def test_mascot_js_wave_is_one_shot():
+    """The wave state must fall back to idle after its animation ends."""
+    js = (ROOT / 'src' / 'static' / 'js' / 'mascot.js').read_text()
+    assert 'animationend' in js, (
+        "mascot.js does not listen for animationend to auto-return from wave"
     )
+
+
+def test_progress_js_maps_busy_variants():
+    """progress.js must map 'busy' to variant A/B/C by progress %."""
+    js = (ROOT / 'src' / 'static' / 'js' / 'progress.js').read_text()
+    assert 'busyB' in js, "progress.js does not map to busyB variant"
+    assert 'busyC' in js, "progress.js does not map to busyC variant"
 
 
 def test_retro_css_declares_error_state_glow():
@@ -359,3 +389,17 @@ def test_retro_css_declares_error_state_glow():
     assert '#robot-mascot.mascot-state-error' in css, (
         'retro.css does not declare a glow for mascot-state-error'
     )
+
+
+def test_retro_css_declares_sprite_sheets():
+    """retro.css must reference the sprite-sheet PNGs for each state."""
+    css = (ROOT / 'src' / 'static' / 'css' / 'retro.css').read_text()
+    for needle in [
+        'mascot-idle-sprite.png',
+        'mascot-busy-sprite.png',
+        'mascot-happy-sprite.png',
+        'mascot-error-sprite.png',
+        'mascot-talk-sprite.png',
+        'mascot-wave-sprite.png',
+    ]:
+        assert needle in css, f'retro.css does not reference {needle}'

@@ -824,6 +824,19 @@ h2, .section-title {
 }
 
 /* ===== ROBOT MASCOT ===== */
+/*
+ * Sprite-sheet player: the mascot is a <div> with a CSS background-image
+ * pointing at a 1-row sprite sheet (e.g. mascot-idle-sprite.png).  The
+ * sheet is N × 759 px wide (one frame per 759px slice).  CSS steps()
+ * animation slides background-position across the sheet.
+ *
+ * Each state sets its own --mascot-frames / --mascot-ms AND its own
+ * @keyframes rule.  We can't use a single shared keyframe with var()
+ * inside steps() because CSS var() substitution inside timing functions
+ * is not reliably supported — if steps() fails to parse the browser
+ * falls back to linear easing, producing a "conveyor belt" slide
+ * instead of frame-stepping.  So each state gets a literal keyframe.
+ */
 #robot-mascot {
     position: fixed;
     bottom: 30px;
@@ -832,13 +845,225 @@ h2, .section-title {
     height: 120px;
     z-index: 1000;
     cursor: pointer;
+    image-rendering: pixelated;
+    background-repeat: no-repeat;
+    background-size: auto 120px;
+    animation-iteration-count: infinite;
+    animation-timing-function: steps(1, end);
     filter: drop-shadow(0 10px 20px rgba(0, 180, 216, 0.4));
 }
 
+/*
+ * Per-state sprite sheets.  Each state sets:
+ *   --mascot-ms      per-frame duration
+ *   animation-name   a state-specific @keyframes (literal frame count)
+ * The sheet is N × 759 px; background-size: auto 120px keeps each
+ * frame at 759px source width, and the keyframe jumps background-position
+ * in 759px steps.  steps(1, end) ensures each keyframe key is held (no
+ * interpolation between the 0% and 100% keys).
+ */
+
+/* Per-state sprite sheets + tuning (frame count + per-frame ms).
+   Each state has its own @keyframes with a LITERAL frame count in the
+   background-position end value — no var() inside steps() or calc()
+   for the position, because var() in timing functions is unreliable. */
+.mascot-sprite.mascot-state-idle {
+    --mascot-ms: 250ms;
+    background-image: url("../images/mascots/idle/mascot-idle-sprite.png");
+    animation-name: mascot-idle;
+    animation-duration: 3.5s;  /* 14 × 250ms */
+}
+.mascot-sprite.mascot-state-busy {
+    --mascot-ms: 150ms;
+    background-image: url("../images/mascots/busy/mascot-busy-sprite.png");
+    animation-name: mascot-busy;
+    animation-duration: 2.1s;  /* 14 × 150ms */
+}
+.mascot-sprite.mascot-state-busyB {
+    --mascot-ms: 150ms;
+    background-image: url("../images/mascots/busyB/mascot-busyB-sprite.png");
+    animation-name: mascot-busyB;
+    animation-duration: 2.1s;
+}
+.mascot-sprite.mascot-state-busyC {
+    --mascot-ms: 150ms;
+    background-image: url("../images/mascots/busyC/mascot-busyC-sprite.png");
+    animation-name: mascot-busyC;
+    animation-duration: 2.1s;
+}
+.mascot-sprite.mascot-state-happy {
+    --mascot-ms: 220ms;
+    background-image: url("../images/mascots/happy/mascot-happy-sprite.png");
+    animation-name: mascot-happy;
+    animation-duration: 3.08s;  /* 14 × 220ms */
+}
+.mascot-sprite.mascot-state-error {
+    --mascot-ms: 220ms;
+    background-image: url("../images/mascots/error/mascot-error-sprite.png");
+    animation-name: mascot-error;
+    animation-duration: 3.08s;
+}
+.mascot-sprite.mascot-state-talk {
+    --mascot-ms: 110ms;
+    background-image: url("../images/mascots/talk/mascot-talk-sprite.png");
+    animation-name: mascot-talk;
+    animation-duration: 1.32s;  /* 12 × 110ms */
+}
+.mascot-sprite.mascot-state-wave {
+    --mascot-ms: 140ms;
+    background-image: url("../images/mascots/wave/mascot-wave-sprite.png");
+    animation-name: mascot-wave;
+    animation-duration: 2.24s;  /* 16 × 140ms */
+    animation-iteration-count: 1;  /* one-shot greeting */
+    animation-fill-mode: forwards;
+}
+
+/* Per-state keyframes: background-size: auto 120px scales the sheet so
+   each frame is 120px wide in the background.  Steps must be -120px
+   (the SCALED frame width), NOT -759px (the source frame width). */
+@keyframes mascot-idle {
+    0%    { background-position: 0 0; }
+    7.14% { background-position: -120px 0; }
+    14.28% { background-position: -240px 0; }
+    21.42% { background-position: -360px 0; }
+    28.57% { background-position: -480px 0; }
+    35.71% { background-position: -600px 0; }
+    42.85% { background-position: -720px 0; }
+    50%    { background-position: -840px 0; }
+    57.14% { background-position: -960px 0; }
+    64.28% { background-position: -1080px 0; }
+    71.42% { background-position: -1200px 0; }
+    78.57% { background-position: -1320px 0; }
+    85.71% { background-position: -1440px 0; }
+    100%   { background-position: -1560px 0; }
+}
+
+@keyframes mascot-busy {
+    0%    { background-position: 0 0; }
+    7.14% { background-position: -120px 0; }
+    14.28% { background-position: -240px 0; }
+    21.42% { background-position: -360px 0; }
+    28.57% { background-position: -480px 0; }
+    35.71% { background-position: -600px 0; }
+    42.85% { background-position: -720px 0; }
+    50%    { background-position: -840px 0; }
+    57.14% { background-position: -960px 0; }
+    64.28% { background-position: -1080px 0; }
+    71.42% { background-position: -1200px 0; }
+    78.57% { background-position: -1320px 0; }
+    85.71% { background-position: -1440px 0; }
+    100%   { background-position: -1560px 0; }
+}
+
+@keyframes mascot-busyB {
+    0%    { background-position: 0 0; }
+    7.14% { background-position: -120px 0; }
+    14.28% { background-position: -240px 0; }
+    21.42% { background-position: -360px 0; }
+    28.57% { background-position: -480px 0; }
+    35.71% { background-position: -600px 0; }
+    42.85% { background-position: -720px 0; }
+    50%    { background-position: -840px 0; }
+    57.14% { background-position: -960px 0; }
+    64.28% { background-position: -1080px 0; }
+    71.42% { background-position: -1200px 0; }
+    78.57% { background-position: -1320px 0; }
+    85.71% { background-position: -1440px 0; }
+    100%   { background-position: -1560px 0; }
+}
+
+@keyframes mascot-busyC {
+    0%    { background-position: 0 0; }
+    7.14% { background-position: -120px 0; }
+    14.28% { background-position: -240px 0; }
+    21.42% { background-position: -360px 0; }
+    28.57% { background-position: -480px 0; }
+    35.71% { background-position: -600px 0; }
+    42.85% { background-position: -720px 0; }
+    50%    { background-position: -840px 0; }
+    57.14% { background-position: -960px 0; }
+    64.28% { background-position: -1080px 0; }
+    71.42% { background-position: -1200px 0; }
+    78.57% { background-position: -1320px 0; }
+    85.71% { background-position: -1440px 0; }
+    100%   { background-position: -1560px 0; }
+}
+
+@keyframes mascot-happy {
+    0%    { background-position: 0 0; }
+    7.14% { background-position: -120px 0; }
+    14.28% { background-position: -240px 0; }
+    21.42% { background-position: -360px 0; }
+    28.57% { background-position: -480px 0; }
+    35.71% { background-position: -600px 0; }
+    42.85% { background-position: -720px 0; }
+    50%    { background-position: -840px 0; }
+    57.14% { background-position: -960px 0; }
+    64.28% { background-position: -1080px 0; }
+    71.42% { background-position: -1200px 0; }
+    78.57% { background-position: -1320px 0; }
+    85.71% { background-position: -1440px 0; }
+    100%   { background-position: -1560px 0; }
+}
+
+@keyframes mascot-error {
+    0%    { background-position: 0 0; }
+    7.14% { background-position: -120px 0; }
+    14.28% { background-position: -240px 0; }
+    21.42% { background-position: -360px 0; }
+    28.57% { background-position: -480px 0; }
+    35.71% { background-position: -600px 0; }
+    42.85% { background-position: -720px 0; }
+    50%    { background-position: -840px 0; }
+    57.14% { background-position: -960px 0; }
+    64.28% { background-position: -1080px 0; }
+    71.42% { background-position: -1200px 0; }
+    78.57% { background-position: -1320px 0; }
+    85.71% { background-position: -1440px 0; }
+    100%   { background-position: -1560px 0; }
+}
+
+/* talk has 12 frames */
+@keyframes mascot-talk {
+    0%    { background-position: 0 0; }
+    8.33% { background-position: -120px 0; }
+    16.66% { background-position: -240px 0; }
+    25%    { background-position: -360px 0; }
+    33.33% { background-position: -480px 0; }
+    41.66% { background-position: -600px 0; }
+    50%    { background-position: -720px 0; }
+    58.33% { background-position: -840px 0; }
+    66.66% { background-position: -960px 0; }
+    75%    { background-position: -1080px 0; }
+    83.33% { background-position: -1200px 0; }
+    100%   { background-position: -1320px 0; }
+}
+
+/* wave has 16 frames */
+@keyframes mascot-wave {
+    0%    { background-position: 0 0; }
+    6.25% { background-position: -120px 0; }
+    12.5% { background-position: -240px 0; }
+    18.75% { background-position: -360px 0; }
+    25%    { background-position: -480px 0; }
+    31.25% { background-position: -600px 0; }
+    37.5%  { background-position: -720px 0; }
+    43.75% { background-position: -840px 0; }
+    50%    { background-position: -960px 0; }
+    56.25% { background-position: -1080px 0; }
+    62.5%  { background-position: -1200px 0; }
+    68.75% { background-position: -1320px 0; }
+    75%    { background-position: -1440px 0; }
+    81.25% { background-position: -1560px 0; }
+    87.5%  { background-position: -1680px 0; }
+    100%   { background-position: -1800px 0; }
+}
+
 /* State-based glow tints so users can see when the mascot is
-   idle vs processing vs celebrating vs in an error state. The GIF
-   itself is the only motion — no CSS transforms are applied. */
-#robot-mascot.mascot-state-busy {
+   idle vs processing vs celebrating vs in an error state. */
+#robot-mascot.mascot-state-busy,
+#robot-mascot.mascot-state-busyB,
+#robot-mascot.mascot-state-busyC {
     filter: drop-shadow(0 10px 22px rgba(0, 180, 216, 0.65))
             drop-shadow(0 0 8px rgba(0, 180, 216, 0.45));
 }
@@ -851,6 +1076,12 @@ h2, .section-title {
 #robot-mascot.mascot-state-error {
     filter: drop-shadow(0 10px 22px rgba(255, 70, 80, 0.65))
             drop-shadow(0 0 10px rgba(255, 130, 60, 0.45));
+}
+
+#robot-mascot.mascot-state-talk,
+#robot-mascot.mascot-state-wave {
+    filter: drop-shadow(0 10px 22px rgba(0, 180, 216, 0.55))
+            drop-shadow(0 0 9px rgba(144, 224, 239, 0.4));
 }
 
 #robot-mascot.mascot-state-idle {

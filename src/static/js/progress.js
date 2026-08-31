@@ -100,7 +100,14 @@
           }
           window.setBubblePersistent(data.mascot || 'Processing your materials...');
           window.showBubbleBar(data.pct);
-          window.setMascotState(data.mascot_state || 'busy');
+          // Map busy → variant A/B/C by progress % (same as generate poll)
+          var procState = data.mascot_state || 'busy';
+          if (procState === 'busy') {
+            var procPct = data.pct || 0;
+            if (procPct >= 75) procState = 'busyC';
+            else if (procPct >= 40) procState = 'busyB';
+          }
+          window.setMascotState(procState);
         })
         .catch(function () {});
     }, 2000);
@@ -241,7 +248,17 @@
           window.setBubblePersistent(data.mascot || 'Working on your lesson...');
           window.showBubbleBar(data.pct || 0);
           if (data.mascot_state) {
-            window.setMascotState(data.mascot_state);
+            // Map busy → variant A/B/C by progress % so the 45-90 min
+            // generation doesn't look frozen on one loop.  The backend
+            // only sends 'busy'; the variant is a client-side refinement.
+            var state = data.mascot_state;
+            if (state === 'busy') {
+              var pct = data.pct || 0;
+              if (pct >= 75) state = 'busyC';
+              else if (pct >= 40) state = 'busyB';
+              else state = 'busy';
+            }
+            window.setMascotState(state);
           }
         })
         .catch(function () {});
