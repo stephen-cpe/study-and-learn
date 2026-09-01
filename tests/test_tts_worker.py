@@ -676,18 +676,18 @@ def test_worker_does_not_overwrite_request_handler_stage_list(
     assert entry_after['stage'] == 4, (
         f"Worker overwrote stage number: {entry_after['stage']}"
     )
-    # TTS_STAGES[3] = {"label": "Complete", "mascot": "All done!"}.
-    # The user sees the mascot in the bubble, so that's the field
-    # the TTS worker's final cosmetic update is expected to set.
-    assert entry_after['mascot'] == 'All done!', (
+    # TTS_STAGES[3] mascot = 'All done, {name}!' which resolves to
+    # 'All done, there!' when no display_name was set on the task.
+    assert entry_after['mascot'] == 'All done, there!', (
         f"Worker did not publish final TTS cosmetic mascot: "
         f"{entry_after['mascot']!r}"
     )
     # Verify _tts_cosmetic(3) returns the expected cosmetic payload
-    # (label=Complete, mascot='All done!') — sanity check on the
-    # cosmetic-payload extraction that strips the 'stage' key.
+    # (label=Complete) — sanity check on the cosmetic-payload extraction
+    # that strips the 'stage' key.  The mascot field still contains the
+    # {name} placeholder before resolution by update_cosmetic.
     cos = _tts_cosmetic(3)
-    assert cos['mascot'] == 'All done!'
+    assert 'All done' in cos['mascot'], f"Unexpected mascot: {cos['mascot']!r}"
     assert cos['label'] == 'Complete'
     assert 'stage' not in cos
 
@@ -863,12 +863,13 @@ def test_worker_uses_update_cosmetic_not_update_progress(
     # The stage number from the request handler must still be 4
     # (we patched update_progress to raise, so the worker couldn't
     # have changed it). The mascot was patched by update_cosmetic
-    # to the TTS final-stage mascot ('All done!') — the user-facing
-    # bubble text. The label is also updated to the TTS final-stage
-    # label ('Complete'), but that is internal.
+    # to the TTS final-stage mascot ('All done, there!' when no
+    # display_name is set) — the user-facing bubble text. The label is
+    # also updated to the TTS final-stage label ('Complete'), but that
+    # is internal.
     entry = pt_get_progress(task_id)
     assert entry['stage'] == 4
-    assert entry['mascot'] == 'All done!'
+    assert entry['mascot'] == 'All done, there!'
     assert entry['label'] == 'Complete'
 
     # The completion column is the new "navigate now" signal, NOT

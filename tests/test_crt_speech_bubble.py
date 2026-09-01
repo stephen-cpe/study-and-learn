@@ -188,10 +188,10 @@ def test_mascot_js_typewriter_appends_caret():
 
 
 def test_mascot_messages_are_short_for_crt():
-    """Idle/click messages must be short so they fit the 4:3 CRT frame."""
+    """Idle/click fallback messages must be short so they fit the 4:3 CRT frame."""
     js = _read(MASCOT_JS)
-    m = re.search(r"var messages = \[(.*?)\];", js, re.S)
-    assert m, 'messages array not found in mascot.js'
+    m = re.search(r"var FALLBACK_MESSAGES = \[(.*?)\];", js, re.S)
+    assert m, 'FALLBACK_MESSAGES array not found in mascot.js'
     body = m.group(1)
     items = re.findall(r"'([^']+)'", body)
     assert items, 'no message literals found'
