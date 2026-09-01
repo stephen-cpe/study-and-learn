@@ -1098,9 +1098,7 @@ h2, .section-title {
     --crt-bezel-padding: 14px;
     --crt-screen-inset: 10px;
     --crt-text-line: 14.4px;   /* 9px * 1.6 line-height */
-    --crt-text-max-lines: 5;    /* 5-line cap gives 4 full lines of text plus
-                                   descender headroom so the last line is not
-                                   clipped by the scanline/screen surface */
+    --crt-text-max-lines: 5;    /* 5 full lines of text must be visible */
 
     position: fixed;
     bottom: 175px;
@@ -1196,7 +1194,10 @@ h2, .section-title {
     flex: 1 1 auto;
     display: block;
     min-height: 0;
-    max-height: calc(var(--crt-text-line) * var(--crt-text-max-lines));
+    /* box-sizing: border-box is active globally, so max-height INCLUDES
+       the 8px top + 6px bottom = 14px padding.  To fit 5 lines of 14.4px
+       each (72px of text), the max-height must be 72 + 14 = 86px. */
+    max-height: calc(var(--crt-text-line) * var(--crt-text-max-lines) + 14px);
     overflow: hidden;
     margin: 0;
     padding: 8px 10px 6px 10px;

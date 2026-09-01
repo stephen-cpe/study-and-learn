@@ -58,7 +58,7 @@ Initialize database schema:
 psql -U postgres -d study_and_learn -f init_db.sql
 ```
 
-This creates all tables, indexes, foreign keys, stamps the alembic version, and seeds three pre-configured accounts:
+This creates all tables (users, study_paths, content_registry, lesson_progress, mascot_memory), indexes, foreign keys, stamps the alembic version, and seeds three pre-configured accounts. The `users` table includes optional `nickname` and `full_name` columns (NULL by default) — set them in **Settings** to make the mascot and narration address the learner by a friendly name instead of the login handle. The `mascot_memory` table stores the mascot's per-learner long-term memory (preferences, quiz outcomes, study path events) so the speech bubble can produce personalized, context-aware lines.
 
 | Username | Password       | Role  | Can generate lessons |
 |----------|---------------|-------|----------------------|

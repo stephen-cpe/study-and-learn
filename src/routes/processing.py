@@ -15,11 +15,13 @@ from flask import (
     session,
     url_for,
 )
-from flask_login import current_user
+from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
+from src.models import LessonProgress, StudyPath
 from src.repositories.lesson_repo import (
     create_study_path,
+    get_most_recent_active_path,
 )
 from src.repositories.lesson_repo import (
     get_learning_goal as _db_get_goal,
@@ -111,6 +113,62 @@ def progress():
     return jsonify(status)
 
 
+@bp.route('/mascot/line')
+@login_required
+def mascot_line():
+    """Return a short, personalized mascot line for the CRT speech bubble.
+
+    Query params:
+        context: 'idle' (default), 'dashboard', 'lessons',
+                 'lesson_complete', 'error', 'progress'
+        path_id: optional — if provided, use that path's context;
+                 otherwise fall back to the most recent active path.
+
+    Returns:
+        {"text": "...", "state": "idle"} — never errors (always 200).
+    """
+    from src.services.mascot_lines import generate_line
+
+    event = request.args.get('context', 'idle').lower()
+    valid = {'idle', 'dashboard', 'lessons', 'lesson_complete',
+             'error', 'progress'}
+    if event not in valid:
+        event = 'idle'
+
+    # Determine the learner's current study path + progress
+    path_title = None
+    progress_pct = None
+    page = event if event in ('dashboard', 'lessons') else None
+
+    path_id = request.args.get('path_id')
+    if path_id:
+        path = StudyPath.query.filter_by(
+            id=path_id, user_id=current_user.id
+        ).first()
+    else:
+        path = get_most_recent_active_path(current_user)
+
+    if path and path.content_data:
+        path_title = path.title
+        progress_rows = LessonProgress.query.filter_by(
+            study_path_id=path.id
+        ).all()
+        total = len(progress_rows)
+        if total > 0:
+            passed = sum(1 for r in progress_rows if r.passed)
+            progress_pct = round((passed / total) * 100)
+
+    line = generate_line(
+        user_id=current_user.id,
+        display_name=current_user.display_name,
+        event=event,
+        path_title=path_title,
+        progress_pct=progress_pct,
+        page=page,
+    )
+    return jsonify({'text': line, 'state': 'talk' if event != 'error' else 'error'})
+
+
 @bp.route('/process', methods=['POST'])
 def process():
     task_id = request.form.get('task_id', '') or None
@@ -136,7 +194,11 @@ def process():
         return _error(f'Maximum {MAX_FILES} files allowed')
 
     if is_ajax:
-        progress_tracker.create_task(task_id=task_id, stages=progress_tracker.PROCESS_STAGES)
+        progress_tracker.create_task(
+            task_id=task_id,
+            stages=progress_tracker.PROCESS_STAGES,
+            display_name=current_user.display_name,
+        )
 
     upload_folder = current_app.config['UPLOAD_FOLDER']
     os.makedirs(upload_folder, exist_ok=True)
@@ -204,7 +266,7 @@ def process():
                 filenames.append(original_filename)
             except ValueError as e:
                 if is_ajax and task_id:
-                    progress_tracker.mark_error(task_id, mascot_msg='Couldn\'t read a file')
+                    progress_tracker.mark_error(task_id, mascot_msg="Couldn't read a file")
                 if is_ajax:
                     progress_tracker.cleanup_task(task_id)
                     return jsonify({'error': f'Error extracting {original_filename}: {str(e)}'}), 400
@@ -225,7 +287,7 @@ def process():
             filenames.append(original_filename)
         except ValueError as e:
             if is_ajax and task_id:
-                progress_tracker.mark_error(task_id, mascot_msg='Couldn\'t read a file')
+                progress_tracker.mark_error(task_id, mascot_msg="Couldn't read a file")
             if is_ajax:
                 progress_tracker.cleanup_task(task_id)
                 return jsonify({'error': f'Error extracting {original_filename}: {str(e)}'}), 400
@@ -252,7 +314,7 @@ def process():
             if is_ajax and task_id:
                 progress_tracker.update_cosmetic(
                     task_id,
-                    mascot='RAG retrieval failed — using full document text instead.',
+                    mascot='RAG retrieval failed — using full text instead.',
                     mascot_state='error',
                 )
 

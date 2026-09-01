@@ -4,7 +4,7 @@
 {% block content %}
 <h1 class="mt-4">My Learning Dashboard</h1>
 <p class="text-center" style="color: var(--az-muted); margin-bottom: 2rem;">
-    Welcome back, <strong>{{ current_user.username }}</strong>! Track your learning progress below.
+    Welcome back, <strong>{{ current_user.display_name }}</strong>! Track your learning progress below.
 </p>
 
 {% if at_cap and tab == 'active' %}

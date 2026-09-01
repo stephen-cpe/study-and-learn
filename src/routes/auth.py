@@ -55,7 +55,16 @@ def signup():
             flash('Email already registered.', 'error')
             return redirect(url_for('main.signup'))
 
-        user = User(username=username, email=email)
+        # Nickname and full_name are optional at signup — left as NULL
+        # (display_name falls back to username) until the learner sets
+        # them in Settings. We only strip/validate length here; the
+        # settings_service validators are reused for consistency.
+        from src.services.settings_service import validate_full_name, validate_nickname
+        nickname = validate_nickname(request.form.get('nickname'))
+        full_name = validate_full_name(request.form.get('full_name'))
+
+        user = User(username=username, nickname=nickname, full_name=full_name,
+                     email=email)
         user.set_password(password)
         db.session.add(user)
         db.session.commit()
@@ -121,14 +130,28 @@ def reset_password():
 def settings():
     """User preferences — avatar, TTS narration toggle/speaker, lesson difficulty."""
     if request.method == 'POST':
+        old_nick = current_user.nickname
+        old_diff = current_user.lesson_difficulty
         _, message = apply_settings(
             current_user,
             avatar=request.form.get('avatar'),
             tts_enabled=request.form.get('tts_enabled', False),
             tts_speaker=request.form.get('tts_speaker'),
             lesson_difficulty=request.form.get('lesson_difficulty'),
+            nickname=request.form.get('nickname'),
+            full_name=request.form.get('full_name'),
         )
         db.session.commit()
+
+        # Memory: record preference changes
+        from src.services.mascot_memory import store_memory as _sm
+        if current_user.nickname and current_user.nickname != old_nick:
+            _sm(current_user.id, 'procedural',
+                f"Likes to be called {current_user.nickname}")
+        if current_user.lesson_difficulty != old_diff:
+            _sm(current_user.id, 'semantic',
+                f"Prefers {current_user.lesson_difficulty} difficulty")
+
         flash(message, 'success')
         return redirect(url_for('main.settings'))
 

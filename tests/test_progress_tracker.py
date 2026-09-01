@@ -37,20 +37,22 @@ def test_generate_stages_have_labels():
 
 
 def test_generate_stages_have_mascot_messages():
-    # New CRT-friendly short messages (must be punchy; see retro.css #speech-bubble).
+    # Progress stages do NOT contain {name} — they repeat frequently and
+    # name repetition becomes annoying. Only the completion stages (happy)
+    # include {name} as a celebration moment.
     assert GENERATE_STAGES[0]['mascot'] == 'Parsing docs...'
     assert GENERATE_STAGES[1]['mascot'] == 'Chunking + indexing...'
     assert GENERATE_STAGES[2]['mascot'] == 'Scanning concepts...'
-    assert GENERATE_STAGES[3]['mascot'] == 'Building lesson...'
-    assert GENERATE_STAGES[4]['mascot'] == 'Polishing...'
+    assert GENERATE_STAGES[3]['mascot'] == 'Building your lesson...'
+    assert GENERATE_STAGES[4]['mascot'] == 'All done, {name}!'
 
 
 def test_mascot_messages_fit_crt_line():
-    """All mascot lines must be short enough to look right inside the
-    4:3 CRT speech bubble (one short line, no wrapping)."""
+    """All mascot lines (with a typical 10-char nickname substituted)
+    must be short enough to look right inside the 4:3 CRT bubble."""
     for s in GENERATE_STAGES + PROCESS_STAGES:
-        line = s['mascot']
-        assert len(line) <= 28, f'Mascot line too long for CRT bubble: {line!r}'
+        line = s['mascot'].replace('{name}', 'Bobby')
+        assert len(line) <= 35, f'Mascot line too long for CRT bubble: {line!r}'
 
 
 def test_process_stages_enumeration():
@@ -84,7 +86,7 @@ def test_process_stages_labels():
 def test_process_stages_mascot_messages():
     assert PROCESS_STAGES[0]['mascot'] == 'Receiving files...'
     assert PROCESS_STAGES[8]['pct'] == 100
-    assert PROCESS_STAGES[8]['mascot'] == 'All done!'
+    assert PROCESS_STAGES[8]['mascot'] == 'All done, {name}!'
 
 
 def test_stages_alias():
@@ -119,6 +121,18 @@ def test_update_progress():
     assert progress['pct'] == 50
     assert progress['label'] == 'Retrieving context'
     assert progress['mascot'] == 'Scanning concepts...'
+
+
+def test_update_progress_resolves_display_name():
+    """When create_task is called with display_name, stage transitions
+    must resolve {name} placeholders in the mascot message.  Only the
+    'happy' completion stages contain {name} now — progress stages do
+    not (they repeat too frequently for name repetition)."""
+    task_id = create_task(display_name='Bobby')
+    update_progress(task_id, 4)  # stage 4 = "All done, {name}!"
+    progress = get_progress(task_id)
+    assert progress['mascot'] == 'All done, Bobby!'
+    assert progress.get('display_name') == 'Bobby'
 
 
 def test_update_progress_process_stages():
@@ -251,6 +265,22 @@ def test_mark_error_sets_mascot_state_error():
     assert progress['mascot_state'] == 'error'
     assert progress['mascot'] == 'AI unreachable'
     assert progress['error'] is True
+
+
+def test_mark_error_resolves_name_placeholder():
+    """mark_error must resolve {name} from the task's display_name."""
+    task_id = create_task(display_name='Ali')
+    mark_error(task_id, mascot_msg='AI generation failed, {name} — retry')
+    progress = get_progress(task_id)
+    assert progress['mascot'] == 'AI generation failed, Ali — retry'
+
+
+def test_mark_error_falls_back_to_there_when_no_name():
+    """When no display_name was set, {name} resolves to 'there'."""
+    task_id = create_task()
+    mark_error(task_id, mascot_msg='Something went wrong, {name}.')
+    progress = get_progress(task_id)
+    assert progress['mascot'] == 'Something went wrong, there.'
 
 
 def test_mark_error_preserves_stage_and_done():

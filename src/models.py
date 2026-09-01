@@ -21,6 +21,8 @@ class User(db.Model, UserMixin):
 
     id = db.Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), nullable=False)
     username = db.Column(String(80), unique=True, index=True, nullable=False)
+    nickname = db.Column(String(40), nullable=True)
+    full_name = db.Column(String(80), nullable=True)
     email = db.Column(String(120), unique=True, index=True, nullable=False)
     password_hash = db.Column(String(255), nullable=False)
     is_admin = db.Column(Boolean, default=False, nullable=False)
@@ -42,6 +44,16 @@ class User(db.Model, UserMixin):
 
     def __repr__(self) -> str:
         return f"<User {self.username} ({self.email}) admin={self.is_admin} gen={self.can_generate_lessons}>"
+
+    @property
+    def display_name(self) -> str:
+        """Friendly name for UI/TTS: nickname if set, else full_name, else username.
+
+        Used by the navbar, dashboard greeting, mascot speech bubble, and
+        TTS narration prompt so the learner is addressed by a name they
+        chose rather than their login handle.
+        """
+        return self.nickname or self.full_name or self.username
 
     @property
     def active_lesson_count(self) -> int:
@@ -106,3 +118,29 @@ class LessonProgress(db.Model):
 
     def __repr__(self) -> str:
         return f"<LessonProgress module={self.module_index} score={self.score} passed={self.passed}>"
+
+
+class MascotMemory(db.Model):
+    """Long-term per-learner memory for the mascot's personality engine.
+
+    Three memory types (mirrors the Eternal Fusion Pavilion pattern):
+    * ``semantic`` — stable preferences ("prefers Hard difficulty")
+    * ``episodic`` — events ("finished module 3 of Cell Biology")
+    * ``procedural`` — how-to ("likes to be called Bobby")
+
+    The mascot's line generator retrieves these at speak time and injects
+    them into the LLM context as a ``[Learner Profile]`` block so the
+    generated line can reference past activity.
+    """
+    __tablename__ = 'mascot_memory'
+
+    id = db.Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), nullable=False)
+    user_id = db.Column(String(36), db.ForeignKey('users.id'), nullable=False, index=True)
+    memory_type = db.Column(String(20), nullable=False)
+    content = db.Column(Text, nullable=False)
+    created_at = db.Column(DateTime, default=_utcnow)
+
+    VALID_TYPES = ('semantic', 'episodic', 'procedural')
+
+    def __repr__(self) -> str:
+        return f"<MascotMemory type={self.memory_type} content={self.content[:60]!r}>"

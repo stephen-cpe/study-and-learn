@@ -26,6 +26,8 @@ from src.services.settings_service import (
     apply_settings,
     validate_avatar,
     validate_difficulty,
+    validate_full_name,
+    validate_nickname,
     validate_tts_speaker,
 )
 
@@ -115,6 +117,23 @@ class TestSettingsServiceValidators:
         assert validate_difficulty('Insane') == DEFAULT_DIFFICULTY
         assert validate_difficulty('') == DEFAULT_DIFFICULTY
 
+    def test_nickname_strips_and_truncates(self):
+        assert validate_nickname('  Ali  ') == 'Ali'
+        assert validate_nickname('x' * 50) == 'x' * 40
+
+    def test_nickname_none_or_empty_returns_none(self):
+        assert validate_nickname(None) is None
+        assert validate_nickname('') is None
+        assert validate_nickname('   ') is None
+
+    def test_full_name_strips_and_truncates(self):
+        assert validate_full_name('  Alice  Smith ') == 'Alice Smith'
+        assert validate_full_name('y' * 90) == 'y' * 80
+
+    def test_full_name_none_or_empty_returns_none(self):
+        assert validate_full_name(None) is None
+        assert validate_full_name('') is None
+
     def test_allowed_lists_have_expected_size(self):
         assert len(ALLOWED_AVATARS) == 9
         assert TTS_SPEAKERS == ['Ava', 'Emma', 'Ryan', 'Andrew']
@@ -147,6 +166,29 @@ class TestSettingsServiceValidators:
             assert user.tts_speaker == DEFAULT_TTS_SPEAKER
             assert user.lesson_difficulty == DEFAULT_DIFFICULTY
 
+    def test_apply_settings_persists_nickname_and_full_name(self, app, make_user):
+        uid = make_user()
+        with app.app_context():
+            user = db.session.get(User, uid)
+            changed, msg = apply_settings(user, nickname='Ali', full_name='Alice Smith')
+            assert changed is True
+            assert user.nickname == 'Ali'
+            assert user.full_name == 'Alice Smith'
+            assert user.display_name == 'Ali'  # nickname wins
+            assert 'Nickname' in msg
+
+    def test_apply_settings_clearing_nickname_falls_back_to_full_name(self, app, make_user):
+        uid = make_user()
+        with app.app_context():
+            user = db.session.get(User, uid)
+            user.nickname = 'Ali'
+            user.full_name = 'Alice Smith'
+            db.session.commit()
+            # Empty nickname string → validate_nickname returns None
+            apply_settings(user, nickname='', full_name='Alice Smith')
+            assert user.nickname is None
+            assert user.display_name == 'Alice Smith'  # falls back to full_name
+
 
 # ── User model defaults ────────────────────────────────────────────────────
 
@@ -160,6 +202,9 @@ class TestUserModelDefaults:
             assert user.tts_enabled is False
             assert user.tts_speaker == 'Ava'
             assert user.lesson_difficulty == 'Normal'
+            assert user.nickname is None
+            assert user.full_name is None
+            assert user.display_name == 'tester'  # falls back to username
 
 
 # ── /settings route ────────────────────────────────────────────────────────
@@ -183,6 +228,10 @@ class TestSettingsRoute:
         assert 'images/avatars/avatar-0.png' in body
         assert 'Text to Speech' in body
         assert 'Lesson Difficulty' in body
+        # The new Profile Name section must be rendered
+        assert 'Profile Name' in body
+        assert 'name="nickname"' in body
+        assert 'name="full_name"' in body
         # The settings.js file must actually be loaded — otherwise the
         # avatar modal never opens when the user clicks their profile pic.
         assert 'js/settings.js' in body
@@ -200,6 +249,8 @@ class TestSettingsRoute:
                 'tts_enabled': '',
                 'tts_speaker': 'Ava',
                 'lesson_difficulty': 'Normal',
+                'nickname': '',
+                'full_name': '',
             },
             follow_redirects=False,
         )
@@ -218,6 +269,8 @@ class TestSettingsRoute:
                 'tts_enabled': 'on',
                 'tts_speaker': 'Ryan',
                 'lesson_difficulty': 'Hard',
+                'nickname': 'Bobster',
+                'full_name': 'Bob Jones',
             },
             follow_redirects=False,
         )
@@ -227,6 +280,9 @@ class TestSettingsRoute:
             assert user.tts_enabled is True
             assert user.tts_speaker == 'Ryan'
             assert user.lesson_difficulty == 'Hard'
+            assert user.nickname == 'Bobster'
+            assert user.full_name == 'Bob Jones'
+            assert user.display_name == 'Bobster'
 
     def test_post_rejects_garbage_values(self, app, client, make_user):
         make_user()
@@ -238,6 +294,8 @@ class TestSettingsRoute:
                 'tts_enabled': 'on',
                 'tts_speaker': 'Voldemort',
                 'lesson_difficulty': 'YOLO',
+                'nickname': 'x' * 50,  # truncated to 40
+                'full_name': 'y' * 90,  # truncated to 80
             },
             follow_redirects=False,
         )
@@ -247,6 +305,8 @@ class TestSettingsRoute:
             assert user.tts_speaker == 'Ava'
             assert user.lesson_difficulty == 'Normal'
             assert user.tts_enabled is True  # bool field untouched
+            assert user.nickname == 'x' * 40
+            assert user.full_name == 'y' * 80
 
     def test_post_unchecked_checkbox_disables_tts(self, app, client, make_user):
         """Regression: an unchecked checkbox is absent from the POST body.
@@ -267,6 +327,8 @@ class TestSettingsRoute:
                 'avatar': 'avatar-0.png',
                 'tts_speaker': 'Ava',
                 'lesson_difficulty': 'Normal',
+                'nickname': '',
+                'full_name': '',
             },
             follow_redirects=False,
         )
@@ -283,6 +345,7 @@ class TestSettingsRoute:
             user.tts_enabled = True
             user.tts_speaker = 'Andrew'
             user.lesson_difficulty = 'Easy'
+            user.nickname = 'Andy'
             db.session.commit()
         _login(client)
         body = client.get('/settings').get_data(as_text=True)
@@ -290,6 +353,8 @@ class TestSettingsRoute:
         assert 'value="Andrew" selected' in body
         # The Easy tick is the leftmost (index 0) on the slider
         assert 'value="0"' in body
+        # The nickname field is pre-filled with the stored value
+        assert 'value="Andy"' in body
 
     def test_logout_link_still_present(self, app, client, make_user):
         make_user()

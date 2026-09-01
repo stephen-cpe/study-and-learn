@@ -15,8 +15,8 @@ GENERATE_STAGES = [
     {"stage": 0, "label": "Parsing documents", "pct": 0, "mascot": "Parsing docs...", "mascot_state": "busy"},
     {"stage": 1, "label": "Chunking & embedding", "pct": 25, "mascot": "Chunking + indexing...", "mascot_state": "busy"},
     {"stage": 2, "label": "Retrieving context", "pct": 50, "mascot": "Scanning concepts...", "mascot_state": "busy"},
-    {"stage": 3, "label": "Generating lessons", "pct": 75, "mascot": "Building lesson...", "mascot_state": "busy"},
-    {"stage": 4, "label": "Finalizing", "pct": 100, "mascot": "Polishing...", "mascot_state": "happy"},
+    {"stage": 3, "label": "Generating lessons", "pct": 75, "mascot": "Building your lesson...", "mascot_state": "busy"},
+    {"stage": 4, "label": "Finalizing", "pct": 100, "mascot": "All done, {name}!", "mascot_state": "happy"},
 ]
 
 PROCESS_STAGES = [
@@ -28,18 +28,35 @@ PROCESS_STAGES = [
     {"stage": 5, "label": "Generating summary",        "pct": 70,  "mascot": "Summarizing...", "mascot_state": "busy"},
     {"stage": 6, "label": "Checking relevance",        "pct": 80,  "mascot": "Relevance check...", "mascot_state": "busy"},
     {"stage": 7, "label": "Creating study path",       "pct": 90,  "mascot": "Building path...", "mascot_state": "busy"},
-    {"stage": 8, "label": "Complete",                  "pct": 100, "mascot": "All done!", "mascot_state": "happy"},
+    {"stage": 8, "label": "Complete",                  "pct": 100, "mascot": "All done, {name}!", "mascot_state": "happy"},
 ]
 
 STAGES = GENERATE_STAGES
 
 
-def create_task(task_id=None, stages=None):
+def _resolve_name(text: str, display_name: str) -> str:
+    """Replace ``{name}`` placeholders in a mascot message with the
+    learner's display name.  Falls back to 'there' if the display name
+    is empty (so the message still reads naturally)."""
+    if not text:
+        return text
+    name = display_name or 'there'
+    return text.replace('{name}', name)
+
+
+def create_task(task_id=None, stages=None, display_name=None):
+    """Create a progress task.  ``display_name`` is the learner's
+    friendly name (nickname/full_name/username) — it's stored on the
+    entry so that ``{name}`` placeholders in stage messages can be
+    resolved when the task is published."""
     if task_id is None:
         task_id = str(uuid.uuid4())
     stage_list = stages or STAGES
     entry = dict(stage_list[0])
     entry['done'] = False
+    entry['display_name'] = display_name or ''
+    # Resolve the initial stage's mascot message
+    entry['mascot'] = _resolve_name(entry.get('mascot', ''), display_name)
     _cache.set(task_id, entry)
     _cache.set(task_id + ':stages', stage_list)
     logger.info(f"[progress] create_task: {task_id} → stage 0")
@@ -54,6 +71,12 @@ def update_progress(task_id, stage):
     if 0 <= stage < len(stage_list):
         entry = dict(stage_list[stage])
         entry['done'] = False
+        # Preserve the display_name across stage transitions
+        old = _cache.get(task_id) or {}
+        entry['display_name'] = old.get('display_name', '')
+        # Resolve the mascot message for this stage
+        entry['mascot'] = _resolve_name(entry.get('mascot', ''),
+                                         entry['display_name'])
         _cache.set(task_id, entry)
         logger.info(f"[progress] update: {task_id} → stage {stage} ({stage_list[stage]['label']})")
 
@@ -83,6 +106,10 @@ def update_cosmetic(task_id, **fields):
         logger.info(f"[progress] update_cosmetic skipped — task {task_id} not found")
         return
     data = _cache.get(task_id) or {}
+    # Resolve {name} placeholders in any mascot string being merged in
+    name = data.get('display_name', '')
+    if 'mascot' in payload and payload['mascot']:
+        payload['mascot'] = _resolve_name(payload['mascot'], name)
     data.update(payload)
     _cache.set(task_id, data)
     logger.info(f"[progress] update_cosmetic: {task_id} → {payload}")
@@ -91,12 +118,17 @@ def update_cosmetic(task_id, **fields):
 def mark_error(task_id, mascot_msg=None, pct=None, label=None):
     """Publish a sticky error state for a task.
 
-    Sets ``mascot_state='error'`` (which drives the mascot-error.gif
+    Sets ``mascot_state='error'`` (which drives the mascot-error sprite
     on the client), the provided mascot bubble message, and an
     ``error=True`` flag that the JS client uses to keep the error
     mascot visible for a short window even if subsequent ``busy``
     cosmetic polls arrive (e.g. from a background TTS worker that is
     still processing other modules).
+
+    ``mascot_msg`` may contain ``{name}`` which is replaced with the
+    learner's display name (stored on the task at ``create_task`` time).
+    If the task has no display_name (e.g. created before this feature),
+    the placeholder falls back to 'there'.
 
     This is the canonical helper for surfacing failures to the user
     via the mascot without crashing the request. Call it in an
@@ -110,15 +142,20 @@ def mark_error(task_id, mascot_msg=None, pct=None, label=None):
     Args:
         task_id: The progress_tracker task id.
         mascot_msg: Short message for the CRT speech bubble
-            (e.g. "Couldn't reach the AI model"). If None, a default
-            is used.
+            (e.g. "Couldn't reach the AI model, {name}"). If None, a
+            default is used.
         pct: Optional progress percentage to freeze the bar at.
         label: Optional internal label (not shown to the user; the
             mascot bubble uses ``mascot_msg``).
     """
+    # Resolve {name} from the stored display_name
+    data = _cache.get(task_id) or {}
+    name = data.get('display_name', '')
+    msg = mascot_msg or 'Something went wrong, {name}.'
+    msg = _resolve_name(msg, name)
     payload = {
         'mascot_state': 'error',
-        'mascot': mascot_msg or 'Something went wrong.',
+        'mascot': msg,
         'error': True,
     }
     if pct is not None:
@@ -126,7 +163,7 @@ def mark_error(task_id, mascot_msg=None, pct=None, label=None):
     if label is not None:
         payload['label'] = label
     update_cosmetic(task_id, **payload)
-    logger.info(f"[progress] mark_error: {task_id} → {mascot_msg!r}")
+    logger.info(f"[progress] mark_error: {task_id} → {msg!r}")
 
 
 def get_progress(task_id):

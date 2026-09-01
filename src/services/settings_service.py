@@ -30,6 +30,39 @@ DEFAULT_TTS_SPEAKER = 'Ava'
 DIFFICULTY_LEVELS = ['Easy', 'Normal', 'Hard']
 DEFAULT_DIFFICULTY = 'Normal'
 
+NICKNAME_MAX_LEN = 40
+FULL_NAME_MAX_LEN = 80
+
+
+def _clean_name(value) -> str | None:
+    """Trim and collapse whitespace; return None for empty/whitespace."""
+    if value is None:
+        return None
+    cleaned = ' '.join(str(value).split())
+    return cleaned or None
+
+
+def validate_nickname(value) -> str | None:
+    """Return a cleaned nickname (<= 40 chars) or None.
+
+    Unlike avatar/speaker/difficulty, nickname has no fixed allowed-list —
+    any non-empty string up to 40 chars is accepted (two learners may share
+    the same nickname). None/empty falls back to None so the model's
+    ``display_name`` property degrades to full_name → username.
+    """
+    cleaned = _clean_name(value)
+    if cleaned is None:
+        return None
+    return cleaned[:NICKNAME_MAX_LEN]
+
+
+def validate_full_name(value) -> str | None:
+    """Return a cleaned full name (<= 80 chars) or None."""
+    cleaned = _clean_name(value)
+    if cleaned is None:
+        return None
+    return cleaned[:FULL_NAME_MAX_LEN]
+
 
 def _coerce_bool(value) -> bool:
     if isinstance(value, bool):
@@ -58,7 +91,8 @@ def validate_difficulty(value) -> str:
 
 
 def apply_settings(user, *, avatar=None, tts_enabled=None,
-                   tts_speaker=None, lesson_difficulty=None) -> Tuple[bool, str]:
+                   tts_speaker=None, lesson_difficulty=None,
+                   nickname=None, full_name=None) -> Tuple[bool, str]:
     """Apply validated settings to *user* in place.
 
     Returns ``(changed, message)``. ``changed`` is True when at least one
@@ -95,6 +129,20 @@ def apply_settings(user, *, avatar=None, tts_enabled=None,
             user.lesson_difficulty = new_diff
             changed = True
             messages.append(f'Lesson difficulty set to {new_diff}.')
+
+    if nickname is not None:
+        new_nick = validate_nickname(nickname)
+        if new_nick != user.nickname:
+            user.nickname = new_nick
+            changed = True
+            messages.append('Nickname updated.')
+
+    if full_name is not None:
+        new_full = validate_full_name(full_name)
+        if new_full != user.full_name:
+            user.full_name = new_full
+            changed = True
+            messages.append('Full name updated.')
 
     if not messages:
         messages.append('Settings are up to date.')

@@ -63,6 +63,48 @@ def test_signup_creates_user_and_logs_in(client):
     assert user.email == 'new@example.com'
     assert user.password_hash != 'secret123'
     assert user.check_password('secret123')
+    # Optional nickname/full_name default to None when not provided
+    assert user.nickname is None
+    assert user.full_name is None
+    assert user.display_name == 'newuser'  # falls back to username
+
+
+def test_signup_persists_optional_nickname_and_full_name(client):
+    """POST /signup with the optional nickname + full_name stores them
+    and display_name prefers nickname."""
+    rv = client.post('/signup', data={
+        'username': 'nickuser',
+        'email': 'nick@example.com',
+        'password': 'secret123',
+        'nickname': 'Nicky',
+        'full_name': 'Nick Newman',
+    }, follow_redirects=True)
+    assert rv.status_code == 200
+
+    user = User.query.filter_by(username='nickuser').first()
+    assert user is not None
+    assert user.nickname == 'Nicky'
+    assert user.full_name == 'Nick Newman'
+    assert user.display_name == 'Nicky'  # nickname wins over full_name
+
+
+def test_signup_blank_nickname_is_treated_as_none(client):
+    """A whitespace-only nickname must not be stored as an empty string —
+    validate_nickname collapses it to None so display_name degrades to
+    full_name/username rather than rendering as a blank."""
+    rv = client.post('/signup', data={
+        'username': 'blanknick',
+        'email': 'blanknick@example.com',
+        'password': 'secret123',
+        'nickname': '   ',
+        'full_name': '',
+    }, follow_redirects=True)
+    assert rv.status_code == 200
+
+    user = User.query.filter_by(username='blanknick').first()
+    assert user.nickname is None
+    assert user.full_name is None
+    assert user.display_name == 'blanknick'
 
 
 def test_login_valid_credentials(client):

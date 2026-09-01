@@ -1,10 +1,16 @@
 /**
  * Mascot manager — sprite-sheet state animation, CRT speech bubble,
- * click-to-talk, greeting wave on load.
+ * click-to-talk, greeting wave on load, context-aware lines.
  *
  * The mascot is a <div class="mascot-sprite"> whose background-image is
  * a 1-row sprite sheet animated via CSS steps().  Switching states is
  * just a CSS class swap — no <img src> change, no GIF-restart jank.
+ *
+ * Idle chatter and click-to-talk lines are fetched from the backend
+ * endpoint ``GET /mascot/line?context=<event>`` which calls the LLM
+ * with the learner's memories + current study context.  On any fetch
+ * error, the mascot falls back to a short static array so the robot
+ * always has something to say.
  *
  * Speech bubble is styled as a 4:3 CRT monitor (see retro.css). Text is
  * rendered with a fast per-character "typewriter" effect using the
@@ -22,6 +28,60 @@
 
   // CRT typewriter settings (kept in one place so progress.js can match).
   var TYPEWRITER_CHAR_DELAY_MS = 25;   // "really quickly" feel
+
+  // Static fallback lines — used when the /mascot/line endpoint fails.
+  // These are generic enough to work without server context.
+  var FALLBACK_MESSAGES = [
+    'Ready to learn?',
+    'Take a break!',
+    'I see you studying...',
+    'Upload & go!',
+    'You got this!',
+    'Need a hint? Click me.',
+    'Knowledge: 0% (jk)',
+    'I tell bad AI jokes.',
+    'You are smarter!',
+    '418: not a teapot.',
+    'Big brain. Ready.',
+    'Knowledge = power!'
+  ];
+
+  // Determine the page context for /mascot/line based on the current URL.
+  function _detectContext() {
+    var path = window.location.pathname;
+    if (path === '/' || path === '/index') return 'idle';
+    if (path.indexOf('/dashboard') !== -1) return 'dashboard';
+    if (path.indexOf('/lessons') !== -1) return 'lessons';
+    if (path.indexOf('/results') !== -1) return 'results';
+    return 'idle';
+  }
+
+  // Fetch a personalized line from the server.  Returns a Promise that
+  // resolves to a string — never rejects (falls back to a static line).
+  function _fetchMascotLine(context) {
+    return fetch('/mascot/line?context=' + encodeURIComponent(context),
+                  { headers: { 'Accept': 'application/json' } })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function (data) {
+        var text = (data && data.text) || '';
+        if (!text) throw new Error('Empty response');
+        // If the server says a specific mascot state, apply it
+        if (data.state && data.state !== 'talk') {
+          // Error context keeps the error state; others fall through
+          // to the talk state which _mascotTalk sets anyway.
+        }
+        return text;
+      })
+      .catch(function () {
+        // Fallback: pick a random static line
+        return FALLBACK_MESSAGES[
+          Math.floor(Math.random() * FALLBACK_MESSAGES.length)
+        ];
+      });
+  }
 
   function typewriteInto(el, text) {
     if (!el) return Promise.resolve();
@@ -97,48 +157,51 @@
     var bubbleText = document.getElementById('bubble-text');
     if (!mascot || !bubble || !bubbleText) return;
 
-    // Short, witty idle/click lines that read well in a 4:3 CRT frame.
-    var messages = [
-      'Ready to learn?',
-      'Take a break!',
-      'I see you studying...',
-      'Upload & go!',
-      'You got this!',
-      'Need a hint? Click me.',
-      'Knowledge: 0% (jk)',
-      'I tell bad AI jokes.',
-      'You are smarter!',
-      '418: not a teapot.',
-      'Big brain. Ready.',
-      'Knowledge = power!'
-    ];
-
     var _typewriterToken = 0;
+    var _pageContext = _detectContext();
 
     window._mascotTalk = function (customMsg) {
       if (window._progressActive) return;
       var els = getBubbleEls();
       if (!els.bubble || !els.text) return;
-      var msg = customMsg || messages[Math.floor(Math.random() * messages.length)];
       var token = ++_typewriterToken;
       els.bubble.classList.add('active');
       // Switch to talk state while typing (syncs the robot's body language)
       window.setMascotState('talk');
-      typewriteInto(els.text, msg).then(function () {
-        if (token !== _typewriterToken) return;
-        // After typing finishes, return to idle (or the previous state)
-        setTimeout(function () {
+
+      // If a custom message was passed (e.g. from upload.js error handler),
+      // use it directly — no fetch needed.
+      if (customMsg) {
+        typewriteInto(els.text, customMsg).then(function () {
           if (token !== _typewriterToken) return;
-          if (window._progressActive) return;
-          els.bubble.classList.remove('active');
-          window.setMascotState('idle');
-        }, 4000);
+          setTimeout(function () {
+            if (token !== _typewriterToken) return;
+            if (window._progressActive) return;
+            els.bubble.classList.remove('active');
+            window.setMascotState('idle');
+          }, 4000);
+        });
+        return;
+      }
+
+      // No custom message — fetch a personalized line from the server.
+      _fetchMascotLine(_pageContext).then(function (line) {
+        if (token !== _typewriterToken) return;  // a newer call superseded us
+        typewriteInto(els.text, line).then(function () {
+          if (token !== _typewriterToken) return;
+          setTimeout(function () {
+            if (token !== _typewriterToken) return;
+            if (window._progressActive) return;
+            els.bubble.classList.remove('active');
+            window.setMascotState('idle');
+          }, 4000);
+        });
       });
     };
 
     function idleTalk() {
       if (!window._progressActive) {
-        window._mascotTalk(messages[Math.floor(Math.random() * messages.length)]);
+        window._mascotTalk();
       }
     }
 

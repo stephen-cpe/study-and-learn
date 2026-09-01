@@ -57,7 +57,7 @@ TTS_STAGES = [
     {"stage": 0, "label": "Preparing", "pct": 0, "mascot": "Warming up...", "mascot_state": "busy"},
     {"stage": 1, "label": "Generating narration", "pct": 25, "mascot": "Recording narration...", "mascot_state": "busy"},
     {"stage": 2, "label": "Encoding audio", "pct": 75, "mascot": "Encoding audio...", "mascot_state": "busy"},
-    {"stage": 3, "label": "Complete", "pct": 100, "mascot": "All done!", "mascot_state": "happy"},
+    {"stage": 3, "label": "Complete", "pct": 100, "mascot": "All done, {name}!", "mascot_state": "happy"},
 ]
 
 

@@ -26,7 +26,7 @@
                         <img src="{{ url_for('static', filename='images/avatars/' ~ current_user.avatar) }}" alt="User Avatar" class="user-avatar">
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end retro-dropdown-menu">
-                        <li><span class="dropdown-item-text">Hi, {{ current_user.username }}!</span></li>
+                        <li><span class="dropdown-item-text">Hi, {{ current_user.display_name }}!</span></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="{{ url_for('main.settings') }}">Settings</a></li>
                         <li><hr class="dropdown-divider"></li>

@@ -103,6 +103,30 @@ def test_user_repr(app):
         assert repr(user) == "<User charlie (charlie@example.com) admin=False gen=False>"
 
 
+def test_display_name_falls_back_to_username(app):
+    with app.app_context():
+        user = User(username='alice', email='alice@example.com')
+        user.set_password('x')
+        # nickname and full_name default to None → display_name is username
+        assert user.nickname is None
+        assert user.full_name is None
+        assert user.display_name == 'alice'
+
+
+def test_display_name_prefers_nickname(app):
+    with app.app_context():
+        user = User(username='alice', email='alice@example.com', nickname='Ali')
+        user.set_password('x')
+        assert user.display_name == 'Ali'
+
+
+def test_display_name_uses_full_name_when_no_nickname(app):
+    with app.app_context():
+        user = User(username='alice', email='alice@example.com', full_name='Alice Smith')
+        user.set_password('x')
+        assert user.display_name == 'Alice Smith'
+
+
 def test_user_mixin_methods(app):
     with app.app_context():
         user = User(username='demo', email='demo@example.com')

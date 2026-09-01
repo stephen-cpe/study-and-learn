@@ -403,3 +403,45 @@ def test_retro_css_declares_sprite_sheets():
         'mascot-wave-sprite.png',
     ]:
         assert needle in css, f'retro.css does not reference {needle}'
+
+
+def test_mascot_js_fetches_line_from_server():
+    """mascot.js must fetch personalized lines from /mascot/line
+    instead of only using a hardcoded array."""
+    js = (ROOT / 'src' / 'static' / 'js' / 'mascot.js').read_text()
+    assert '/mascot/line' in js, (
+        'mascot.js does not fetch from /mascot/line'
+    )
+    assert 'fetch(' in js, 'mascot.js does not use fetch()'
+
+
+def test_mascot_js_has_fallback_messages():
+    """mascot.js must keep a static fallback array for when the server
+    is unreachable."""
+    js = (ROOT / 'src' / 'static' / 'js' / 'mascot.js').read_text()
+    assert 'FALLBACK_MESSAGES' in js, (
+        'mascot.js does not define a FALLBACK_MESSAGES array'
+    )
+
+
+def test_mascot_js_detects_page_context():
+    """mascot.js must detect the current page context from the URL
+    so the line generator knows whether the learner is on the
+    dashboard, lessons page, etc."""
+    js = (ROOT / 'src' / 'static' / 'js' / 'mascot.js').read_text()
+    assert '_detectContext' in js, (
+        'mascot.js does not have a _detectContext function'
+    )
+    assert 'location.pathname' in js, (
+        'mascot.js does not read location.pathname for context'
+    )
+
+
+def test_mascot_js_custom_msg_skips_fetch():
+    """When _mascotTalk is called with a custom message (e.g. from
+    upload.js error handler), it must use that message directly
+    without fetching from the server."""
+    js = (ROOT / 'src' / 'static' / 'js' / 'mascot.js').read_text()
+    assert 'customMsg' in js, (
+        'mascot.js does not handle customMsg parameter'
+    )

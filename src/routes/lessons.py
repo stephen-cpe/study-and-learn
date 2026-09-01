@@ -37,6 +37,7 @@ from src.routes._helpers import (
 from src.services import progress_tracker
 from src.services.grader import _get_correct_answer, _grade_single_question
 from src.services.lesson_orchestrator import build_module_artifacts
+from src.services.mascot_memory import store_memory as _store_mascot_memory
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,8 @@ def generate_lessons():
 
     body = request.get_json(silent=True) or {}
     task_id = body.get('task_id', '') or session.sid
-    progress_tracker.create_task(task_id=task_id)
+    progress_tracker.create_task(task_id=task_id,
+                                 display_name=current_user.display_name)
 
     modules = study_path['modules']
 
@@ -83,7 +85,9 @@ def generate_lessons():
     tts_enabled = getattr(current_user, 'tts_enabled', False)
     tts_speaker = getattr(current_user, 'tts_speaker', 'Ava') or 'Ava'
     difficulty = getattr(current_user, 'lesson_difficulty', 'Normal') or 'Normal'
-    username = current_user.username
+    # display_name = nickname or full_name or username — the friendly name the
+    # mascot and TTS narration use to address the learner.
+    username = current_user.display_name
 
     # Track chunk IDs used across modules to prevent content repetition.
     # Each module's retrieval excludes chunks already used by earlier modules,
@@ -151,6 +155,12 @@ def generate_lessons():
                  file_hashes_val=file_hashes_data,
                  file_names_val=file_names_data,
                  path_id=path_id_val)
+
+    # Memory: record that the learner started a new study path
+    _store_mascot_memory(
+        current_user.id, 'episodic',
+        f"Started a new study path: {study_path.get('title', learning_goal[:50])}"
+    )
 
     if path_id_val is None:
         from src.models import StudyPath
@@ -515,6 +525,17 @@ def grade_lesson(module_index):
         lessons_data[module_index]['score'] = score_pct
         lessons_data[module_index]['passed'] = passed
         save_lessons(lessons_data, current_user, path_id=path_id)
+
+        # Memory: record quiz outcome
+        module_title = (lessons_data[module_index].get('title', '')
+                        if isinstance(lessons_data[module_index], dict)
+                        else f'Module {module_index + 1}')
+        outcome = 'passed' if passed else 'did not pass'
+        _store_mascot_memory(
+            current_user.id, 'episodic',
+            f"{outcome.capitalize()} quiz for '{module_title}' "
+            f"with {score_pct}%"
+        )
     else:
         # Persist the answered checkpoint(s) so a resumed session can
         # credit them on the final-quiz grade. Only record checkpoints
@@ -564,7 +585,7 @@ def retake_lesson(module_index):
     difficulty = lesson.get('difficulty', 'Normal')
     tts_enabled = lesson.get('tts_enabled', False)
     tts_speaker = lesson.get('tts_speaker', 'Ava') or 'Ava'
-    username = current_user.username
+    username = current_user.display_name
 
     artifacts = build_module_artifacts(
         {'title': module_title},
