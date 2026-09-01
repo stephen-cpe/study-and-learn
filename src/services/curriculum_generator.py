@@ -1,7 +1,6 @@
 """
 Curriculum/study path generation service for the Study-and-Learn MVP.
 """
-import json
 import logging
 
 from src.services.ai_client import call_ollama
@@ -92,26 +91,19 @@ Study Plan:"""
             "Please verify your AI backend is running and try again."
         ) from e
 
-    try:
-        start_idx = response.find('{')
-        end_idx = response.rfind('}') + 1
-        if start_idx != -1 and end_idx != 0:
-            json_str = response[start_idx:end_idx]
-            result = json.loads(json_str)
+    from src.services.llm_json import extract_json
+    result = extract_json(response)
+    if result and 'modules' in result and isinstance(result['modules'], list):
+        validated_modules = []
+        for module in result['modules']:
+            if isinstance(module, dict) and 'title' in module and 'estimated_effort' in module:
+                validated_modules.append({
+                    'title': str(module['title']),
+                    'estimated_effort': str(module['estimated_effort'])
+                })
 
-            if 'modules' in result and isinstance(result['modules'], list):
-                validated_modules = []
-                for module in result['modules']:
-                    if isinstance(module, dict) and 'title' in module and 'estimated_effort' in module:
-                        validated_modules.append({
-                            'title': str(module['title']),
-                            'estimated_effort': str(module['estimated_effort'])
-                        })
-
-                if validated_modules:
-                    return {'modules': validated_modules}
-    except (json.JSONDecodeError, ValueError, KeyError, TypeError):
-        pass
+        if validated_modules:
+            return {'modules': validated_modules}
 
     return {
         'modules': [{

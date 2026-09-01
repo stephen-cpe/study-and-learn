@@ -132,6 +132,7 @@
     {% if path_status == 'active' %}
         {% if all_passed %}
         <form method="POST" action="{{ url_for('main.complete_study_path', path_id=path_id) }}" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-complete">Mark Complete</button>
         </form>
         {% else %}
@@ -141,6 +142,7 @@
               data-confirm-body="This cannot be undone."
               data-confirm-action="Cancel / Abandon"
               data-confirm-variant="danger">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-danger-cancel">Cancel / Abandon</button>
         </form>
         <a href="{{ url_for('main.index') }}" class="btn btn-primary">Start New Lesson</a>

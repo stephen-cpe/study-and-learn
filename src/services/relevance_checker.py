@@ -1,7 +1,6 @@
 """
 Relevance checking service for the Study-and-Learn MVP.
 """
-import json
 import logging
 
 from src.services.ai_client import call_ollama
@@ -65,19 +64,12 @@ Analysis:"""
             "Please verify your AI backend is running and try again."
         ) from e
 
-    try:
-        start_idx = response.find('{')
-        end_idx = response.rfind('}') + 1
-        if start_idx != -1 and end_idx != 0:
-            json_str = response[start_idx:end_idx]
-            result = json.loads(json_str)
-
-            if all(key in result for key in ['relevance_label', 'explanation', 'missing_material']):
-                if result['relevance_label'] not in ['strong', 'partial', 'weak']:
-                    result['relevance_label'] = 'weak'
-                return result
-    except (json.JSONDecodeError, ValueError, KeyError):
-        pass
+    from src.services.llm_json import extract_json
+    result = extract_json(response)
+    if result and all(key in result for key in ['relevance_label', 'explanation', 'missing_material']):
+        if result['relevance_label'] not in ['strong', 'partial', 'weak']:
+            result['relevance_label'] = 'weak'
+        return result
 
     return {
         'relevance_label': 'partial',

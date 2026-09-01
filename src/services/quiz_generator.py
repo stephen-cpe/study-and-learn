@@ -13,6 +13,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from src.services.ai_client import call_ollama
 from src.services.exceptions import AIServiceError
+from src.services.llm_json import extract_json
 
 logger = logging.getLogger(__name__)
 
@@ -192,7 +193,9 @@ def generate_quiz(
         shuffled, and diversified question dicts.
     """
     if not module_title or not module_title.strip():
-        return _fallback_quiz(n_questions)
+        result = _fallback_quiz(n_questions)
+        result['fallback'] = True
+        return result
 
     slide_summary = _summarize_slides(slides)
 
@@ -314,24 +317,26 @@ Quiz:"""
         response = call_ollama(prompt)
     except AIServiceError as e:
         logger.error("Quiz generation failed for module '%s': %s", module_title, str(e))
-        return _fallback_quiz(n_questions)
+        result = _fallback_quiz(n_questions, module_title=module_title, slides=slides)
+        result['fallback'] = True
+        return result
 
-    try:
-        start_idx = response.find('{')
-        end_idx = response.rfind('}') + 1
-        if start_idx != -1 and end_idx != 0:
-            json_str = response[start_idx:end_idx]
-            result = json.loads(json_str)
-            if 'questions' in result and isinstance(result['questions'], list):
-                validated = _validate_questions(result['questions'], n_questions)
-                if validated:
-                    validated = _shuffle_questions(validated)
-                    validated = _diversify_true_false(validated)
-                    return {'questions': validated}
-    except (json.JSONDecodeError, ValueError, KeyError, TypeError):
-        pass
+    result = extract_json(response)
+    if result and 'questions' in result and isinstance(result['questions'], list):
+        validated = _validate_questions(result['questions'], n_questions)
+        if validated:
+            validated = _shuffle_questions(validated)
+            validated = _diversify_true_false(validated)
+            return {'questions': validated}
 
-    return _fallback_quiz(n_questions)
+    logger.warning(
+        "Quiz JSON parsing/validation failed for module '%s', using fallback. "
+        "Response (first 300 chars): %r",
+        module_title, response[:300] if response else '<empty>'
+    )
+    fallback = _fallback_quiz(n_questions, module_title=module_title, slides=slides)
+    fallback['fallback'] = True
+    return fallback
 
 
 def generate_inline_checkpoint(
@@ -454,23 +459,22 @@ Question:"""
         logger.error("Checkpoint generation failed for module '%s': %s", module_title, str(e))
         return _fallback_checkpoint()
 
-    try:
-        start_idx = response.find('{')
-        end_idx = response.rfind('}') + 1
-        if start_idx != -1 and end_idx != 0:
-            json_str = response[start_idx:end_idx]
-            result = json.loads(json_str)
-            if cp_type == 'true_false':
-                if all(k in result for k in ['type', 'prompt', 'answer']):
-                    result['id'] = result.get('id', 'checkpoint')
-                    result['answer'] = bool(result['answer'])
-                    return result
-            elif cp_type in ('mcq', 'cloze_dropdown'):
-                if all(k in result for k in ['type', 'prompt', 'options', 'answer_index']):
-                    return _shuffle_checkpoint(result)
-    except (json.JSONDecodeError, ValueError, KeyError, TypeError):
-        pass
+    result = extract_json(response)
+    if result:
+        if cp_type == 'true_false':
+            if all(k in result for k in ['type', 'prompt', 'answer']):
+                result['id'] = result.get('id', 'checkpoint')
+                result['answer'] = bool(result['answer'])
+                return result
+        elif cp_type in ('mcq', 'cloze_dropdown'):
+            if all(k in result for k in ['type', 'prompt', 'options', 'answer_index']):
+                return _shuffle_checkpoint(result)
 
+    logger.warning(
+        "Checkpoint JSON parsing failed for module '%s', using fallback. "
+        "Response (first 300 chars): %r",
+        module_title, response[:300] if response else '<empty>'
+    )
     return _fallback_checkpoint()
 
 
@@ -624,67 +628,161 @@ def _validate_questions(
     return valid
 
 
-def _fallback_quiz(n_questions: int = 5) -> dict:
-    questions = [
-        {
-            'id': 'q1',
-            'type': 'true_false',
-            'prompt': 'Understanding core concepts is essential for mastering any subject.',
-            'answer': True,
-            'explanation': 'Core concepts form the foundation for deeper learning.'
-        },
-        {
+def _fallback_quiz(n_questions: int = 5, module_title: str = '',
+                   slides: list = None) -> dict:
+    """Return a topic-aware fallback quiz when AI generation fails.
+
+    Unlike the old hardcoded study-skills quiz, this builds questions
+    that reference the module title and slide content so the learner
+    at least sees something related to their lesson. The questions are
+    simple (true/false + mcq) and clearly marked as fallback content.
+
+    Args:
+        n_questions: Number of questions to return.
+        module_title: The module title (used in question prompts).
+        slides: The lesson slides (used to extract key terms/concepts).
+
+    Returns:
+        Dict with ``questions`` list.
+    """
+    title = module_title.strip() if module_title else 'this module'
+    slide_summary = _summarize_slides(slides) if slides else ''
+    # Extract a few key terms from the slide content for question prompts.
+    key_terms = []
+    if slide_summary:
+        for slide in (slides or []):
+            if slide.get('type') == 'content':
+                heading = slide.get('heading', '')
+                if heading:
+                    key_terms.append(heading)
+                for b in slide.get('bullets', [])[:2]:
+                    # Take the first few words of each bullet as a "concept".
+                    words = b.strip().split()
+                    if len(words) >= 2:
+                        key_terms.append(' '.join(words[:4]))
+            elif slide.get('type') == 'title':
+                t = slide.get('title', '')
+                if t and t.lower() not in title.lower():
+                    key_terms.append(t)
+    # Deduplicate, keep at most 4.
+    seen = set()
+    unique_terms = []
+    for t in key_terms:
+        tl = t.lower()
+        if tl not in seen and len(tl) > 2:
+            seen.add(tl)
+            unique_terms.append(t)
+    unique_terms = unique_terms[:4]
+
+    questions = []
+
+    # 1. A true/false about the module title.
+    questions.append({
+        'id': 'q1',
+        'type': 'true_false',
+        'prompt': f'The main topic of this module is {title}.',
+        'answer': True,
+        'explanation': f'This module covers {title}.'
+    })
+
+    # 2. An mcq about a key concept from the slides.
+    if unique_terms:
+        correct = unique_terms[0]
+        distractors = unique_terms[1:4] if len(unique_terms) > 1 else [
+            'a topic not covered here', 'an unrelated concept',
+            'a minor detail'
+        ]
+        # Pad distractors to 3.
+        while len(distractors) < 3:
+            distractors.append(f'distractor {len(distractors) + 1}')
+        options = [correct] + distractors[:3]
+        questions.append({
             'id': 'q2',
             'type': 'mcq',
-            'prompt': 'What is the most effective way to learn new material?',
+            'prompt': f'Which of the following is a key concept from {title}?',
+            'options': options,
+            'answer_index': 0,
+            'explanation': f'{correct} is a key concept covered in this module.'
+        })
+    else:
+        questions.append({
+            'id': 'q2',
+            'type': 'mcq',
+            'prompt': f'What is the primary focus of {title}?',
             'options': [
-                'Passive reading only',
-                'Active recall and practice',
-                'Skipping difficult sections',
-                'Memorizing without understanding'
+                'The main subject of this module',
+                'An unrelated topic',
+                'A minor detail',
+                'Something not covered here'
             ],
-            'answer_index': 1,
-            'explanation': 'Active recall and practice are proven to be the most effective learning strategies.'
-        },
-        {
+            'answer_index': 0,
+            'explanation': f'This question tests your understanding of {title}.'
+        })
+
+    # 3. A true/false about a slide detail.
+    if unique_terms and len(unique_terms) >= 2:
+        questions.append({
             'id': 'q3',
-            'type': 'multi_select',
-            'prompt': 'Which of the following are effective study techniques? (Select all that apply)',
-            'options': [
-                'Spaced repetition',
-                'Cramming the night before',
-                'Teaching others',
-                'Practice testing'
-            ],
-            'answer_indices': [0, 2, 3],
-            'explanation': 'Spaced repetition, teaching others, and practice testing are all evidence-based study techniques.'
-        },
-        {
+            'type': 'true_false',
+            'prompt': f'{unique_terms[1]} is related to {title}.',
+            'answer': True,
+            'explanation': f'{unique_terms[1]} is discussed in this module.'
+        })
+    else:
+        questions.append({
+            'id': 'q3',
+            'type': 'true_false',
+            'prompt': f'Reviewing the material from {title} is important.',
+            'answer': True,
+            'explanation': f'Reviewing {title} helps reinforce learning.'
+        })
+
+    # 4. A cloze_dropdown with a key term.
+    if unique_terms:
+        term = unique_terms[0]
+        questions.append({
             'id': 'q4',
             'type': 'cloze_dropdown',
-            'prompt': 'The practice of actively retrieving information from memory is called ___.',
-            'options': ['recall', 'cramming', 'skimming', 'highlighting'],
+            'prompt': f'A key concept in {title} is ___.',
+            'options': [term, 'unrelated term A', 'unrelated term B', 'unrelated term C'],
             'answer_index': 0,
-            'explanation': 'Active recall is the practice of actively stimulating memory during the learning process.'
-        },
-        {
+            'explanation': f'{term} is a key concept in {title}.'
+        })
+    else:
+        questions.append({
+            'id': 'q4',
+            'type': 'cloze_dropdown',
+            'prompt': 'The subject of this module is ___.',
+            'options': [title, 'something else', 'not applicable', 'unknown'],
+            'answer_index': 0,
+            'explanation': f'This module covers {title}.'
+        })
+
+    # 5. A multi_select about key concepts.
+    if len(unique_terms) >= 3:
+        questions.append({
             'id': 'q5',
-            'type': 'mcq',
-            'prompt': 'Why is it important to review material multiple times?',
+            'type': 'multi_select',
+            'prompt': f'Which of the following are key concepts from {title}? (Select all that apply)',
+            'options': unique_terms[:3] + ['an unrelated concept'] if len(unique_terms) >= 3 else unique_terms + ['extra'],
+            'answer_indices': list(range(min(3, len(unique_terms)))),
+            'explanation': f'These are key concepts from {title}.'
+        })
+    else:
+        questions.append({
+            'id': 'q5',
+            'type': 'multi_select',
+            'prompt': f'Which of the following help you understand {title}? (Select all that apply)',
             'options': [
-                'To waste time',
-                'To strengthen neural connections',
-                'Because teachers say so',
-                'It is not important'
+                f'Reviewing the slides on {title}',
+                'Ignoring the material',
+                f'Thinking about {title}',
+                'Skipping the lesson'
             ],
-            'answer_index': 1,
-            'explanation': 'Reviewing material strengthens neural connections, making recall easier and more durable.'
-        }
-    ]
-    questions = [q for q in questions if q.get('type') != 'true_false' or q.get('answer') is not False]
-    questions = [
-        {'id': 'q_tf_f', 'type': 'true_false', 'prompt': 'Last-minute cramming is the most effective way to retain information long-term.', 'answer': False, 'explanation': 'Cramming leads to rapid forgetting. Spaced repetition is far more effective for long-term retention.'}
-    ] + questions
+            'answer_indices': [0, 2],
+            'explanation': f'Reviewing and thinking about {title} helps you learn.'
+        })
+
     sliced = questions[:n_questions]
     sliced = _shuffle_questions(sliced)
     sliced = _diversify_true_false(sliced)

@@ -50,6 +50,7 @@ def _call_ollama_local(prompt: str, model: str = None, images: list = None) -> s
         "model": model,
         "prompt": prompt,
         "stream": False,
+        "format": "json",
         "options": {"num_ctx": int(os.environ.get('OLLAMA_NUM_CTX', '131072'))}
     }
     if images:

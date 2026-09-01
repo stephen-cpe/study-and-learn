@@ -440,7 +440,9 @@
                     const color = r.correct ? 'var(--deck-success)' : 'var(--deck-danger)';
                     detailHtml += '<p style="color: ' + color + '; margin-bottom:0.5rem;">' + icon + ' ' + r.prompt + '<br><small>' + (r.explanation || '') + '</small></p>';
                 });
-                resultsDetail.innerHTML = detailHtml;
+                resultsDetail.innerHTML = (typeof DOMPurify !== 'undefined')
+                    ? DOMPurify.sanitize(detailHtml)
+                    : detailHtml;
                 resultsDetail.style.display = 'block';
             }
 

@@ -19,6 +19,7 @@
         <h1 class="mt-4">Welcome!</h1>
         <div class="auth-card">
             <form action="{{ url_for('main.login') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="mb-3">
                     <input type="text" class="form-control form-control-lg" name="username"
                            placeholder="Username" required>
@@ -50,6 +51,7 @@
         Change in <a href="{{ url_for('main.settings') }}">Settings</a> before uploading.</p>
     {% endif %}
     <form id="unified-form" action="{{ url_for('main.process') }}" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-4">
             <label for="learning_goal" class="form-label">What do you want to learn?</label>
             <input type="text" class="form-control form-control-lg" id="learning_goal" name="learning_goal"

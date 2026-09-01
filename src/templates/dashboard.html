@@ -86,6 +86,7 @@
                 {% if is_active %}
                     {% if path.all_passed %}
                     <form method="POST" action="{{ url_for('main.complete_study_path', path_id=path.id) }}" style="display:inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-complete btn-sm">Mark Complete</button>
                     </form>
                     {% endif %}
@@ -95,6 +96,7 @@
                           data-confirm-body="This cannot be undone."
                           data-confirm-action="Cancel / Abandon"
                           data-confirm-variant="danger">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-danger-cancel btn-sm">Cancel / Abandon</button>
                     </form>
                 {% elif is_completed or is_cancelled %}
@@ -104,6 +106,7 @@
                           data-confirm-body="This action CANNOT be undone. All lesson data, quiz results, and progress will be lost forever."
                           data-confirm-action="Delete Forever"
                           data-confirm-variant="danger">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-delete btn-sm">Delete</button>
                     </form>
                 {% endif %}

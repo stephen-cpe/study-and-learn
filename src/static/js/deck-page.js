@@ -33,7 +33,9 @@
       text = text.replace(/__(.+?)__/g, '<u>$1</u>');
       text = text.replace(/`(.+?)`/g, '<code>$1</code>');
       text = text.replace(/^\s*\*\s+/gm, '\u2022 ');
-      el.innerHTML = text;
+      el.innerHTML = (typeof DOMPurify !== 'undefined')
+        ? DOMPurify.sanitize(text)
+        : text;
     });
   };
 

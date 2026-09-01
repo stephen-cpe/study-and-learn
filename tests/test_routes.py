@@ -23,9 +23,21 @@ def client(monkeypatch):
         app.config['SESSION_PERMANENT'] = False
         from flask_session import Session
         Session(app)
-        with app.test_client() as client:
-            with app.app_context():
+        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+        app.extensions.pop('sqlalchemy', None)
+        db.init_app(app)
+        with app.app_context():
+            db.create_all()
+            user = User(username='procuser', email='proc@example.com',
+                        can_generate_lessons=True)
+            user.set_password('pass')
+            db.session.add(user)
+            db.session.commit()
+            with app.test_client() as client:
+                client.post('/login', data={'username': 'procuser', 'password': 'pass'})
                 yield client
+            db.session.remove()
+            db.drop_all()
 
 @pytest.fixture
 def logged_in_client(monkeypatch):

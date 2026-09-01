@@ -42,18 +42,21 @@
                 <td>
                     <div class="d-flex gap-2 flex-wrap">
                         <form method="POST" action="{{ url_for('main.admin_toggle_generation', user_id=user.id) }}" style="display:inline;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-sm btn-outline-primary">
                                 {% if user.can_generate_lessons %}Revoke{% else %}Allow{% endif %}
                             </button>
                         </form>
-                        <button class="btn btn-sm btn-outline-warning"
-                                onclick="showResetForm('{{ user.id }}', '{{ user.username }}')">
+                        <button class="btn btn-sm btn-outline-warning reset-pw-btn"
+                                data-user-id="{{ user.id }}"
+                                data-username="{{ user.username }}">
                             Reset PW
                         </button>
                     </div>
                     <form id="reset-form-{{ user.id }}" method="POST"
                           action="{{ url_for('main.admin_reset_password', user_id=user.id) }}"
                           style="display: none; margin-top: 0.5rem;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="input-group input-group-sm">
                             <input type="text" class="form-control form-control-sm" name="new_password"
                                    placeholder="New password (min 6 chars)" minlength="6">
@@ -71,14 +74,32 @@
 
 {% block scripts %}
 <script>
-function showResetForm(userId, username) {
-    var forms = document.querySelectorAll('[id^="reset-form-"]');
-    forms.forEach(function(f) { f.style.display = 'none'; });
-    var form = document.getElementById('reset-form-' + userId);
-    if (form) {
-        form.style.display = 'block';
-        form.querySelector('input[name="new_password"]').focus();
-    }
-}
+(function () {
+  'use strict';
+  // Delegated click handler for the "Reset PW" buttons. Replaces the
+  // previous inline onclick that interpolated the user id and username
+  // directly into a JS string literal — an XSS vector because Jinja's
+  // '&#39;' escaping is decoded back by the HTML parser before JS runs,
+  // so a username containing a single quote could break out of the
+  // string. The data-* attributes are read via .dataset (never eval'd
+  // as code), so this is safe.
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.reset-pw-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var userId = btn.dataset.userId;
+        // Hide all reset forms, then show the one for this user.
+        document.querySelectorAll('[id^="reset-form-"]').forEach(function (f) {
+          f.style.display = 'none';
+        });
+        var form = document.getElementById('reset-form-' + userId);
+        if (form) {
+          form.style.display = 'block';
+          var input = form.querySelector('input[name="new_password"]');
+          if (input) input.focus();
+        }
+      });
+    });
+  });
+})();
 </script>
 {% endblock %}

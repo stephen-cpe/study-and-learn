@@ -17,11 +17,14 @@
       selectedFiles.forEach(function (file, index) {
         var li = document.createElement('li');
         li.className = 'file-item d-flex justify-content-between align-items-center p-2 mb-2';
-        li.innerHTML =
+        var itemHtml =
           '<span class="text-truncate">' +
           '\uD83D\uDCC4 ' + file.name +
           ' <small class="text-muted">(' + (file.size / 1024).toFixed(1) + ' KB)</small></span>' +
           '<button type="button" class="btn btn-sm btn-outline-danger ms-2 remove-btn" data-index="' + index + '">\u2716</button>';
+        li.innerHTML = (typeof DOMPurify !== 'undefined')
+          ? DOMPurify.sanitize(itemHtml)
+          : itemHtml;
         fileList.appendChild(li);
       });
       document.querySelectorAll('.remove-btn').forEach(function (btn) {

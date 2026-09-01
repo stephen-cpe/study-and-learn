@@ -61,6 +61,20 @@ def create_app():
             f"Got: {app.config['SQLALCHEMY_DATABASE_URI']}"
         )
 
+    # ── CSRF protection (Flask-WTF) ───────────────────────────────────────
+    # CSRF is enforced in production; disabled under CI / AI_MOCK / TESTING
+    # so the test suite (which uses raw POSTs) keeps passing without tokens.
+    # Tests that want to exercise CSRF enforcement set WTF_CSRF_ENABLED=True
+    # explicitly (see tests/test_security_task1.py).
+    if 'WTF_CSRF_ENABLED' not in app.config:
+        app.config['WTF_CSRF_ENABLED'] = not (
+            _is_debug or _is_mock or _is_ci
+        )
+    from flask_wtf import CSRFProtect
+    csrf = CSRFProtect(app)
+    # Expose the csrf object on the app so tests/routes can inspect it.
+    app.extensions['csrf'] = csrf
+
     # ── Server-side sessions (cachelib-backed) ────────────────────────────
     session_dir = os.path.join(
         os.path.dirname(os.path.dirname(__file__)), 'data', 'flask_session'
@@ -90,7 +104,7 @@ def create_app():
     from src import routes
     app.register_blueprint(routes.bp)
 
-    # ── Static-file cache control ───────────────────────────────────────
+    # ── Cache control for HTML and static files ─────────────────────────
     # Flask's default static-file handler sends strong cache headers
     # (12-hour max-age), which causes the browser to keep stale
     # .js and .css files across code changes. This produced a
@@ -102,5 +116,19 @@ def create_app():
     # static file on each page load. (In production this would be
     # handled by a CDN or by serving hashed asset names.)
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
+    # Also prevent the browser from caching rendered HTML pages in the
+    # dev server. Without this, a stale dashboard page (rendered before
+    # CSRF token inputs were added to its forms) can be served from the
+    # browser's back/forward cache, causing POSTs to fail with
+    # "CSRF token is missing" because the old form had no token field.
+    # In production, HTML caching is handled by Nginx/CDN headers.
+    @app.after_request
+    def _no_cache_html(response):
+        if response.content_type and 'text/html' in response.content_type:
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            response.headers['Pragma'] = 'no-cache'
+            response.headers['Expires'] = '0'
+        return response
 
     return app

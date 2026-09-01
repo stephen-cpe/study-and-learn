@@ -5,7 +5,6 @@ Generates RAG-grounded interactive slide-based lessons with four slide types:
 title, content, example, and summary. Falls back to a generic placeholder
 lesson when AI generation fails or returns unparseable output.
 """
-import json
 import logging
 from typing import Any, Callable, Dict, List, Optional
 
@@ -178,22 +177,16 @@ Lesson:"""
         logger.error("Lesson generation failed for module '%s': %s", module_title, str(e))
         return _fallback_lesson(module_title)
 
-    try:
-        start_idx = response.find('{')
-        end_idx = response.rfind('}') + 1
-        if start_idx != -1 and end_idx != 0:
-            json_str = response[start_idx:end_idx]
-            result = json.loads(json_str)
-            if 'slides' in result and isinstance(result['slides'], list):
-                validated_slides = _validate_slides(result['slides'])
-                if validated_slides:
-                    return {
-                        'module_title': result.get('module_title', module_title),
-                        'slides': validated_slides,
-                        'sources': sources,
-                    }
-    except (json.JSONDecodeError, ValueError, KeyError, TypeError):
-        pass
+    from src.services.llm_json import extract_json
+    result = extract_json(response)
+    if result and 'slides' in result and isinstance(result['slides'], list):
+        validated_slides = _validate_slides(result['slides'])
+        if validated_slides:
+            return {
+                'module_title': result.get('module_title', module_title),
+                'slides': validated_slides,
+                'sources': sources,
+            }
 
     return _fallback_lesson(module_title)
 
@@ -406,12 +399,10 @@ JSON FORMAT:
 """
     try:
         response = call_ollama(prompt)
-        start = response.find('[')
-        end = response.rfind(']') + 1
-        if start != -1 and end > start:
-            result = json.loads(response[start:end])
-            if isinstance(result, list) and all('slide_index' in r and 'text' in r for r in result):
-                return result
+        from src.services.llm_json import extract_json_array
+        result = extract_json_array(response)
+        if result and isinstance(result, list) and all('slide_index' in r and 'text' in r for r in result):
+            return result
     except Exception as e:
         logger.warning("Narration script generation failed for '%s': %s", module_title, str(e))
 
@@ -475,12 +466,10 @@ FORMAT:
 """
     try:
         response = call_ollama(prompt)
-        start = response.find('[')
-        end = response.rfind(']') + 1
-        if start != -1 and end > start:
-            result = json.loads(response[start:end])
-            if isinstance(result, list) and all('slide_index' in r and 'text' in r for r in result):
-                return result
+        from src.services.llm_json import extract_json_array
+        result = extract_json_array(response)
+        if result and isinstance(result, list) and all('slide_index' in r and 'text' in r for r in result):
+            return result
     except Exception as e:
         logger.warning("Legacy narration script generation failed for '%s': %s", module_title, str(e))
 

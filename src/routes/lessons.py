@@ -148,6 +148,20 @@ def generate_lessons():
         progress_tracker.mark_error(task_id, mascot_msg='AI generation failed — retry')
         raise
 
+    # Surface a warning if any module's quiz fell back to the
+    # topic-aware placeholder (AI generation or JSON parsing failed).
+    fallback_modules = [
+        lessons[i].get('module_title', f'Module {i + 1}')
+        for i, l in enumerate(lessons)
+        if l.get('quiz', {}).get('fallback')
+    ]
+    if fallback_modules:
+        flash(
+            f"AI quiz generation failed for: {', '.join(fallback_modules)}. "
+            f"Showing placeholder quizzes — try retaking for AI-generated questions.",
+            'warning'
+        )
+
     save_lessons(lessons, current_user,
                  title=study_path.get('title', learning_goal[:50]),
                  learning_goal=learning_goal,

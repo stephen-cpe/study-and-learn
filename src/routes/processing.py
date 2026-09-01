@@ -48,20 +48,6 @@ def health():
     return jsonify({'status': 'healthy'})
 
 
-@bp.route('/test/set-model', methods=['POST'])
-def test_set_model():
-    """TEMPORARY: Set the OLLAMA_MODEL at runtime for model comparison testing.
-    This endpoint is for testing only and should be removed after testing.
-    """
-    data = request.get_json(silent=True) or {}
-    model = data.get('model')
-    if not model:
-        return jsonify({'error': 'model parameter required'}), 400
-    os.environ['OLLAMA_MODEL'] = model
-    logger.info("Test endpoint: OLLAMA_MODEL set to '%s'", model)
-    return jsonify({'ok': True, 'model': model})
-
-
 @bp.route('/')
 def index():
     from src.models import StudyPath
@@ -170,6 +156,7 @@ def mascot_line():
 
 
 @bp.route('/process', methods=['POST'])
+@login_required
 def process():
     task_id = request.form.get('task_id', '') or None
     is_ajax = task_id is not None

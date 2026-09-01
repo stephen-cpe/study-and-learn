@@ -152,6 +152,25 @@ def store_chunks(chunks: List[str], collection_name: str,
         embeddings = embedding_model.embed_documents(chunks)
         
         ids = [f"chunk_{i}" for i in range(len(chunks))]
+
+        # Inject chunk_id into each chunk's metadata so the retrieval
+        # layer can return it for cross-module dedup filtering
+        # (used_chunk_ids / exclude_chunks). Without this field in
+        # metadata, retrieve_from_multiple_collections_with_sources
+        # reads metadata.get('chunk_id', '') which is always '' and the
+        # dedup never matches — modules can repeat the same chunks.
+        if metadata:
+            # Merge chunk_id into the caller-supplied metadata dicts
+            # without overwriting the caller's keys.
+            enriched = []
+            for i, m in enumerate(metadata):
+                d = dict(m) if isinstance(m, dict) else {}
+                d.setdefault('chunk_id', ids[i])
+                enriched.append(d)
+            metadata = enriched
+        else:
+            metadata = [{'chunk_id': cid} for cid in ids]
+
         kwargs = {"ids": ids, "documents": chunks, "embeddings": embeddings}
         if metadata:
             kwargs["metadatas"] = metadata

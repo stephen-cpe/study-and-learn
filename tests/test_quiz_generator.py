@@ -96,12 +96,12 @@ def test_validate_questions():
 
 
 def test_fallback_quiz():
-    result = _fallback_quiz(3)
+    result = _fallback_quiz(3, module_title='Test Module')
     assert len(result['questions']) == 3
 
 
 def test_fallback_quiz_default_count():
-    result = _fallback_quiz()
+    result = _fallback_quiz(module_title='Test Module')
     assert len(result['questions']) == 5
 
 
@@ -127,7 +127,7 @@ def test_build_type_mix():
 
 
 def test_quiz_questions_have_explanations():
-    result = _fallback_quiz(5)
+    result = _fallback_quiz(5, module_title='Test Module')
     for q in result['questions']:
         assert 'explanation' in q, f"Question {q['id']} missing explanation"
 
@@ -160,7 +160,7 @@ def test_cloze_dropdown_validation():
 
 
 def test_cloze_dropdown_in_fallback():
-    result = _fallback_quiz(5)
+    result = _fallback_quiz(5, module_title='Test Module')
     cd_q = None
     for q in result['questions']:
         if q['type'] == 'cloze_dropdown':

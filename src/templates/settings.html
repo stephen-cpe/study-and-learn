@@ -11,6 +11,7 @@
     <p class="retro-subtitle">Tune your Study-and-Learn experience</p>
 
     <form method="POST" action="{{ url_for('main.settings') }}" id="settings-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="avatar" id="avatar-input" value="{{ current_user.avatar }}">
 
         <!-- ── Profile Name ──────────────────────────────────────── -->

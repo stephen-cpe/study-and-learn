@@ -77,13 +77,15 @@ def call_ollama(prompt: str, model: str = None, images: list = None) -> str:
         payload = {
             "model": model,
             "messages": [{"role": "user", "content": user_content}],
-            "stream": False
+            "stream": False,
+            "response_format": {"type": "json_object"}
         }
     else:
         payload = {
             "model": model,
             "messages": [{"role": "user", "content": prompt}],
-            "stream": False
+            "stream": False,
+            "response_format": {"type": "json_object"}
         }
 
     logger.info(f"Calling Ollama Cloud model='{model}' timeout={timeout}s")

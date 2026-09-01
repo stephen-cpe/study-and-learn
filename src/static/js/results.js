@@ -7,7 +7,10 @@
   function parseMarkdown(elementId) {
     var el = document.getElementById(elementId);
     if (!el || typeof marked === 'undefined') return;
-    el.innerHTML = marked.parse(el.innerText.trim());
+    var html = marked.parse(el.innerText.trim());
+    el.innerHTML = (typeof DOMPurify !== 'undefined')
+      ? DOMPurify.sanitize(html)
+      : html;
     el.classList.remove('raw-md');
   }
 
@@ -26,11 +29,16 @@
       t = t.replace(/__(.+?)__/g, '<u>$1</u>');
       t = t.replace(/`(.+?)`/g, '<code>$1</code>');
       t = t.replace(/^\s*\*\s+/gm, '\u2022 ');
-      suggestedEl.innerHTML = t;
+      suggestedEl.innerHTML = (typeof DOMPurify !== 'undefined')
+        ? DOMPurify.sanitize(t)
+        : t;
     }
     document.querySelectorAll('.module-title.raw-md').forEach(function (el) {
       if (typeof marked !== 'undefined') {
-        el.innerHTML = marked.parse(el.innerText);
+        var html = marked.parse(el.innerText);
+        el.innerHTML = (typeof DOMPurify !== 'undefined')
+          ? DOMPurify.sanitize(html)
+          : html;
         el.classList.remove('raw-md');
       }
     });

@@ -7,6 +7,7 @@
 <div class="form-section">
     <h2 class="section-title mb-4">Create Your Account</h2>
     <form action="{{ url_for('main.signup') }}" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-4">
             <label for="username" class="form-label">Username</label>
             <input type="text" class="form-control form-control-lg" id="username" name="username"
