@@ -10,6 +10,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from src.services.ai_client import call_ollama
 from src.services.exceptions import AIServiceError
+from src.services.prompts import DEFAULT_DIFFICULTY_INSTRUCTION, DIFFICULTY_INSTRUCTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -20,29 +21,6 @@ HUMOR_NOTE = (
     "the concept. Never undermine the educational content. One well-placed wit per "
     "lesson is enough.\n"
 )
-
-DIFFICULTY_INSTRUCTIONS = {
-    'Easy': (
-        "AUDIENCE — Easy (age 10–11):\n"
-        "Use short sentences and simple vocabulary. Introduce every concept with a "
-        "concrete everyday analogy before stating the formal definition. Avoid jargon "
-        "entirely — if a technical term is unavoidable, define it immediately in plain "
-        "language. Use encouraging language. Never condescend; treat the learner as "
-        "curious and fully capable.\n"
-    ),
-    'Normal': (
-        "AUDIENCE — Normal (age 12–13):\n"
-        "Use clear, moderately detailed language. Some subject-specific terms are "
-        "appropriate — define each on first use before continuing. Assume the learner "
-        "has basic school-level knowledge. Balance depth with accessibility.\n"
-    ),
-    'Hard': (
-        "AUDIENCE — Hard (age 14–15):\n"
-        "Use full subject vocabulary without simplifying. Do not filter or dumb down "
-        "material. Assume a motivated learner who can handle nuance, multi-step "
-        "reasoning, and precise terminology. Keep examples concise and sophisticated.\n"
-    ),
-}
 
 
 def build_rag_context_for_module(
@@ -128,7 +106,7 @@ def generate_lesson(
             "Use widely known facts only. Do NOT invent specific data, quotes, or statistics.\n\n"
         )
 
-    diff_instruction = DIFFICULTY_INSTRUCTIONS.get(difficulty, DIFFICULTY_INSTRUCTIONS['Normal'])
+    diff_instruction = DIFFICULTY_INSTRUCTIONS.get(difficulty, DEFAULT_DIFFICULTY_INSTRUCTION)
 
     prompt = f"""You are an expert educator creating a structured, interactive lesson for high-school to early-college learners.
 

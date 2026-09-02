@@ -133,17 +133,17 @@ def test_process_max_files(client):
 
 
 def test_cloze_dropdown_grader():
-    from src.services.grader import _get_correct_answer, _grade_single_question
+    from src.services.grader import get_correct_answer, grade_single_question
     q = {
         'id': 'q1', 'type': 'cloze_dropdown',
         'prompt': 'Water is ___.',
         'options': ['H2O', 'CO2', 'NaCl', 'O2'],
         'answer_index': 0, 'explanation': 'Water is H2O.'
     }
-    assert _grade_single_question(q, 0) is True
-    assert _grade_single_question(q, 1) is False
-    assert _grade_single_question(q, None) is False
-    assert _get_correct_answer(q) == 0
+    assert grade_single_question(q, 0) is True
+    assert grade_single_question(q, 1) is False
+    assert grade_single_question(q, None) is False
+    assert get_correct_answer(q) == 0
 
 
 @patch('src.services.lesson_generator.call_ollama')

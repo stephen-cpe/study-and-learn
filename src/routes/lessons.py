@@ -35,7 +35,7 @@ from src.routes._helpers import (
     _resolve_texts,
 )
 from src.services import progress_tracker
-from src.services.grader import _get_correct_answer, _grade_single_question
+from src.services.grader import get_correct_answer, grade_single_question
 from src.services.lesson_orchestrator import build_module_artifacts
 from src.services.mascot_memory import store_memory as _store_mascot_memory
 
@@ -501,7 +501,7 @@ def grade_lesson(module_index):
             user_answer = fill_blank_answers.get(question['id'], answers[i] if i < len(answers) else None)
         else:
             user_answer = answers[i] if i < len(answers) else None
-        correct = _grade_single_question(question, user_answer)
+        correct = grade_single_question(question, user_answer)
         if correct:
             earned_points += 1
         quiz_results.append({
@@ -509,7 +509,7 @@ def grade_lesson(module_index):
             'type': question['type'],
             'prompt': question['prompt'],
             'user_answer': user_answer,
-            'correct_answer': _get_correct_answer(question),
+            'correct_answer': get_correct_answer(question),
             'correct': correct,
             'explanation': question.get('explanation', '')
         })
@@ -517,14 +517,14 @@ def grade_lesson(module_index):
     checkpoint_results = []
     for slide_idx, cp in checkpoints.items():
         user_cp = effective_cp_answers.get(slide_idx)
-        cp_correct = _grade_single_question(cp, user_cp)
+        cp_correct = grade_single_question(cp, user_cp)
         if cp_correct:
             earned_points += 1
         checkpoint_results.append({
             'slide_index': slide_idx,
             'prompt': cp.get('prompt', ''),
             'user_answer': user_cp,
-            'correct_answer': _get_correct_answer(cp),
+            'correct_answer': get_correct_answer(cp),
             'correct': cp_correct,
             'explanation': cp.get('explanation', '')
         })

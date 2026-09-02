@@ -14,6 +14,7 @@ from typing import Any, Callable, Dict, List, Optional
 from src.services.ai_client import call_ollama
 from src.services.exceptions import AIServiceError
 from src.services.llm_json import extract_json
+from src.services.prompts import DEFAULT_DIFFICULTY_INSTRUCTION, DIFFICULTY_INSTRUCTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -29,29 +30,6 @@ HUMOR_INSTRUCTIONS = (
     "Keep it classroom-appropriate. The other distractors must still be genuinely "
     "plausible per PEDAGOGICAL REQUIREMENTS — only one per question should be ridiculous.\n"
 )
-
-DIFFICULTY_INSTRUCTIONS = {
-    'Easy': (
-        "AUDIENCE — Easy (age 10–11):\n"
-        "Use short sentences and simple vocabulary. Introduce every concept with a "
-        "concrete everyday analogy before stating the formal definition. Avoid jargon "
-        "entirely — if a technical term is unavoidable, define it immediately in plain "
-        "language. Use encouraging language. Never condescend; treat the learner as "
-        "curious and fully capable.\n"
-    ),
-    'Normal': (
-        "AUDIENCE — Normal (age 12–13):\n"
-        "Use clear, moderately detailed language. Some subject-specific terms are "
-        "appropriate — define each on first use before continuing. Assume the learner "
-        "has basic school-level knowledge. Balance depth with accessibility.\n"
-    ),
-    'Hard': (
-        "AUDIENCE — Hard (age 14–15):\n"
-        "Use full subject vocabulary without simplifying. Do not filter or dumb down "
-        "material. Assume a motivated learner who can handle nuance, multi-step "
-        "reasoning, and precise terminology. Keep examples concise and sophisticated.\n"
-    ),
-}
 
 
 def _shuffle_options(
@@ -228,7 +206,7 @@ def generate_quiz(
             "Use widely known facts only — do NOT invent specific data.\n\n"
         )
 
-    diff_instruction = DIFFICULTY_INSTRUCTIONS.get(difficulty, DIFFICULTY_INSTRUCTIONS['Normal'])
+    diff_instruction = DIFFICULTY_INSTRUCTIONS.get(difficulty, DEFAULT_DIFFICULTY_INSTRUCTION)
 
     prompt = f"""You are an expert educator creating a quiz for high-school to early-college learners.
 
@@ -427,7 +405,7 @@ def generate_inline_checkpoint(
   "explanation": "Brief explanation of the correct answer."
 }}"""
 
-    diff_instruction = DIFFICULTY_INSTRUCTIONS.get(difficulty, DIFFICULTY_INSTRUCTIONS['Normal'])
+    diff_instruction = DIFFICULTY_INSTRUCTIONS.get(difficulty, DEFAULT_DIFFICULTY_INSTRUCTION)
 
     prompt = f"""You are an expert educator creating a quick comprehension checkpoint for high-school to early-college learners.
 

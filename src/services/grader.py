@@ -17,7 +17,7 @@ def _safe_int(value: Any, default: int = -1) -> int:
         return default
 
 
-def _grade_single_question(question: dict, user_answer: Any) -> bool:
+def grade_single_question(question: dict, user_answer: Any) -> bool:
     """
     Grade a single question against a user-supplied answer.
 
@@ -58,7 +58,7 @@ def _grade_single_question(question: dict, user_answer: Any) -> bool:
     return False
 
 
-def _get_correct_answer(question: dict) -> Any:
+def get_correct_answer(question: dict) -> Any:
     """Return the canonical correct answer for a question dict."""
     qtype = question.get("type", "")
     if qtype == "mcq":

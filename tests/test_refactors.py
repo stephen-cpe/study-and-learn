@@ -1,7 +1,7 @@
 """
 Tests for refactors covering:
 - lesson_orchestrator.build_module_artifacts
-- grader._grade_single_question and _get_correct_answer
+- grader.grade_single_question and get_correct_answer
 """
 import tempfile
 from unittest.mock import patch
@@ -10,7 +10,7 @@ import pytest
 from cachelib import FileSystemCache
 
 from src import create_app
-from src.services.grader import _get_correct_answer, _grade_single_question
+from src.services.grader import get_correct_answer, grade_single_question
 from src.services.lesson_orchestrator import build_module_artifacts, make_retriever
 
 
@@ -88,55 +88,55 @@ def test_make_retriever_returns_empty_when_no_texts():
 class TestGradeSingleQuestion:
     def test_mcq_correct(self):
         q = {"type": "mcq", "answer_index": 2}
-        assert _grade_single_question(q, 2) is True
+        assert grade_single_question(q, 2) is True
 
     def test_mcq_incorrect(self):
         q = {"type": "mcq", "answer_index": 2}
-        assert _grade_single_question(q, 1) is False
+        assert grade_single_question(q, 1) is False
 
     def test_true_false_correct(self):
         q = {"type": "true_false", "answer": True}
-        assert _grade_single_question(q, "true") is True
-        assert _grade_single_question(q, True) is True
+        assert grade_single_question(q, "true") is True
+        assert grade_single_question(q, True) is True
 
     def test_true_false_incorrect(self):
         q = {"type": "true_false", "answer": True}
-        assert _grade_single_question(q, "false") is False
-        assert _grade_single_question(q, False) is False
+        assert grade_single_question(q, "false") is False
+        assert grade_single_question(q, False) is False
 
     def test_multi_select_correct(self):
         q = {"type": "multi_select", "answer_indices": [0, 2]}
-        assert _grade_single_question(q, [0, 2]) is True
+        assert grade_single_question(q, [0, 2]) is True
 
     def test_multi_select_incorrect(self):
         q = {"type": "multi_select", "answer_indices": [0, 2]}
-        assert _grade_single_question(q, [0, 1]) is False
+        assert grade_single_question(q, [0, 1]) is False
 
     def test_fill_blank_correct(self):
         q = {"type": "fill_blank", "answer": "gravity", "acceptable_answers": ["gravity"]}
-        assert _grade_single_question(q, "gravity") is True
-        assert _grade_single_question(q, " Gravity ") is True
+        assert grade_single_question(q, "gravity") is True
+        assert grade_single_question(q, " Gravity ") is True
 
     def test_fill_blank_rejects_multi_word(self):
         q = {"type": "fill_blank", "answer": "gravity", "acceptable_answers": ["gravity"]}
-        assert _grade_single_question(q, "force of gravity") is False
+        assert grade_single_question(q, "force of gravity") is False
 
     def test_fill_blank_rejects_empty(self):
         q = {"type": "fill_blank", "answer": "gravity", "acceptable_answers": ["gravity"]}
-        assert _grade_single_question(q, "") is False
-        assert _grade_single_question(q, None) is False
+        assert grade_single_question(q, "") is False
+        assert grade_single_question(q, None) is False
 
     def test_unknown_type_returns_false(self):
         q = {"type": "short_answer", "answer": "foo"}
-        assert _grade_single_question(q, "foo") is False
+        assert grade_single_question(q, "foo") is False
 
 
-def test_get_correct_answer_all_types():
-    assert _get_correct_answer({"type": "mcq", "answer_index": 3}) == 3
-    assert _get_correct_answer({"type": "true_false", "answer": False}) is False
-    assert _get_correct_answer({"type": "multi_select", "answer_indices": [1]}) == [1]
-    assert _get_correct_answer({"type": "fill_blank", "answer": "moon"}) == "moon"
-    assert _get_correct_answer({"type": "unknown"}) is None
+def testget_correct_answer_all_types():
+    assert get_correct_answer({"type": "mcq", "answer_index": 3}) == 3
+    assert get_correct_answer({"type": "true_false", "answer": False}) is False
+    assert get_correct_answer({"type": "multi_select", "answer_indices": [1]}) == [1]
+    assert get_correct_answer({"type": "fill_blank", "answer": "moon"}) == "moon"
+    assert get_correct_answer({"type": "unknown"}) is None
 
 
 

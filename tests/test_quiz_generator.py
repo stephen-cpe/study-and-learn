@@ -280,25 +280,25 @@ def test_mock_responses_pass_validation_under_new_prompts(monkeypatch):
 
 
 def test_cloze_dropdown_grading_correct():
-    from src.services.grader import _grade_single_question
+    from src.services.grader import grade_single_question
     question = {
         'id': 'q1', 'type': 'cloze_dropdown',
         'prompt': 'The capital of France is ___.',
         'options': ['Paris', 'Berlin', 'Madrid', 'London'],
         'answer_index': 0, 'explanation': 'Paris is the capital.'
     }
-    assert _grade_single_question(question, 0) is True
+    assert grade_single_question(question, 0) is True
 
 
 def test_cloze_dropdown_grading_wrong():
-    from src.services.grader import _grade_single_question
+    from src.services.grader import grade_single_question
     question = {
         'id': 'q1', 'type': 'cloze_dropdown',
         'prompt': 'The capital of France is ___.',
         'options': ['Paris', 'Berlin', 'Madrid', 'London'],
         'answer_index': 0, 'explanation': 'Paris is the capital.'
     }
-    assert _grade_single_question(question, 1) is False
+    assert grade_single_question(question, 1) is False
 
 
 def test_cloze_dropdown_options_shuffled():
@@ -317,15 +317,15 @@ def test_cloze_dropdown_options_shuffled():
 
 
 def test_legacy_fill_blank_graded_as_mcq():
-    from src.services.grader import _grade_single_question
+    from src.services.grader import grade_single_question
     question = {
         'id': 'q1', 'type': 'fill_blank',
         'prompt': 'The capital of France is ___.',
         'options': ['Paris', 'Berlin', 'Madrid', 'London'],
         'answer_index': 0, 'explanation': 'Paris is the capital.'
     }
-    assert _grade_single_question(question, 0) is True
-    assert _grade_single_question(question, 1) is False
+    assert grade_single_question(question, 0) is True
+    assert grade_single_question(question, 1) is False
 
 
 def test_checkpoint_mcq_type(monkeypatch):

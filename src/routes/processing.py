@@ -31,10 +31,7 @@ from src.services import progress_tracker
 from src.services.curriculum_generator import generate_study_path
 from src.services.document_parser import extract_text_with_vision
 from src.services.exceptions import StudyAndLearnError
-from src.services.rag_retriever import (
-    build_rag_context,
-    build_rag_context_from_hashes,
-)
+from src.services.rag_retriever import build_rag_context_from_hashes
 from src.services.relevance_checker import check_relevance
 from src.services.summarizer import generate_summary
 from src.services.vision_parser import hash_file, is_content_registered
@@ -292,10 +289,10 @@ def process():
         if is_ajax:
             progress_tracker.update_progress(task_id, 4)
 
-        if file_hashes:
-            rag_context = build_rag_context_from_hashes(goal, file_hashes, top_k=40)
-        else:
-            rag_context = build_rag_context(goal, extracted_texts)
+        # Every accepted file appends its hash before the dedup `continue`
+        # and the empty-extraction early-return above, so file_hashes is
+        # guaranteed non-empty here.
+        rag_context = build_rag_context_from_hashes(goal, file_hashes, top_k=40)
         if not rag_context:
             rag_context = "\n\n".join(extracted_texts)
             if is_ajax and task_id:
