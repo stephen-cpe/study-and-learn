@@ -11,6 +11,7 @@ from src.services.rag_retriever import (
     build_rag_context,
     build_rag_context_from_hashes_with_sources,
 )
+from src.services.settings_service import DEFAULT_DIFFICULTY, DEFAULT_TTS_SPEAKER
 
 # Type alias for the canonical deck layout. Each entry is one slot in the
 # rendered slide deck (content slide, checkpoint, final quiz, or results).
@@ -170,10 +171,10 @@ def build_module_artifacts(
     learning_goal: str,
     retriever: Callable[[str], Dict[str, Any]],
     existing_slides: List[Dict[str, Any]] = None,
-    difficulty: str = 'Normal',
+    difficulty: str = DEFAULT_DIFFICULTY,
     tts_enabled: bool = False,
     username: str = '',
-    tts_speaker: str = 'Ava',
+    tts_speaker: str = DEFAULT_TTS_SPEAKER,
     next_module_title: str = None,
     is_last_module: bool = False,
     path_id: str = None,
@@ -245,7 +246,7 @@ def build_module_artifacts(
     if tts_enabled:
         from src.services.lesson_generator import generate_narration_script
         narration = generate_narration_script(
-            module_title, slides, username,
+            module_title, username,
             next_module_title=next_module_title,
             is_last_module=is_last_module,
             difficulty=difficulty,

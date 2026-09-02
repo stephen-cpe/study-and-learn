@@ -9,10 +9,24 @@ from sqlalchemy import Boolean, DateTime, Integer, String, Text
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from src import db
+from src.services.settings_service import (
+    DEFAULT_DIFFICULTY,
+    DEFAULT_TTS_SPEAKER,
+)
 
 
 def _utcnow():
     return datetime.now(timezone.utc)
+
+
+# ── StudyPath status lifecycle ─────────────────────────────────────────
+# Canonical status values for StudyPath.status. Queries and route
+# handlers must use these constants so a typo cannot silently match
+# nothing (e.g. 'actve').
+PATH_STATUS_ACTIVE = 'active'
+PATH_STATUS_COMPLETED = 'completed'
+PATH_STATUS_CANCELLED = 'cancelled'
+PATH_STATUSES = (PATH_STATUS_ACTIVE, PATH_STATUS_COMPLETED, PATH_STATUS_CANCELLED)
 
 
 class User(db.Model, UserMixin):
@@ -29,8 +43,8 @@ class User(db.Model, UserMixin):
     can_generate_lessons = db.Column(Boolean, default=False, nullable=False)
     avatar = db.Column(String(32), nullable=False, default='avatar-0.png')
     tts_enabled = db.Column(Boolean, nullable=False, default=False)
-    tts_speaker = db.Column(String(16), nullable=False, default='Ava')
-    lesson_difficulty = db.Column(String(8), nullable=False, default='Normal')
+    tts_speaker = db.Column(String(16), nullable=False, default=DEFAULT_TTS_SPEAKER)
+    lesson_difficulty = db.Column(String(8), nullable=False, default=DEFAULT_DIFFICULTY)
     created_at = db.Column(DateTime, default=_utcnow)
     updated_at = db.Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
@@ -58,7 +72,7 @@ class User(db.Model, UserMixin):
     @property
     def active_lesson_count(self) -> int:
         """Return the number of active StudyPath records for this user."""
-        return StudyPath.query.filter_by(user_id=self.id, status='active').count()
+        return StudyPath.query.filter_by(user_id=self.id, status=PATH_STATUS_ACTIVE).count()
 
     def can_start_new_lesson(self) -> bool:
         """Return True if the user has fewer than 3 active lessons."""
@@ -73,7 +87,7 @@ class StudyPath(db.Model):
     user_id = db.Column(String(36), db.ForeignKey('users.id'), nullable=False, index=True)
     title = db.Column(String(200), nullable=False)
     learning_goal = db.Column(Text, nullable=False)
-    status = db.Column(String(20), default='active', nullable=False)
+    status = db.Column(String(20), default=PATH_STATUS_ACTIVE, nullable=False)
     content_data = db.Column(db.Text, nullable=True)
     extracted_texts = db.Column(db.Text, nullable=True)
     file_hashes = db.Column(db.Text, nullable=True)

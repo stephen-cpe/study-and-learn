@@ -8,7 +8,37 @@ from typing import Any, Dict, List, Optional
 from flask_login import current_user
 
 from src import db
-from src.models import LessonProgress, StudyPath
+from src.models import (
+    PATH_STATUS_ACTIVE,
+    LessonProgress,
+    StudyPath,
+)
+
+
+def get_path_with_lessons(user_id: str, path_id: str) -> tuple:
+    """Load a StudyPath and its parsed lesson list in one call.
+
+    Single access point for the ``StudyPath`` + ``content_data`` load-parse
+    pattern that the TTS worker (and any future background consumer)
+    needs: one query, one JSON parse, one failure contract.
+
+    Args:
+        user_id: The owning user id (ownership guard).
+        path_id: The StudyPath id.
+
+    Returns:
+        Tuple ``(path, lessons)``. ``(None, [])`` when the path is missing,
+        has no content_data, or the JSON is invalid — mirrors the
+        worker's previous early-return shapes.
+    """
+    path = StudyPath.query.filter_by(id=path_id, user_id=user_id).first()
+    if not path or not path.content_data:
+        return None, []
+    try:
+        lessons = json.loads(path.content_data)
+    except (json.JSONDecodeError, TypeError):
+        return None, []
+    return path, lessons
 
 
 def get_lessons(user=None, path_id: str = None) -> List[Dict[str, Any]]:
@@ -27,7 +57,7 @@ def get_lessons(user=None, path_id: str = None) -> List[Dict[str, Any]]:
         path = StudyPath.query.filter_by(id=path_id, user_id=user.id).first()
     else:
         path = StudyPath.query.filter_by(
-            user_id=user.id, status='active'
+            user_id=user.id, status=PATH_STATUS_ACTIVE
         ).order_by(StudyPath.created_at.desc()).first()
     if not path or not path.content_data:
         return []
@@ -58,7 +88,7 @@ def get_active_path(user=None) -> Optional[StudyPath]:
         user = current_user
     if not user or not user.is_authenticated:
         return None
-    return StudyPath.query.filter_by(user_id=user.id, status='active').first()
+    return StudyPath.query.filter_by(user_id=user.id, status=PATH_STATUS_ACTIVE).first()
 
 
 def get_most_recent_active_path(user=None) -> Optional[StudyPath]:
@@ -66,7 +96,7 @@ def get_most_recent_active_path(user=None) -> Optional[StudyPath]:
         user = current_user
     if not user or not user.is_authenticated:
         return None
-    return StudyPath.query.filter_by(user_id=user.id, status='active').order_by(StudyPath.created_at.desc()).first()
+    return StudyPath.query.filter_by(user_id=user.id, status=PATH_STATUS_ACTIVE).order_by(StudyPath.created_at.desc()).first()
 
 
 def get_extracted_texts(user=None, path_id: str = None) -> List[str]:
@@ -79,7 +109,7 @@ def get_extracted_texts(user=None, path_id: str = None) -> List[str]:
         user = current_user
     if not user or not user.is_authenticated:
         return []
-    query = StudyPath.query.filter_by(user_id=user.id, status='active')
+    query = StudyPath.query.filter_by(user_id=user.id, status=PATH_STATUS_ACTIVE)
     if path_id:
         query = query.filter(StudyPath.id == path_id)
     path = query.first()
@@ -96,7 +126,7 @@ def get_learning_goal(user=None, path_id: str = None) -> Optional[str]:
         user = current_user
     if not user or not user.is_authenticated:
         return None
-    query = StudyPath.query.filter_by(user_id=user.id, status='active')
+    query = StudyPath.query.filter_by(user_id=user.id, status=PATH_STATUS_ACTIVE)
     if path_id:
         query = query.filter(StudyPath.id == path_id)
     path = query.first()
@@ -111,7 +141,7 @@ def get_study_path_data(user=None) -> Optional[Dict[str, Any]]:
         user = current_user
     if not user or not user.is_authenticated:
         return None
-    path = StudyPath.query.filter_by(user_id=user.id, status='active').order_by(StudyPath.created_at.desc()).first()
+    path = StudyPath.query.filter_by(user_id=user.id, status=PATH_STATUS_ACTIVE).order_by(StudyPath.created_at.desc()).first()
     if not path or not path.content_data:
         return None
     try:
@@ -129,7 +159,7 @@ def get_file_names(user=None, path_id: str = None) -> List[str]:
         user = current_user
     if not user or not user.is_authenticated:
         return []
-    query = StudyPath.query.filter_by(user_id=user.id, status='active')
+    query = StudyPath.query.filter_by(user_id=user.id, status=PATH_STATUS_ACTIVE)
     if path_id:
         query = query.filter(StudyPath.id == path_id)
     path = query.first()
@@ -149,7 +179,7 @@ def create_study_path(user, title: str, learning_goal: str,
         user_id=user.id,
         title=title,
         learning_goal=learning_goal,
-        status='active',
+        status=PATH_STATUS_ACTIVE,
     )
     if extracted_texts is not None:
         path.extracted_texts = json.dumps(extracted_texts)
@@ -176,7 +206,7 @@ def save_lessons(lessons: List[Dict[str, Any]], user=None,
     if path_id:
         path = StudyPath.query.filter_by(id=path_id, user_id=user.id).first()
     else:
-        path = StudyPath.query.filter_by(user_id=user.id, status='active').order_by(StudyPath.created_at.desc()).first()
+        path = StudyPath.query.filter_by(user_id=user.id, status=PATH_STATUS_ACTIVE).order_by(StudyPath.created_at.desc()).first()
 
     if not path:
         if not title:
@@ -187,7 +217,7 @@ def save_lessons(lessons: List[Dict[str, Any]], user=None,
             user_id=user.id,
             title=title,
             learning_goal=learning_goal,
-            status='active',
+            status=PATH_STATUS_ACTIVE,
         )
         db.session.add(path)
         if file_hashes_val is not None:

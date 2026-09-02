@@ -5,6 +5,13 @@ import logging
 import os
 from typing import Any, Dict, List, Optional
 
+from config_defaults import (
+    EMBEDDING_MODEL_DEFAULT,
+    RAG_TOP_K_DEFAULT,
+    env_default,
+    env_int,
+)
+
 logger = logging.getLogger(__name__)
 
 COLLECTION_PREFIX = "doc_"
@@ -147,7 +154,7 @@ def store_chunks(chunks: List[str], collection_name: str,
         collection = client.get_or_create_collection(name=collection_name)
         
         from langchain_ollama import OllamaEmbeddings
-        embedding_model = OllamaEmbeddings(model=os.environ.get('OLLAMA_EMBEDDING_MODEL', 'qwen3-embedding:0.6b'))
+        embedding_model = OllamaEmbeddings(model=env_default('OLLAMA_EMBEDDING_MODEL', EMBEDDING_MODEL_DEFAULT))
         
         embeddings = embedding_model.embed_documents(chunks)
         
@@ -199,7 +206,7 @@ def retrieve_context(query: str, collection_name: str, top_k: int = 5) -> str:
         collection = client.get_or_create_collection(name=collection_name)
         
         from langchain_ollama import OllamaEmbeddings
-        embedding_model = OllamaEmbeddings(model=os.environ.get('OLLAMA_EMBEDDING_MODEL', 'qwen3-embedding:0.6b'))
+        embedding_model = OllamaEmbeddings(model=env_default('OLLAMA_EMBEDDING_MODEL', EMBEDDING_MODEL_DEFAULT))
         
         query_embedding = embedding_model.embed_query(query)
         
@@ -234,7 +241,7 @@ def retrieve_with_scores(query: str, collection_name: str, top_k: int = 5) -> Li
         collection = client.get_or_create_collection(name=collection_name)
         
         from langchain_ollama import OllamaEmbeddings
-        embedding_model = OllamaEmbeddings(model=os.environ.get('OLLAMA_EMBEDDING_MODEL', 'qwen3-embedding:0.6b'))
+        embedding_model = OllamaEmbeddings(model=env_default('OLLAMA_EMBEDDING_MODEL', EMBEDDING_MODEL_DEFAULT))
         
         query_embedding = embedding_model.embed_query(query)
         
@@ -278,7 +285,7 @@ def retrieve_from_multiple_collections(
         Joined top_k most relevant chunks across all collections.
     """
     if top_k is None:
-        top_k = int(os.environ.get('RAG_TOP_K', '20'))
+        top_k = env_int('RAG_TOP_K', RAG_TOP_K_DEFAULT)
     all_results = []
     
     for coll_name in collection_names:
@@ -320,7 +327,7 @@ def retrieve_from_multiple_collections_with_sources(
         each containing chunk_id, source_hash, score, and text).
     """
     if top_k is None:
-        top_k = int(os.environ.get('RAG_TOP_K', '20'))
+        top_k = env_int('RAG_TOP_K', RAG_TOP_K_DEFAULT)
 
     all_results = []
 

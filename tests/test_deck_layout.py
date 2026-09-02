@@ -165,7 +165,7 @@ def test_narration_script_includes_one_entry_per_deck_position():
     layout = build_deck_layout(slides, checkpoints)
     # layout has 4 entries: content 0, checkpoint, content 1, quiz, results
     # So deck indices 0..4 (5 entries) plus intro at -1.
-    script = generate_narration_script('M', slides, 'Alice', deck_layout=layout)
+    script = generate_narration_script('M', 'Alice', deck_layout=layout)
     deck_indices = [e['slide_index'] for e in script]
     assert -1 in deck_indices, "Missing intro entry"
     # All deck positions from 0..len(layout)-1 must be present
@@ -194,7 +194,7 @@ def test_narration_script_checkpoint_entry_uses_short_tutor_voice():
     lg_module.call_ollama = mock_call
     slides = [{'type': 'title', 'title': 'T', 'subtitle': ''}]
     layout = build_deck_layout(slides, {'0': {'type': 'mcq', 'prompt': 'P?', 'options': ['A', 'B'], 'answer_index': 0}})
-    generate_narration_script('M', slides, 'Alice', deck_layout=layout)
+    generate_narration_script('M', 'Alice', deck_layout=layout)
     p = captured['prompt']
     # Checkpoint narration must be instructed to be short and encouraging
     assert 'checkpoint' in p.lower()
@@ -223,7 +223,7 @@ def test_narration_script_quiz_entry_introduces_final_quiz():
         {'type': 'content', 'heading': 'C', 'bullets': ['a']},
     ]
     layout = build_deck_layout(slides, {})
-    generate_narration_script('M', slides, 'Alice', deck_layout=layout)
+    generate_narration_script('M', 'Alice', deck_layout=layout)
     p = captured['prompt']
     # The prompt must include a "final quiz" instruction for the AI.
     assert 'final quiz' in p.lower()
@@ -246,7 +246,7 @@ def test_narration_script_results_entry_references_results():
     lg_module.call_ollama = mock_call
     slides = [{'type': 'title', 'title': 'T', 'subtitle': ''}]
     layout = build_deck_layout(slides, {})
-    generate_narration_script('M', slides, 'Alice', deck_layout=layout)
+    generate_narration_script('M', 'Alice', deck_layout=layout)
     p = captured['prompt']
     assert 'results' in p.lower()
 
@@ -270,7 +270,7 @@ def test_narration_script_fallback_uses_deck_layout_when_provided():
         '0': {'type': 'mcq', 'prompt': 'P?', 'options': ['A', 'B'], 'answer_index': 0},
     }
     layout = build_deck_layout(slides, checkpoints)
-    script = generate_narration_script('M', slides, 'Alice', deck_layout=layout)
+    script = generate_narration_script('M', 'Alice', deck_layout=layout)
     deck_indices = sorted([e['slide_index'] for e in script])
     expected = [-1] + list(range(len(layout)))
     assert deck_indices == expected, (
@@ -289,7 +289,7 @@ def test_narration_fallback_for_checkpoint_uses_gentle_text():
         '0': {'type': 'mcq', 'prompt': 'P?', 'options': ['A', 'B'], 'answer_index': 0},
     }
     layout = build_deck_layout(slides, checkpoints)
-    fallback = _build_narration_fallback('M', slides, 'Alice', None, False, deck_layout=layout)
+    fallback = _build_narration_fallback('M', 'Alice', False, deck_layout=layout)
     cp_entry = [e for e in fallback if e.get('deck_kind') == 'checkpoint'][0]
     # Should be short and NOT include the literal question prompt
     assert len(cp_entry['text']) < 100
@@ -300,7 +300,7 @@ def test_narration_fallback_for_quiz_uses_intro_text():
     """The fallback for the final quiz slide should be an encouraging intro."""
     slides = [{'type': 'title', 'title': 'T', 'subtitle': ''}]
     layout = build_deck_layout(slides, {})
-    fallback = _build_narration_fallback('M', slides, 'Alice', None, False, deck_layout=layout)
+    fallback = _build_narration_fallback('M', 'Alice', False, deck_layout=layout)
     quiz_entry = [e for e in fallback if e.get('deck_kind') == 'quiz'][0]
     assert 'quiz' in quiz_entry['text'].lower() or 'test' in quiz_entry['text'].lower()
 
@@ -309,7 +309,7 @@ def test_narration_fallback_for_results_uses_results_text():
     """The fallback for the results slide should reference the results."""
     slides = [{'type': 'title', 'title': 'T', 'subtitle': ''}]
     layout = build_deck_layout(slides, {})
-    fallback = _build_narration_fallback('M', slides, 'Alice', None, False, deck_layout=layout)
+    fallback = _build_narration_fallback('M', 'Alice', False, deck_layout=layout)
     results_entry = [e for e in fallback if e.get('deck_kind') == 'results'][0]
     assert 'results' in results_entry['text'].lower() or 'how you did' in results_entry['text'].lower()
 

@@ -345,7 +345,7 @@ AI_MOCK=false
 AI_BACKEND=cloud
 OLLAMA_CLOUD_API_KEY=your-ollama-cloud-api-key-here
 OLLAMA_CLOUD_BASE_URL=https://ollama.com
-OLLAMA_MODEL=deepseek-v4-flash:cloud
+OLLAMA_MODEL=gemma4:cloud
 
 # ── Vector Store / Chroma Cloud ─────────────────────────────────────────────
 CHROMA_DB=cloud
@@ -358,7 +358,7 @@ CHROMA_COLLECTION_NAME=study-and-learn-chromadb
 # Setting OCR_FULL=true enables text+table+figure OCR on every PDF/DOCX/PPTX page
 # (3 local Ollama calls/page). The t3.xlarge has 16 GB RAM, so this is safe to enable.
 OCR_FULL=false
-# OCR_FIGURE_DESCRIPTION=true adds a qwen3.5:397b-cloud call per page (Ollama Cloud).
+# OCR_FIGURE_DESCRIPTION=true adds a glm-5.3-flash:cloud call per page (Ollama Cloud).
 OCR_FIGURE_DESCRIPTION=false
 
 # ── CI / Testing (set to false in production) ───────────────────────────────
@@ -605,7 +605,7 @@ Visit: `https://studyandlearn.duckdns.org`
 - Verify the results page shows a summary and study path
 - Click **Generate Interactive Lessons** and verify modules appear
 
-> **Note:** Lesson generation with cloud AI (default model `deepseek-v4-flash:cloud`, override via `OLLAMA_MODEL`) and 3+ modules can take 45-90 minutes. The progress page will show the mascot animating during this time. This is expected behavior.
+> **Note:** Lesson generation with cloud AI (default model `gemma4:cloud`, override via `OLLAMA_MODEL`) and 3+ modules can take 45-90 minutes. The progress page will show the mascot animating during this time. This is expected behavior.
 
 ---
 
@@ -762,7 +762,7 @@ For a stable IP, use an Elastic IP (free under AWS Free Tier):
 
 **Symptom:** Progress page stays at "Building lesson..." for a long time
 
-**This is expected with cloud AI.** Full generation with the default cloud chat model (`deepseek-v4-flash:cloud`, override via `OLLAMA_MODEL`) and 3+ modules can take 45-90 minutes. The JS hard-timeout is 2 hours and will show a "still working" message without redirecting. Check:
+**This is expected with cloud AI.** Full generation with the default cloud chat model (`gemma4:cloud`, override via `OLLAMA_MODEL`) and 3+ modules can take 45-90 minutes. The JS hard-timeout is 2 hours and will show a "still working" message without redirecting. Check:
 
 1. Is Ollama Cloud reachable? `curl -H "Authorization: Bearer $OLLAMA_CLOUD_API_KEY" https://ollama.com/api/tags`
 2. Check app logs: `tail -50 /home/ubuntu/study-and-learn/logs/error.log`
@@ -830,7 +830,7 @@ Internet
                  |
                  +-- PostgreSQL (study_and_learn database)
                  +-- Local Ollama :11434 (qwen3-embedding:0.6b for RAG embeddings)
-                 +-- Ollama Cloud (chat LLM: deepseek-v4-flash:cloud)
+                 +-- Ollama Cloud (chat LLM: gemma4:cloud)
                  +-- Chroma Cloud (vector storage)
                  +-- Edge-TTS (neural text-to-speech, background worker thread)
 ```

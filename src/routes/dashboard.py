@@ -11,14 +11,20 @@ from flask_login import current_user, login_required
 logger = logging.getLogger(__name__)
 
 from src import db
-from src.models import LessonProgress, StudyPath
+from src.models import (
+    PATH_STATUS_ACTIVE,
+    PATH_STATUS_CANCELLED,
+    PATH_STATUS_COMPLETED,
+    LessonProgress,
+    StudyPath,
+)
 from src.routes import bp
 
 
 @bp.route('/dashboard')
 @login_required
 def dashboard():
-    tab = request.args.get('tab', 'active')
+    tab = request.args.get('tab', PATH_STATUS_ACTIVE)
 
     def _build_paths(status_filter):
         paths = StudyPath.query.filter_by(
@@ -53,9 +59,9 @@ def dashboard():
             })
         return result
 
-    active_paths = _build_paths('active')
-    completed_paths = _build_paths('completed')
-    cancelled_paths = _build_paths('cancelled')
+    active_paths = _build_paths(PATH_STATUS_ACTIVE)
+    completed_paths = _build_paths(PATH_STATUS_COMPLETED)
+    cancelled_paths = _build_paths(PATH_STATUS_CANCELLED)
 
     return render_template(
         'dashboard.html',
@@ -80,7 +86,7 @@ def complete_study_path(path_id):
         flash('All modules must be passed before marking as complete.', 'error')
         return redirect(url_for('main.dashboard'))
 
-    path.status = 'completed'
+    path.status = PATH_STATUS_COMPLETED
     path.updated_at = datetime.now(timezone.utc)
     db.session.commit()
     try:
@@ -100,7 +106,7 @@ def cancel_study_path(path_id):
         flash('Study path not found.', 'error')
         return redirect(url_for('main.dashboard'))
 
-    path.status = 'cancelled'
+    path.status = PATH_STATUS_CANCELLED
     db.session.commit()
     try:
         from src.services.tts_service import delete_lesson_audio
@@ -119,7 +125,7 @@ def delete_study_path(path_id):
         flash('Study path not found.', 'error')
         return redirect(url_for('main.dashboard'))
 
-    if path.status not in ('completed', 'cancelled'):
+    if path.status not in (PATH_STATUS_COMPLETED, PATH_STATUS_CANCELLED):
         flash('Only completed or cancelled lessons can be deleted.', 'error')
         return redirect(url_for('main.dashboard'))
 
@@ -182,13 +188,13 @@ def export_lesson_pdf(module_index):
 def reset():
     if current_user.is_authenticated:
         for path in StudyPath.query.filter_by(
-            user_id=current_user.id, status='active'
+            user_id=current_user.id, status=PATH_STATUS_ACTIVE
         ).all():
             lesson_count = LessonProgress.query.filter_by(
                 study_path_id=path.id
             ).count()
             if lesson_count == 0:
-                path.status = 'cancelled'
+                path.status = PATH_STATUS_CANCELLED
         db.session.commit()
     session.clear()
     flash('Session reset. You can start over.', 'info')

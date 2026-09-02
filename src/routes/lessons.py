@@ -15,6 +15,7 @@ from flask import (
 )
 from flask_login import current_user, login_required
 
+from src.models import PATH_STATUS_ACTIVE
 from src.repositories.lesson_repo import (
     get_active_path,
     get_lessons,
@@ -38,6 +39,7 @@ from src.services import progress_tracker
 from src.services.grader import get_correct_answer, grade_single_question
 from src.services.lesson_orchestrator import build_module_artifacts
 from src.services.mascot_memory import store_memory as _store_mascot_memory
+from src.services.settings_service import DEFAULT_DIFFICULTY, DEFAULT_TTS_SPEAKER
 
 logger = logging.getLogger(__name__)
 
@@ -83,8 +85,8 @@ def generate_lessons():
     retriever = _build_retriever(learning_goal, extracted_texts, file_hashes_data, file_names_data)
 
     tts_enabled = getattr(current_user, 'tts_enabled', False)
-    tts_speaker = getattr(current_user, 'tts_speaker', 'Ava') or 'Ava'
-    difficulty = getattr(current_user, 'lesson_difficulty', 'Normal') or 'Normal'
+    tts_speaker = getattr(current_user, 'tts_speaker', DEFAULT_TTS_SPEAKER) or DEFAULT_TTS_SPEAKER
+    difficulty = getattr(current_user, 'lesson_difficulty', DEFAULT_DIFFICULTY) or DEFAULT_DIFFICULTY
     # display_name = nickname or full_name or username — the friendly name the
     # mascot and TTS narration use to address the learner.
     username = current_user.display_name
@@ -179,7 +181,7 @@ def generate_lessons():
     if path_id_val is None:
         from src.models import StudyPath
         refreshed = StudyPath.query.filter_by(
-            user_id=current_user.id, status='active'
+            user_id=current_user.id, status=PATH_STATUS_ACTIVE
         ).order_by(StudyPath.created_at.desc()).first()
         if refreshed:
             path_id_val = refreshed.id
@@ -229,7 +231,7 @@ def generate_lessons():
 
     path = StudyPath.query.filter_by(id=path_id_val, user_id=current_user.id).first() if path_id_val else None
     if not path:
-        path = StudyPath.query.filter_by(user_id=current_user.id, status='active').order_by(StudyPath.created_at.desc()).first()
+        path = StudyPath.query.filter_by(user_id=current_user.id, status=PATH_STATUS_ACTIVE).order_by(StudyPath.created_at.desc()).first()
     if path:
         path.extracted_texts = None
         db.session.commit()
@@ -309,7 +311,7 @@ def lessons():
     # Completed tab) instead of the legacy "Back to Results" / "Start Over"
     # pair that bounced users through an empty session to /index.
     from src.models import StudyPath
-    path_status = 'active'
+    path_status = PATH_STATUS_ACTIVE
     all_passed = bool(lessons_data) and all(
         l.get('passed', False) for l in lessons_data
     )
@@ -596,9 +598,9 @@ def retake_lesson(module_index):
     names_data = _resolve_filenames()
     retriever = _build_retriever(goal, texts, hashes_data, names_data)
 
-    difficulty = lesson.get('difficulty', 'Normal')
+    difficulty = lesson.get('difficulty', DEFAULT_DIFFICULTY)
     tts_enabled = lesson.get('tts_enabled', False)
-    tts_speaker = lesson.get('tts_speaker', 'Ava') or 'Ava'
+    tts_speaker = lesson.get('tts_speaker', DEFAULT_TTS_SPEAKER) or DEFAULT_TTS_SPEAKER
     username = current_user.display_name
 
     artifacts = build_module_artifacts(

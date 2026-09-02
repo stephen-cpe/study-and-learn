@@ -234,45 +234,20 @@ class TestVisionModelProbe:
             raise AIModelUnavailableError("not found")
 
         with patch.object(vp, "call_ollama", side_effect=fake_call):
-            first = vp.probe_vision_model_availability("qwen3.5:397b-cloud")
-            second = vp.probe_vision_model_availability("qwen3.5:397b-cloud")
+            first = vp.probe_vision_model_availability("glm-5.3-flash:cloud")
+            second = vp.probe_vision_model_availability("glm-5.3-flash:cloud")
         assert first is False
         assert second is False
         # First call hit call_ollama; second call was short-circuited by cache.
         assert len(calls) == 1
-        assert calls[0][1] == "qwen3.5:397b-cloud"
-
-    def test_warns_with_deprecation_hint_for_old_default(self, monkeypatch):
-        """If a user still has the deprecated qwen3-vl:235b-cloud default,
-        the warning must explicitly point them to the new model.
-        """
-        from src.services import vision_parser as vp
-        from src.services.exceptions import AIModelUnavailableError
-
-        monkeypatch.setenv("AI_MOCK", "false")
-        vp._vision_availability_warned = ""
-        with patch.object(vp, "call_ollama",
-                          side_effect=AIModelUnavailableError("not found")):
-            with patch.object(vp.logger, "warning") as mock_warn:
-                vp.probe_vision_model_availability("qwen3-vl:235b-cloud")
-        # The probe logs at least one WARNING; the deprecation hint must
-        # appear in the concatenated call args (first arg is a format
-        # string, remaining args are its substitutions).
-        assert mock_warn.call_count >= 1
-        all_args = []
-        for call in mock_warn.call_args_list:
-            all_args.extend(call.args)
-            all_args.extend(str(v) for v in call.kwargs.values())
-        combined = " ".join(all_args)
-        assert "deprecated" in combined.lower()
-        assert "qwen3.5:397b-cloud" in combined
+        assert calls[0][1] == "glm-5.3-flash:cloud"
 
     def test_returns_true_on_success(self, monkeypatch):
         from src.services import vision_parser as vp
         monkeypatch.setenv("AI_MOCK", "false")
         vp._vision_availability_warned = ""
         with patch.object(vp, "call_ollama", return_value="ok"):
-            assert vp.probe_vision_model_availability("qwen3.5:397b-cloud") is True
+            assert vp.probe_vision_model_availability("glm-5.3-flash:cloud") is True
 
     def test_non_unavailable_exception_is_treated_as_soft(self, monkeypatch):
         """A non-AIModelUnavailableError exception (e.g. timeout, HTTP 500)
@@ -287,7 +262,7 @@ class TestVisionModelProbe:
         with patch.object(vp, "call_ollama", side_effect=RuntimeError("timeout")):
             with patch.object(vp.logger, "warning") as mock_warn, \
                  patch.object(vp.logger, "debug") as mock_debug:
-                result = vp.probe_vision_model_availability("qwen3.5:397b-cloud")
+                result = vp.probe_vision_model_availability("glm-5.3-flash:cloud")
         assert result is True
         assert mock_warn.call_count == 0
         assert mock_debug.call_count == 1
@@ -308,7 +283,7 @@ class TestVisionModelProbe:
         )
         # Verify probe works correctly from the clean initial state
         with patch.object(vp, "call_ollama", return_value="ok"):
-            result = vp.probe_vision_model_availability("qwen3.5:397b-cloud")
+            result = vp.probe_vision_model_availability("glm-5.3-flash:cloud")
         assert result is True
 
 

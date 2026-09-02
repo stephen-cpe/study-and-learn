@@ -55,42 +55,17 @@ def build_rag_context_for_module(
     return {"context_text": "", "sources": []}
 
 
-def generate_lesson(
+def _build_lesson_prompt(
     module_title: str,
     learning_goal: str,
-    retriever: Optional[Callable[[str], Dict[str, Any]]],
-    difficulty: str = 'Normal',
-    exclude_chunks: set = None,
-) -> Dict[str, Any]:
-    """Generate an interactive slide-based lesson for a single module.
+    rag_context: str,
+    difficulty: str,
+) -> str:
+    """Assemble the lesson generation prompt.
 
-    Builds a prompt grounded in RAG context (when available), calls the AI
-    backend, and parses the JSON response. Falls back to a generic placeholder
-    lesson if generation fails, the response is unparseable, or inputs are empty.
-
-    Args:
-        module_title: The title of the module to generate a lesson for.
-        learning_goal: The learner's stated goal.
-        retriever: A callable that accepts a query string and returns a dict
-            with ``context_text`` and ``sources``, or None if unavailable.
-        difficulty: One of 'Easy', 'Normal', 'Hard'. Controls vocabulary,
-            sentence complexity, and depth. Defaults to 'Normal'.
-        exclude_chunks: Optional set of chunk IDs to exclude from retrieval
-            (prevents the same document content from repeating across modules).
-
-    Returns:
-        A dict with keys ``module_title`` (str), ``slides`` (list), and
-        ``sources`` (list of source provenance dicts).
+    Pure string assembly — no I/O, no retrieval — so it can be unit
+    tested and tuned independently of ``generate_lesson``'s control flow.
     """
-    if not learning_goal or not learning_goal.strip():
-        return _fallback_lesson(module_title)
-    if not module_title or not module_title.strip():
-        return _fallback_lesson("Untitled Module")
-
-    rag_result = build_rag_context_for_module(module_title, learning_goal, retriever, exclude_chunks=exclude_chunks)
-    rag_context = rag_result.get("context_text", "") if isinstance(rag_result, dict) else str(rag_result)
-    sources = rag_result.get("sources", []) if isinstance(rag_result, dict) else []
-
     context_instruction = ""
     if rag_context and rag_context.strip():
         context_instruction = (
@@ -148,6 +123,51 @@ JSON FORMAT:
 }}
 
 Lesson:"""
+    return prompt
+
+
+def generate_lesson(
+    module_title: str,
+    learning_goal: str,
+    retriever: Optional[Callable[[str], Dict[str, Any]]],
+    difficulty: str = 'Normal',
+    exclude_chunks: set = None,
+) -> Dict[str, Any]:
+    """Generate an interactive slide-based lesson for a single module.
+
+    Builds a prompt grounded in RAG context (when available), calls the AI
+    backend, and parses the JSON response. Falls back to a generic placeholder
+    lesson if generation fails, the response is unparseable, or inputs are empty.
+
+    Args:
+        module_title: The title of the module to generate a lesson for.
+        learning_goal: The learner's stated goal.
+        retriever: A callable that accepts a query string and returns a dict
+            with ``context_text`` and ``sources``, or None if unavailable.
+        difficulty: One of 'Easy', 'Normal', 'Hard'. Controls vocabulary,
+            sentence complexity, and depth. Defaults to 'Normal'.
+        exclude_chunks: Optional set of chunk IDs to exclude from retrieval
+            (prevents the same document content from repeating across modules).
+
+    Returns:
+        A dict with keys ``module_title`` (str), ``slides`` (list), and
+        ``sources`` (list of source provenance dicts).
+    """
+    if not learning_goal or not learning_goal.strip():
+        return _fallback_lesson(module_title)
+    if not module_title or not module_title.strip():
+        return _fallback_lesson("Untitled Module")
+
+    rag_result = build_rag_context_for_module(module_title, learning_goal, retriever, exclude_chunks=exclude_chunks)
+    rag_context = rag_result.get("context_text", "") if isinstance(rag_result, dict) else str(rag_result)
+    sources = rag_result.get("sources", []) if isinstance(rag_result, dict) else []
+
+    prompt = _build_lesson_prompt(
+        module_title=module_title,
+        learning_goal=learning_goal,
+        rag_context=rag_context,
+        difficulty=difficulty,
+    )
 
     try:
         response = call_ollama(prompt)
@@ -218,7 +238,6 @@ def _fallback_lesson(module_title: str) -> Dict[str, Any]:
 
 def generate_narration_script(
     module_title: str,
-    slides: list,
     username: str,
     next_module_title: str = None,
     is_last_module: bool = False,
@@ -229,8 +248,7 @@ def generate_narration_script(
 
     Makes one call_ollama() call per module to produce narration text.
 
-    When ``deck_layout`` is provided (the new contract from Task 4), the
-    script contains one entry per deck position (content slides,
+    The script contains one entry per deck position (content slides,
     checkpoints, final quiz, and results) plus an intro at ``-1``. The
     ``slide_index`` of each entry matches the corresponding
     ``deck_index`` in the layout, so the TTS manifest stays in sync with
@@ -245,36 +263,27 @@ def generate_narration_script(
         - Results slide: acknowledges the learner and previews pass/fail
           (the actual verdict is rendered by the page itself).
 
-    When ``deck_layout`` is None (legacy / back-compat), the script
-    contains entries only for content slides (one per slide, indexed
-    0..N-1) plus intro at -1 and outro at N. This preserves the
-    behavior of the old contract for callers that haven't migrated.
-
-    Stored as a list of dicts ``{'slide_index': int, 'text': str}`` plus
-    a ``deck_kind`` field for fallback entries (``'intro'``,
-    ``'content'``, ``'checkpoint'``, ``'quiz'``, ``'results'``,
-    ``'outro'``) so consumers can reason about slot type without
-    cross-referencing the layout.
+    Fallback entries additionally carry a ``deck_kind`` field
+    (``'content'``, ``'checkpoint'``, ``'quiz'``, ``'results'``) so
+    consumers can reason about slot type without cross-referencing the
+    layout.
 
     Args:
         module_title: The module title.
-        slides: List of slide dicts from the lesson.
         username: The learner's display name.
         next_module_title: Title of the next module (for outro preview).
         is_last_module: True if this is the final module.
         difficulty: One of 'Easy', 'Normal', 'Hard'.
-        deck_layout: Optional canonical deck layout list. When provided,
-            the script is keyed by deck_index and includes entries for
-            every deck slot (content, checkpoint, quiz, results).
+        deck_layout: The canonical deck layout list from
+            ``build_deck_layout`` — the script is keyed by deck_index
+            and includes entries for every deck slot (content,
+            checkpoint, quiz, results).
 
     Returns:
         List of dicts with 'slide_index' (int) and 'text' (str).
     """
     if deck_layout is None:
-        return _generate_narration_legacy(
-            module_title, slides, username, next_module_title,
-            is_last_module, difficulty,
-        )
+        deck_layout = []
 
     layout_descriptions = []
     for entry in deck_layout:
@@ -385,118 +394,21 @@ JSON FORMAT:
         logger.warning("Narration script generation failed for '%s': %s", module_title, str(e))
 
     return _build_narration_fallback(
-        module_title, slides, username, next_module_title, is_last_module,
+        module_title, username, is_last_module,
         deck_layout=deck_layout,
     )
 
 
-def _generate_narration_legacy(
-    module_title, slides, username, next_module_title, is_last_module, difficulty,
-) -> list:
-    """Legacy narration generator (back-compat). Produces one entry per
-    content slide, indexed 0..N-1, plus intro at -1 and outro at N.
-
-    Used by callers that haven't been migrated to the deck_layout contract.
-    """
-    slide_contents = []
-    for i, slide in enumerate(slides):
-        stype = slide.get('type', '')
-        if stype == 'title':
-            slide_contents.append(f"Slide {i} (title): {slide.get('title','')} — {slide.get('subtitle','')}")
-        elif stype == 'content':
-            bullets = ' | '.join(slide.get('bullets', []))
-            slide_contents.append(f"Slide {i} (content): {slide.get('heading','')} — {bullets}")
-        elif stype == 'example':
-            slide_contents.append(f"Slide {i} (example): {slide.get('heading','')} — {slide.get('body','')}")
-        elif stype == 'summary':
-            bullets = ' | '.join(slide.get('bullets', []))
-            slide_contents.append(f"Slide {i} (summary): {bullets}")
-
-    slides_text = '\n'.join(slide_contents)
-    outro_instruction = (
-        f"For the outro (slide_index={len(slides)}): "
-        f"{'Congratulate the learner on completing ' + module_title + ' and suggest they explore a related topic next.' if is_last_module else 'Briefly preview the next lesson: ' + (next_module_title or 'the next topic') + '.'}"
-    )
-
-    prompt = f"""You are a friendly, enthusiastic tutor creating audio narration for a lesson.
-The learner's name is {username}. The lesson is about: {module_title}.
-Difficulty: {difficulty}.
-
-Here are the lesson slides:
-{slides_text}
-
-Write a narration script. For EACH slide, write 2–4 natural spoken sentences that:
-1. Do NOT just read the bullets aloud — explain, connect, and elaborate as a tutor would.
-2. Use analogies, transitions, and conversational language appropriate for the difficulty level.
-3. Keep each slide narration concise (max 60 words).
-
-Also write:
-- An intro (slide_index=-1): 2 sentences. Address {username} by name. Introduce the topic enthusiastically.
-- {outro_instruction}
-
-RESPOND WITH ONLY a JSON array. No prose, no markdown.
-FORMAT:
-[
-  {{"slide_index": -1, "text": "Hello {username}! Today we are going to explore ..."}},
-  {{"slide_index": 0, "text": "Let's start with ..."}},
-  {{"slide_index": {len(slides)}, "text": "Great work! ..."}}
-]
-"""
-    try:
-        response = call_ollama(prompt)
-        from src.services.llm_json import extract_json_array
-        result = extract_json_array(response)
-        if result and isinstance(result, list) and all('slide_index' in r and 'text' in r for r in result):
-            return result
-    except Exception as e:
-        logger.warning("Legacy narration script generation failed for '%s': %s", module_title, str(e))
-
-    return _build_narration_fallback(
-        module_title, slides, username, next_module_title, is_last_module,
-    )
-
-
 def _build_narration_fallback(
-    module_title, slides, username, next_module_title, is_last_module,
+    module_title, username, is_last_module,
     deck_layout: list = None,
 ):
     """Build a fallback narration script when the AI fails.
 
-    When ``deck_layout`` is provided, the script has one entry per deck
-    slot (content slides, checkpoints, quiz, results) plus intro at -1.
-    When ``deck_layout`` is None, falls back to the legacy layout: one
-    entry per content slide plus intro at -1 and outro at len(slides).
+    The script has one entry per deck slot (content slides, checkpoints,
+    quiz, results) plus intro at -1.
     """
     script = [{'slide_index': -1, 'text': f"Hello {username}! Today we are going to explore {module_title}. Let's get started."}]
-    if deck_layout is None:
-        # Legacy: one entry per content slide
-        for i, slide in enumerate(slides):
-            stype = slide.get('type', '')
-            parts = []
-            if stype == 'title':
-                parts.append(slide.get('title', ''))
-                if slide.get('subtitle'): parts.append(slide['subtitle'])
-            elif stype == 'content':
-                if slide.get('heading'): parts.append(slide.get('heading', '') + '.')
-                parts.extend(slide.get('bullets', []))
-            elif stype == 'example':
-                if slide.get('heading'): parts.append(slide.get('heading', '') + '.')
-                if slide.get('body'): parts.append(slide.get('body', ''))
-            elif stype == 'summary':
-                parts.append('To summarize:')
-                parts.extend(slide.get('bullets', []))
-            text = ' '.join(p.strip() for p in parts if p.strip())
-            if text:
-                script.append({'slide_index': i, 'text': text})
-        # Outro at len(slides)
-        if is_last_module:
-            outro = f"Congratulations on completing {module_title}! Well done."
-        elif next_module_title:
-            outro = f"Great work on {module_title}! Next, we will explore {next_module_title}."
-        else:
-            outro = f"That wraps up {module_title}. Well done!"
-        script.append({'slide_index': len(slides), 'text': outro})
-        return script
 
     # Deck-aware fallback: one entry per deck slot, plus intro at -1
     for entry in deck_layout:

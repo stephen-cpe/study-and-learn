@@ -18,7 +18,7 @@ Environment variables
 ---------------------
 OLLAMA_CLOUD_API_KEY   (required)  Ollama Cloud API key
 OLLAMA_CLOUD_BASE_URL  (optional)  Default: https://ollama.com
-OLLAMA_MODEL           (optional)  Default: deepseek-v4-flash:cloud. Override via the
+OLLAMA_MODEL           (optional)  Default: gemma4:cloud. Override via the
                       OLLAMA_MODEL env var to use any chat model your Ollama
                       Cloud instance serves.
 OLLAMA_TIMEOUT         (optional)  Default: 300 seconds
@@ -28,6 +28,13 @@ import os
 
 import requests
 
+from config_defaults import (
+    OLLAMA_CLOUD_BASE_URL_DEFAULT,
+    OLLAMA_MODEL_CLOUD_DEFAULT,
+    OLLAMA_TIMEOUT_DEFAULT,
+    env_default,
+    env_int,
+)
 from src.services.exceptions import (
     AICloudAPIError,
     AIModelUnavailableError,
@@ -53,12 +60,12 @@ def call_ollama(prompt: str, model: str = None, images: list = None) -> str:
         return f"Mock response for prompt: {prompt[:50]}..."
 
     if model is None:
-        model = os.environ.get('OLLAMA_MODEL', 'deepseek-v4-flash:cloud')
+        model = env_default('OLLAMA_MODEL', OLLAMA_MODEL_CLOUD_DEFAULT)
 
-    base_url = os.environ.get('OLLAMA_CLOUD_BASE_URL', 'https://ollama.com')
+    base_url = env_default('OLLAMA_CLOUD_BASE_URL', OLLAMA_CLOUD_BASE_URL_DEFAULT)
     url = f"{base_url}/v1/chat/completions"
     api_key = os.environ.get('OLLAMA_CLOUD_API_KEY', '')
-    timeout = int(os.environ.get('OLLAMA_TIMEOUT', '300'))
+    timeout = env_int('OLLAMA_TIMEOUT', OLLAMA_TIMEOUT_DEFAULT)
 
     headers = {
         "Authorization": f"Bearer {api_key}",

@@ -17,6 +17,14 @@ import os
 
 import requests
 
+from config_defaults import (
+    OLLAMA_BASE_URL_DEFAULT,
+    OLLAMA_MODEL_LOCAL_DEFAULT,
+    OLLAMA_NUM_CTX_DEFAULT,
+    OLLAMA_TIMEOUT_DEFAULT,
+    env_default,
+    env_int,
+)
 from src.services.exceptions import (
     AIModelUnavailableError,
     AIServiceError,
@@ -40,18 +48,18 @@ def _call_ollama_local(prompt: str, model: str = None, images: list = None) -> s
             prompt text is never read by the model.
     """
     if model is None:
-        model = os.environ.get('OLLAMA_MODEL', 'qwen3:0.6b')
+        model = env_default('OLLAMA_MODEL', OLLAMA_MODEL_LOCAL_DEFAULT)
 
-    base_url = os.environ.get('OLLAMA_BASE_URL', 'http://localhost:11434')
+    base_url = env_default('OLLAMA_BASE_URL', OLLAMA_BASE_URL_DEFAULT)
     url = f"{base_url}/api/generate"
-    timeout = int(os.environ.get('OLLAMA_TIMEOUT', '300'))
+    timeout = env_int('OLLAMA_TIMEOUT', OLLAMA_TIMEOUT_DEFAULT)
 
     payload = {
         "model": model,
         "prompt": prompt,
         "stream": False,
         "format": "json",
-        "options": {"num_ctx": int(os.environ.get('OLLAMA_NUM_CTX', '131072'))}
+        "options": {"num_ctx": env_int('OLLAMA_NUM_CTX', OLLAMA_NUM_CTX_DEFAULT)}
     }
     if images:
         payload["images"] = images

@@ -12,6 +12,18 @@ Usage in src/__init__.py:
 import os
 import sys
 
+from config_defaults import (
+    EMBEDDING_MODEL_DEFAULT,
+    OCR_MODEL_DEFAULT,
+    OLLAMA_BASE_URL_DEFAULT,
+    OLLAMA_CLOUD_BASE_URL_DEFAULT,
+    OLLAMA_MODEL_CLOUD_DEFAULT,
+    OLLAMA_NUM_CTX_DEFAULT,
+    OLLAMA_TIMEOUT_DEFAULT,
+    RAG_TOP_K_DEFAULT,
+    VISION_MODEL_DEFAULT,
+)
+
 
 def _bool(value: str, default: bool = False) -> bool:
     """Parse a string env var into a bool."""
@@ -49,21 +61,21 @@ class Config:
     # ── Ollama Cloud (AI backend) ───────────────────────────────────────
     OLLAMA_CLOUD_API_KEY = os.environ.get("OLLAMA_CLOUD_API_KEY", "")
     OLLAMA_CLOUD_BASE_URL = os.environ.get(
-        "OLLAMA_CLOUD_BASE_URL", "https://ollama.com"
+        "OLLAMA_CLOUD_BASE_URL", OLLAMA_CLOUD_BASE_URL_DEFAULT
     )
-    OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "deepseek-v4-flash:cloud")
-    OLLAMA_TIMEOUT = _int(os.environ.get("OLLAMA_TIMEOUT"), 300)
-    OLLAMA_NUM_CTX = _int(os.environ.get("OLLAMA_NUM_CTX"), 131072)
-    RAG_TOP_K = _int(os.environ.get("RAG_TOP_K"), 20)
+    OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", OLLAMA_MODEL_CLOUD_DEFAULT)
+    OLLAMA_TIMEOUT = _int(os.environ.get("OLLAMA_TIMEOUT"), OLLAMA_TIMEOUT_DEFAULT)
+    OLLAMA_NUM_CTX = _int(os.environ.get("OLLAMA_NUM_CTX"), OLLAMA_NUM_CTX_DEFAULT)
+    RAG_TOP_K = _int(os.environ.get("RAG_TOP_K"), RAG_TOP_K_DEFAULT)
 
     # ── Local Ollama (alternative backend) ──────────────────────────────
-    OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
-    OLLAMA_OCR_MODEL = os.environ.get("OLLAMA_OCR_MODEL", "glm-ocr")
+    OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", OLLAMA_BASE_URL_DEFAULT)
+    OLLAMA_OCR_MODEL = os.environ.get("OLLAMA_OCR_MODEL", OCR_MODEL_DEFAULT)
     OLLAMA_VISION_MODEL = os.environ.get(
-        "OLLAMA_VISION_MODEL", "qwen3.5:397b-cloud"
+        "OLLAMA_VISION_MODEL", VISION_MODEL_DEFAULT
     )
     OLLAMA_EMBEDDING_MODEL = os.environ.get(
-        "OLLAMA_EMBEDDING_MODEL", "qwen3-embedding:0.6b"
+        "OLLAMA_EMBEDDING_MODEL", EMBEDDING_MODEL_DEFAULT
     )
 
     # ── OCR / vision pipeline ───────────────────────────────────────────

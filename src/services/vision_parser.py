@@ -6,6 +6,7 @@ from typing import List, Optional, Tuple
 
 from PIL import Image
 
+from config_defaults import OCR_MODEL_DEFAULT, VISION_MODEL_DEFAULT, env_default
 from src import db
 from src.models import ContentRegistry
 from src.services.ai_client import call_ollama
@@ -32,13 +33,11 @@ def _encode_image(image_path: str) -> Optional[str]:
         return None
 
 
-# Vision model default. Migrated from the deprecated qwen3-vl:235b-cloud
-# to qwen3.5:397b-cloud (same vendor, Text+Image input, 256K context, Medium
-# cloud cost tier). If the model is unreachable on Ollama Cloud, callers
-# should expect a soft failure (empty string) + a WARNING log from
-# :func:`probe_vision_model_availability` instead of a hard error.
-_DEFAULT_VISION_MODEL = "qwen3.5:397b-cloud"
-_DEPRECATED_VISION_MODEL = "qwen3-vl:235b-cloud"
+# Vision model default (the value lives in config_defaults.py as
+# VISION_MODEL_DEFAULT). If the model is unreachable on Ollama Cloud,
+# callers should expect a soft failure (empty string) + a WARNING log
+# from :func:`probe_vision_model_availability` instead of a hard error.
+_DEFAULT_VISION_MODEL = VISION_MODEL_DEFAULT
 
 # Tracks whether the warning has been logged once per process to avoid
 # log spam when the vision model is called repeatedly.
@@ -66,12 +65,9 @@ def probe_vision_model_availability(model: Optional[str] = None) -> bool:
         return True
 
     if model is None:
-        model = os.environ.get("OLLAMA_VISION_MODEL", _DEFAULT_VISION_MODEL)
+        model = env_default("OLLAMA_VISION_MODEL", _DEFAULT_VISION_MODEL)
 
-    # Detect the previously-deprecated default so we can give a useful hint.
-    is_deprecated = model == _DEPRECATED_VISION_MODEL
-
-    probe_key = f"{model}:{is_deprecated}"
+    probe_key = f"{model}"
     if _vision_availability_warned.startswith(f"{probe_key}:"):
         return not _vision_availability_warned.endswith(":unavailable")
     _vision_availability_warned = f"{probe_key}:probing"
@@ -95,12 +91,6 @@ def probe_vision_model_availability(model: Optional[str] = None) -> bool:
             f"Ollama Cloud, confirm `AI_BACKEND=cloud` is set and your "
             f"API key is valid."
         )
-        if is_deprecated:
-            hint += (
-                f" NOTE: '{model}' is the deprecated default — "
-                f"update OLLAMA_VISION_MODEL to "
-                f"'{_DEFAULT_VISION_MODEL}' (Qwen3.5:397b-cloud)."
-            )
         logger.warning("%s Underlying error: %s", hint, str(e))
         _vision_availability_warned = f"{probe_key}:unavailable"
         return False
@@ -318,7 +308,7 @@ def ocr_page(image_path: str, mode: str = "text") -> str:
         raise ValueError(f"Unknown OCR mode: {mode}. Use 'text', 'table', or 'figure'.")
 
     prompt = mode_prompts[mode]
-    model = os.environ.get("OLLAMA_OCR_MODEL", "glm-ocr")
+    model = env_default("OLLAMA_OCR_MODEL", OCR_MODEL_DEFAULT)
 
     b64_image = _encode_image(abs_path)
     if not b64_image:

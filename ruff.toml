@@ -7,4 +7,4 @@ select = ["F", "I"]
 ignore = []
 
 [lint.isort]
-known-first-party = ["src", "config"]
+known-first-party = ["src", "config", "config_defaults"]

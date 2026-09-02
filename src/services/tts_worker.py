@@ -33,6 +33,7 @@ import threading
 from typing import Any, Dict, Optional
 
 from src.services import progress_tracker
+from src.services.settings_service import DEFAULT_TTS_SPEAKER
 from src.services.tts_service import (
     TTS_DIR,
     generate_lesson_audio,
@@ -98,18 +99,10 @@ def get_path_audio_status(user_id: str, path_id: str) -> Dict[str, Any]:
             - 'ready_count': number of modules with status='ready'
             - 'total': total number of modules in the path
     """
-    import json
+    from src.repositories.lesson_repo import get_path_with_lessons
 
-    from src.models import StudyPath
-
-    path = StudyPath.query.filter_by(id=path_id, user_id=user_id).first()
-    if not path or not path.content_data:
-        return {
-            'modules': [], 'all_ready': False, 'ready_count': 0, 'total': 0,
-        }
-    try:
-        lessons = json.loads(path.content_data)
-    except (json.JSONDecodeError, TypeError):
+    path, lessons = get_path_with_lessons(user_id, path_id)
+    if not path:
         return {
             'modules': [], 'all_ready': False, 'ready_count': 0, 'total': 0,
         }
@@ -188,21 +181,15 @@ def run_tts_generation_for_path(
     import json
 
     from src import db
-    from src.models import StudyPath
+    from src.repositories.lesson_repo import get_path_with_lessons
 
     try:
         if task_id:
             progress_tracker.update_cosmetic(task_id, **_tts_cosmetic(0))
 
-        path = StudyPath.query.filter_by(id=path_id, user_id=user_id).first()
-        if not path or not path.content_data:
+        path, lessons = get_path_with_lessons(user_id, path_id)
+        if not path:
             logger.warning("TTS worker: path %s not found for user %s", path_id, user_id)
-            return {'modules': [], 'all_ready': False}
-
-        try:
-            lessons = json.loads(path.content_data)
-        except (json.JSONDecodeError, TypeError):
-            logger.warning("TTS worker: path %s has invalid content_data", path_id)
             return {'modules': [], 'all_ready': False}
 
         results = []
@@ -249,7 +236,7 @@ def run_tts_generation_for_path(
                 })
                 continue
 
-            speaker = lesson.get('tts_speaker', 'Ava') or 'Ava'
+            speaker = lesson.get('tts_speaker', DEFAULT_TTS_SPEAKER) or DEFAULT_TTS_SPEAKER
             try:
                 generate_lesson_audio(
                     path_id=path_id,

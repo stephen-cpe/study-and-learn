@@ -47,13 +47,13 @@ def health():
 
 @bp.route('/')
 def index():
-    from src.models import StudyPath
+    from src.models import PATH_STATUS_ACTIVE, StudyPath
     if current_user.is_authenticated and current_user.is_admin:
         return redirect(url_for('main.admin'))
     goals = []
     if current_user.is_authenticated:
         paths = StudyPath.query.filter_by(
-            user_id=current_user.id, status='active'
+            user_id=current_user.id, status=PATH_STATUS_ACTIVE
         ).order_by(StudyPath.created_at.asc()).all()
         goals = [{'id': p.id, 'title': p.learning_goal or p.title} for p in paths]
     return render_template('index.html', goals=goals,

@@ -148,50 +148,19 @@ def _shuffle_checkpoint(cp: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]
     return cp
 
 
-def generate_quiz(
+def _build_quiz_prompt(
     module_title: str,
-    slides: List[Dict[str, Any]],
-    retriever: Optional[Callable[[str], Dict[str, Any]]],
-    n_questions: int = 5,
-    difficulty: str = 'Normal',
-) -> Dict[str, Any]:
-    """Generate a mixed-type quiz for a module grounded in RAG context.
+    slide_summary: str,
+    rag_context: str,
+    type_mix: Dict[str, int],
+    n_questions: int,
+    difficulty: str,
+) -> str:
+    """Assemble the final-quiz generation prompt.
 
-    Args:
-        module_title: The module title.
-        slides: The lesson slides to base quiz questions on.
-        retriever: A callable that returns RAG context for a query string,
-            or None if unavailable.
-        n_questions: Number of questions to generate (default 5).
-        difficulty: One of 'Easy', 'Normal', 'Hard'. Controls vocabulary
-            and question complexity. Defaults to 'Normal'.
-
-    Returns:
-        A dict with key ``questions`` containing a list of validated,
-        shuffled, and diversified question dicts.
+    Pure string assembly — no I/O, no retrieval — so it can be unit
+    tested and tuned independently of ``generate_quiz``'s control flow.
     """
-    if not module_title or not module_title.strip():
-        result = _fallback_quiz(n_questions)
-        result['fallback'] = True
-        return result
-
-    slide_summary = _summarize_slides(slides)
-
-    rag_context = ""
-    if retriever:
-        try:
-            query = f"{module_title}"
-            result = retriever(query)
-            if isinstance(result, dict):
-                rag_context = result.get("context_text", str(result))
-            elif result:
-                rag_context = str(result)
-        except Exception as e:
-            logger.warning("RAG retrieval failed for quiz '%s': %s", module_title, str(e))
-
-    question_types = ['mcq', 'true_false', 'multi_select', 'cloze_dropdown']
-    type_mix = _build_type_mix(n_questions, question_types)
-
     context_instruction = ""
     if rag_context and rag_context.strip():
         context_instruction = (
@@ -290,6 +259,61 @@ JSON FORMAT:
 }}
 
 Quiz:"""
+    return prompt
+
+
+def generate_quiz(
+    module_title: str,
+    slides: List[Dict[str, Any]],
+    retriever: Optional[Callable[[str], Dict[str, Any]]],
+    n_questions: int = 5,
+    difficulty: str = 'Normal',
+) -> Dict[str, Any]:
+    """Generate a mixed-type quiz for a module grounded in RAG context.
+
+    Args:
+        module_title: The module title.
+        slides: The lesson slides to base quiz questions on.
+        retriever: A callable that returns RAG context for a query string,
+            or None if unavailable.
+        n_questions: Number of questions to generate (default 5).
+        difficulty: One of 'Easy', 'Normal', 'Hard'. Controls vocabulary
+            and question complexity. Defaults to 'Normal'.
+
+    Returns:
+        A dict with key ``questions`` containing a list of validated,
+        shuffled, and diversified question dicts.
+    """
+    if not module_title or not module_title.strip():
+        result = _fallback_quiz(n_questions)
+        result['fallback'] = True
+        return result
+
+    slide_summary = _summarize_slides(slides)
+
+    rag_context = ""
+    if retriever:
+        try:
+            query = f"{module_title}"
+            result = retriever(query)
+            if isinstance(result, dict):
+                rag_context = result.get("context_text", str(result))
+            elif result:
+                rag_context = str(result)
+        except Exception as e:
+            logger.warning("RAG retrieval failed for quiz '%s': %s", module_title, str(e))
+
+    question_types = ['mcq', 'true_false', 'multi_select', 'cloze_dropdown']
+    type_mix = _build_type_mix(n_questions, question_types)
+
+    prompt = _build_quiz_prompt(
+        module_title=module_title,
+        slide_summary=slide_summary,
+        rag_context=rag_context,
+        type_mix=type_mix,
+        n_questions=n_questions,
+        difficulty=difficulty,
+    )
 
     try:
         response = call_ollama(prompt)
