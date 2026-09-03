@@ -6,7 +6,7 @@ search happened to surface.
 """
 from unittest.mock import MagicMock, patch
 
-from src.services import rag_budget, rag_retriever
+from src.services import rag_retriever
 
 
 def test_full_coverage_context_combines_digest_and_retrieval(monkeypatch):
