@@ -174,7 +174,8 @@ def get_file_names(user=None, path_id: str = None) -> List[str]:
 def create_study_path(user, title: str, learning_goal: str,
                       extracted_texts: List[str] = None,
                       file_hashes: List[str] = None,
-                      file_names: List[str] = None) -> StudyPath:
+                      file_names: List[str] = None,
+                      content_digest: str = None) -> StudyPath:
     path = StudyPath(
         user_id=user.id,
         title=title,
@@ -187,6 +188,8 @@ def create_study_path(user, title: str, learning_goal: str,
         path.file_hashes = json.dumps(file_hashes)
     if file_names is not None:
         path.file_names = json.dumps(file_names)
+    if content_digest is not None:
+        path.content_digest = content_digest
     db.session.add(path)
     db.session.commit()
     return path

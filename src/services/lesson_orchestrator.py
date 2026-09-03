@@ -135,7 +135,10 @@ def make_retriever_from_hashes(goal: str, file_hashes: List[str]) -> Callable[[s
 
 
 def make_retriever_from_hashes_with_names(
-    goal: str, file_hashes: List[str], file_names: List[str]
+    goal: str,
+    file_hashes: List[str],
+    file_names: List[str],
+    content_digest: str = "",
 ) -> Callable[[str], Dict[str, Any]]:
     """Build a retriever that returns sources with resolved filenames.
 
@@ -143,10 +146,16 @@ def make_retriever_from_hashes_with_names(
     the original filenames so that source entries include human-readable
     filenames (rendering "my_notes.pdf" instead of a hash prefix).
 
+    When ``content_digest`` is provided (the processing route's map-reduce
+    digest of the entire document), it is prepended to every query result so
+    the LLM is grounded in the full document even when similarity retrieval
+    only surfaces a subset of chunks.
+
     Args:
         goal: The learning goal for context queries.
         file_hashes: SHA-256 file hashes.
         file_names: Original filenames, one per hash.
+        content_digest: Full-coverage digest produced at processing time.
 
     Returns:
         Callable that returns dict with ``context_text`` and ``sources``.
@@ -156,10 +165,22 @@ def make_retriever_from_hashes_with_names(
     """
     def retrieve(query: str, exclude_chunks: set = None) -> Dict[str, Any]:
         try:
+            from src.services.rag_budget import get_context_budget_chars
+            module_budget = get_context_budget_chars(fraction=0.35)
             result = build_rag_context_from_hashes_with_sources(
                 goal, file_hashes, file_names,
-                top_k=20, exclude_chunks=exclude_chunks,
+                top_k=None, exclude_chunks=exclude_chunks,
+                max_chars=module_budget,
             )
+            if content_digest:
+                digest_block = (
+                    "# Complete Document Digest (every section)\n\n"
+                    + content_digest
+                    + "\n\n"
+                )
+                result["context_text"] = digest_block + result.get(
+                    "context_text", ""
+                )
             return result
         except Exception:
             return {"context_text": "", "sources": []}

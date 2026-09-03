@@ -6,6 +6,13 @@
 
 <div class="results-meta mb-4">
     <span class="badge goal-badge">{{ learning_goal }}</span>
+    {% if coverage_ratio is not none %}
+    {% set cov_pct = (coverage_ratio * 100) | round | int %}
+    <span class="badge filename-badge" title="Share of extracted document text delivered to the AI (full-coverage digest + retrieved chunks). Higher is better.">
+        Document coverage: {{ cov_pct }}%
+        {% if cov_pct < 50 %}&#9888;{% endif %}
+    </span>
+    {% endif %}
     {% if filenames %}
     <div class="file-list">
         {% for f in filenames %}

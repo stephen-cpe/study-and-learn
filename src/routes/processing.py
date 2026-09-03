@@ -31,7 +31,9 @@ from src.services import progress_tracker
 from src.services.curriculum_generator import generate_study_path
 from src.services.document_parser import extract_text_with_vision
 from src.services.exceptions import StudyAndLearnError
-from src.services.rag_retriever import build_rag_context_from_hashes
+from src.services.rag_retriever import (
+    build_full_coverage_context,
+)
 from src.services.relevance_checker import check_relevance
 from src.services.summarizer import generate_summary
 from src.services.vision_parser import hash_file, is_content_registered
@@ -84,7 +86,8 @@ def results():
                            study_path=study_path,
                            filename=filename,
                            filenames=filenames,
-                           learning_goal=learning_goal)
+                           learning_goal=learning_goal,
+                           coverage_ratio=session.get('coverage_ratio'))
 
 
 @bp.route('/progress')
@@ -292,7 +295,54 @@ def process():
         # Every accepted file appends its hash before the dedup `continue`
         # and the empty-extraction early-return above, so file_hashes is
         # guaranteed non-empty here.
-        rag_context = build_rag_context_from_hashes(goal, file_hashes, top_k=40)
+        #
+        # Stage 4 (index build) is done; stage 5 is the map step of the
+        # full-coverage pipeline (every extracted chunk is summarized in
+        # reading order), and the returned context is grounded in the
+        # whole document rather than only the most relevant chunks.  The
+        # digest + the budget-sized retrieved context are combined into
+        # ``rag_context``.
+        #
+        # The map step is the long pole on cloud backends (one LLM call per
+        # section), so the callback publishes a *live, rotating* status
+        # message — section number + short label + busy mascot — on every
+        # completed section.  Without this the bubble stays frozen on the
+        # previous stage and the JS stale-timeout handler overwrites it
+        # with a permanent "hang tight!" even though work is progressing.
+        _MAP_LABELS = (
+            'Reading sections',
+            'Summarizing concepts',
+            'Extracting key points',
+            'Linking ideas',
+        )
+
+        def _map_progress(done, total):
+            if not (is_ajax and task_id):
+                return
+            pct = min(80, 55 + int((done / max(total, 1)) * 25))
+            label = _MAP_LABELS[(done - 1) % len(_MAP_LABELS)]
+            # Keep the bubble line inside the CRT width budget (<= 35 chars
+            # incl. the counter) so it never wraps awkwardly on the mascot.
+            mascot_msg = f'{label} {done}/{total}...'
+            if len(mascot_msg) > 35:
+                mascot_msg = f'{label} {done}/{total}'
+            progress_tracker.update_cosmetic(
+                task_id,
+                pct=pct,
+                label=label,
+                mascot=mascot_msg,
+                mascot_state='busy',
+            )
+
+        full = build_full_coverage_context(
+            goal, file_hashes, filenames,
+            top_k=40,
+            progress_callback=_map_progress if is_ajax else None,
+        )
+        rag_context = full.get('context_text', '')
+        content_digest = full.get('content_digest', '')
+        coverage_ratio = full.get('coverage_ratio')
+
         if not rag_context:
             rag_context = "\n\n".join(extracted_texts)
             if is_ajax and task_id:
@@ -303,21 +353,24 @@ def process():
                 )
 
         if is_ajax:
-            progress_tracker.update_progress(task_id, 5)
+            progress_tracker.update_progress(task_id, 6)
 
         summary = generate_summary(rag_context)
         if is_ajax:
-            progress_tracker.update_progress(task_id, 6)
+            progress_tracker.update_progress(task_id, 7)
 
         relevance_result = check_relevance(goal, rag_context, summary)
         if is_ajax:
-            progress_tracker.update_progress(task_id, 7)
+            progress_tracker.update_progress(task_id, 8)
 
         if relevance_result.get('relevance_label') != 'weak':
             study_path = generate_study_path(goal, rag_context, summary)
         else:
             study_path = {}
 
+        # Store the document digest + coverage ratio on the StudyPath so the
+        # lesson-generation route can reuse the full-coverage context
+        # without re-running the expensive map step.
         session['learning_goal'] = goal
         session['summary'] = summary
         session['relevance_result'] = relevance_result
@@ -326,6 +379,8 @@ def process():
         session['uploaded_filenames'] = filenames
         session['extracted_texts'] = extracted_texts
         session['file_hashes'] = file_hashes
+        session['content_digest'] = content_digest
+        session['coverage_ratio'] = coverage_ratio
 
         if current_user.is_authenticated:
             if not current_user.can_start_new_lesson():
@@ -338,7 +393,8 @@ def process():
             create_study_path(current_user, path_title, goal,
                               extracted_texts=extracted_texts,
                               file_hashes=file_hashes,
-                              file_names=filenames)
+                              file_names=filenames,
+                              content_digest=content_digest or None)
 
         if is_ajax:
             progress_tracker.update_progress(task_id, 8)

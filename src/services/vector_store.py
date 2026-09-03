@@ -18,6 +18,23 @@ COLLECTION_PREFIX = "doc_"
 MAX_HASH_LENGTH = 59
 
 
+def _per_collection_top_k(top_k: int | None) -> int:
+    """Return the per-collection retrieval depth.
+
+    The caller passes the *total* ``top_k`` it wants across all collections.
+    Each individual collection is queried with a deeper ``per-collection``
+    depth so the merged-and-sorted result can actually fill the budget
+    (instead of being starved by an arbitrary per-collection cap).  The
+    default scales with ``OLLAMA_NUM_CTX`` via :func:`rag_budget.get_top_k_for_budget`.
+    """
+    if top_k is not None:
+        return max(1, top_k)
+    from src.services.rag_budget import get_top_k_for_budget
+    return get_top_k_for_budget(
+        per_collection_top_k=env_int('RAG_TOP_K', RAG_TOP_K_DEFAULT)
+    )
+
+
 def get_collection_name(file_hash: str) -> str:
     return f"{COLLECTION_PREFIX}{file_hash[:MAX_HASH_LENGTH]}"
 
@@ -166,17 +183,25 @@ def store_chunks(chunks: List[str], collection_name: str,
         # metadata, retrieve_from_multiple_collections_with_sources
         # reads metadata.get('chunk_id', '') which is always '' and the
         # dedup never matches — modules can repeat the same chunks.
+        #
+        # chunk_id is namespaced by collection name so the same integer
+        # position in two different files never collides (e.g. chunk_0
+        # of file A and chunk_0 of file B are distinct).  This is
+        # critical for the exclude_chunks filter to be correct across
+        # multiple uploaded files.
         if metadata:
             # Merge chunk_id into the caller-supplied metadata dicts
             # without overwriting the caller's keys.
             enriched = []
             for i, m in enumerate(metadata):
                 d = dict(m) if isinstance(m, dict) else {}
-                d.setdefault('chunk_id', ids[i])
+                d.setdefault('chunk_id', f"{collection_name}:{ids[i]}")
                 enriched.append(d)
             metadata = enriched
         else:
-            metadata = [{'chunk_id': cid} for cid in ids]
+            metadata = [
+                {'chunk_id': f"{collection_name}:{cid}"} for cid in ids
+            ]
 
         kwargs = {"ids": ids, "documents": chunks, "embeddings": embeddings}
         if metadata:
@@ -271,69 +296,97 @@ def retrieve_with_scores(query: str, collection_name: str, top_k: int = 5) -> Li
 def retrieve_from_multiple_collections(
     query: str,
     collection_names: List[str],
-    top_k: int = None
+    top_k: int = None,
+    max_chars: int = None
 ) -> str:
     """Query multiple ChromaDB collections and merge results by similarity score.
-    
+
+    Each collection is queried at a deeper *per-collection* depth (see
+    :func:`_per_collection_top_k`) so the merged results can actually fill
+    the total budget instead of being starved by an arbitrary cap.  A
+    character budget then trims the merged list to what can actually fit in
+    the model's context window.
+
     Args:
         query: The search query (learning goal)
         collection_names: List of collection names to query
-        top_k: Number of top results to return total. If None, uses the
-            RAG_TOP_K env var (default 20).
-    
+        top_k: Number of top results to return *total* across all
+            collections.  If None, uses ``RAG_TOP_K`` scaled by the
+            available context budget (see :mod:`rag_budget`).
+        max_chars: Hard cap on the returned joined text length in
+            characters.  If None, derived from the context budget.
+
     Returns:
         Joined top_k most relevant chunks across all collections.
     """
-    if top_k is None:
-        top_k = env_int('RAG_TOP_K', RAG_TOP_K_DEFAULT)
+    per_coll_k = _per_collection_top_k(top_k)
     all_results = []
-    
+
     for coll_name in collection_names:
         try:
-            results = retrieve_with_scores(query, coll_name, top_k=3)
+            results = retrieve_with_scores(query, coll_name, top_k=per_coll_k)
             all_results.extend(results)
         except Exception as e:
             logger.warning("Failed to query collection '%s': %s", coll_name, str(e))
             continue
-    
+
     if not all_results:
         return ""
-    
+
     all_results.sort(key=lambda r: r.get('score', 0.0), reverse=True)
-    top_results = all_results[:top_k]
-    
-    return "\n\n".join(r['document'] for r in top_results)
+    total_top_k_max = env_int('RAG_TOP_K', RAG_TOP_K_DEFAULT)
+    top_results = all_results[:total_top_k_max]
+
+    # Enforce character budget so the merged context actually fits in the
+    # model's context window.  Chunks are dropped from the tail (lowest
+    # relevance) until the joined length is within budget.
+    if max_chars is None:
+        from src.services.rag_budget import get_context_budget_chars
+        max_chars = get_context_budget_chars()
+    kept: list[str] = []
+    running = 0
+    for r in top_results:
+        doc = r.get('document', '') or ''
+        doc_len = len(doc)
+        if running + doc_len > max_chars:
+            break
+        kept.append(doc)
+        running += doc_len
+
+    return "\n\n".join(kept)
 
 
 def retrieve_from_multiple_collections_with_sources(
     query: str,
     collection_names: List[str],
-    top_k: int = None
+    top_k: int = None,
+    max_chars: int = None
 ) -> Dict[str, Any]:
     """Query multiple collections and return context text + source metadata.
 
     Unlike ``retrieve_from_multiple_collections``, this function preserves
     chunk-level provenance (chunk ID, source hash, similarity score, and
-    full chunk text) alongside the joined context string.
+    full chunk text) alongside the joined context string.  The same
+    per-collection depth and character budgeting apply.
 
     Args:
         query: The search query.
         collection_names: ChromaDB collection names to query.
         top_k: Total number of top results across all collections. If None,
-            uses the RAG_TOP_K env var (default 20).
+            uses ``RAG_TOP_K`` scaled by the available context budget.
+        max_chars: Hard cap on the returned joined context_text length in
+            characters.  If None, derived from the context budget.
 
     Returns:
         Dict with ``context_text`` (str) and ``sources`` (list of dicts
         each containing chunk_id, source_hash, score, and text).
     """
-    if top_k is None:
-        top_k = env_int('RAG_TOP_K', RAG_TOP_K_DEFAULT)
-
+    per_coll_k = _per_collection_top_k(top_k)
     all_results = []
 
     for coll_name in collection_names:
         try:
-            results = retrieve_with_scores(query, coll_name, top_k=3)
+            results = retrieve_with_scores(query, coll_name, top_k=per_coll_k)
             all_results.extend(results)
         except Exception as e:
             logger.warning("Failed to query collection '%s': %s", coll_name, str(e))
@@ -343,10 +396,26 @@ def retrieve_from_multiple_collections_with_sources(
         return {"context_text": "", "sources": []}
 
     all_results.sort(key=lambda r: r.get('score', 0.0), reverse=True)
-    top_results = all_results[:top_k]
+    total_top_k_max = env_int('RAG_TOP_K', RAG_TOP_K_DEFAULT)
+    top_results = all_results[:total_top_k_max]
+
+    # Enforce character budget so the merged context actually fits in the
+    # model's context window, keeping the highest-relevance chunks.
+    if max_chars is None:
+        from src.services.rag_budget import get_context_budget_chars
+        max_chars = get_context_budget_chars()
+    kept_results = []
+    running = 0
+    for r in top_results:
+        doc = r.get('document', '') or ''
+        doc_len = len(doc)
+        if running + doc_len > max_chars:
+            break
+        kept_results.append(r)
+        running += doc_len
 
     sources = []
-    for r in top_results:
+    for r in kept_results:
         metadata = r.get('metadata', {}) if isinstance(r.get('metadata'), dict) else {}
         sources.append({
             'chunk_id': metadata.get('chunk_id', ''),
@@ -355,5 +424,5 @@ def retrieve_from_multiple_collections_with_sources(
             'text': r.get('document', ''),
         })
 
-    context_text = "\n\n".join(r['document'] for r in top_results)
+    context_text = "\n\n".join(r['document'] for r in kept_results)
     return {"context_text": context_text, "sources": sources}

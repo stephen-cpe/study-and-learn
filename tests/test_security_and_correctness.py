@@ -538,8 +538,10 @@ class TestChunkIdInMetadata:
 
         metadatas = mock_collection.add.call_args.kwargs.get('metadatas')
         assert metadatas is not None
-        assert metadatas[0]['chunk_id'] == 'chunk_0'
-        assert metadatas[1]['chunk_id'] == 'chunk_1'
+        # chunk_id is namespaced with the collection name so chunks from
+        # different files never collide in the cross-module dedup filter.
+        assert metadatas[0]['chunk_id'] == 'test_coll:chunk_0'
+        assert metadatas[1]['chunk_id'] == 'test_coll:chunk_1'
 
     @patch('src.services.vector_store.get_chroma_client')
     def test_merges_with_caller_metadata(self, mock_client):
@@ -559,15 +561,16 @@ class TestChunkIdInMetadata:
 
         metadatas = mock_collection.add.call_args.kwargs.get('metadatas')
         assert metadatas[0]['source_hash'] == 'aaa'
-        assert metadatas[0]['chunk_id'] == 'chunk_0'
+        assert metadatas[0]['chunk_id'] == 'test_coll:chunk_0'
         assert metadatas[1]['source_hash'] == 'bbb'
-        assert metadatas[1]['chunk_id'] == 'chunk_1'
+        assert metadatas[1]['chunk_id'] == 'test_coll:chunk_1'
 
     @patch("src.services.vector_store.get_chroma_client")
     def test_rebuild_path_enriches_metadata(self, mock_client_factory):
         """The on-the-fly rebuild path in rag_retriever must produce
         metadata with chunk_id after passing through store_chunks."""
         from src.services.rag_retriever import build_rag_context_from_hashes
+        from src.services.vector_store import get_collection_name
 
         h = "a" * 64
         mock_collection = MagicMock()
@@ -597,8 +600,11 @@ class TestChunkIdInMetadata:
 
         metadatas = mock_collection.add.call_args.kwargs.get('metadatas')
         assert metadatas is not None
+        coll = get_collection_name(h)
         for i, m in enumerate(metadatas):
-            assert m['chunk_id'] == f'chunk_{i}'
+            # chunk_id must be namespaced with the collection so the
+            # cross-module dedup filter matches chunks uniquely per file.
+            assert m['chunk_id'] == f'{coll}:chunk_{i}'
 
     def test_exclude_chunks_filters_when_chunk_id_present(self):
         """With chunk_id in metadata, exclude_chunks must actually filter."""

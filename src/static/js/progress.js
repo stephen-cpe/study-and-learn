@@ -70,14 +70,19 @@
     var STALE_TIMEOUT_MS = 120000;
     var processErrorShownAt = 0;
     var PROCESS_ERROR_STICKY_MS = 8000;
+    var _lastPct = 0;
+    var _lastActivityAt = Date.now();  // reset whenever pct changes
 
     _processPollInterval = setInterval(function () {
       var elapsed = Date.now() - startTime;
-      if (elapsed > STALE_TIMEOUT_MS) {
-        window.stopProcessProgressPoll();
+      var idleMs = Date.now() - _lastActivityAt;
+      // Stale hint only when the task has gone quiet for a while.  It is a
+      // transient *hint*, not a permanent overwrite — as soon as the next
+      // real progress update arrives it is replaced.
+      if (elapsed > STALE_TIMEOUT_MS && idleMs > 30000) {
         window.setBubblePersistent('This is taking longer than expected \u2014 hang tight!');
-        window.showBubbleBar(50);
-        return;
+        window.showBubbleBar(_lastPct >= 0 ? _lastPct : 50);
+        // keep polling; do NOT return, so the very next real update replaces it
       }
       fetch('/progress?task_id=' + encodeURIComponent(taskId))
         .then(function (r) { return r.json(); })
@@ -98,12 +103,20 @@
           if (data.mascot_state === 'error') {
             processErrorShownAt = Date.now();
           }
+
+          // Real activity — reset the idle clock so the stale hint clears.
+          var pct = (typeof data.pct === 'number') ? data.pct : _lastPct;
+          if (pct !== _lastPct) { _lastActivityAt = Date.now(); }
+          _lastPct = pct;
+
           window.setBubblePersistent(data.mascot || 'Processing your materials...');
-          window.showBubbleBar(data.pct);
-          // Map busy → variant A/B/C by progress % (same as generate poll)
+          window.showBubbleBar(pct);
+          // Map busy → variant A/B/C by progress % (same as generate poll).
+          // Always force a busy/happy/error state while the task is running
+          // so the sprite never falls back to idle mid-process.
           var procState = data.mascot_state || 'busy';
           if (procState === 'busy') {
-            var procPct = data.pct || 0;
+            var procPct = pct;
             if (procPct >= 75) procState = 'busyC';
             else if (procPct >= 40) procState = 'busyB';
           }
@@ -157,6 +170,9 @@
     // away manually; the poll will simply stop without redirecting.
     var HARD_TIMEOUT_MS = 7200000;
 
+    var _lastGenPct = 0;
+    var _lastActivityAt = Date.now();  // reset whenever pct changes, below
+
     // Two parallel polls, two different purposes:
     //
     // (A) ``/progress?task_id=<taskId>`` polls the legacy
@@ -189,11 +205,15 @@
 
     _progressInterval = setInterval(function () {
       var elapsed = Date.now() - startTime;
+      var idleMs = Date.now() - _lastActivityAt;
 
-      if (!_receivedValidProgress && elapsed > STALE_TIMEOUT_MS && !_progressTimedOut) {
+      // Stale hint only when we have never received any progress AND the
+      // task has gone quiet for a while.  It is a transient hint — the very
+      // next real cosmetic update replaces it, so it never gets stuck.
+      if (!_receivedValidProgress && elapsed > STALE_TIMEOUT_MS && idleMs > 30000 && !_progressTimedOut) {
         _progressTimedOut = true;
         window.setBubblePersistent('This is taking longer than expected \u2014 hang tight!');
-        window.showBubbleBar(50);
+        window.showBubbleBar(_lastGenPct >= 0 ? _lastGenPct : 50);
         // Don't return — keep polling both signals.
       }
 
@@ -223,6 +243,12 @@
           if (!data) return;
           if (data.stage === undefined || data.stage < 0) return;
           _receivedValidProgress = true;
+
+          // Real activity — reset the idle clock so the stale hint clears.
+          var pctNow = (typeof data.pct === 'number') ? data.pct : _lastGenPct;
+          if (pctNow !== _lastGenPct) { _lastActivityAt = Date.now(); }
+          _lastGenPct = pctNow;
+
           // Sticky-error: if we showed an error recently, ignore
           // non-error cosmetic updates until the sticky window
           // expires. This prevents a background worker (e.g. TTS
@@ -246,14 +272,16 @@
             _errorShownAt = Date.now();
           }
           window.setBubblePersistent(data.mascot || 'Working on your lesson...');
-          window.showBubbleBar(data.pct || 0);
+          window.showBubbleBar(pctNow);
           if (data.mascot_state) {
             // Map busy → variant A/B/C by progress % so the 45-90 min
             // generation doesn't look frozen on one loop.  The backend
             // only sends 'busy'; the variant is a client-side refinement.
+            // Always force a busy/happy/error state while generation runs
+            // so the sprite never falls back to idle mid-task.
             var state = data.mascot_state;
             if (state === 'busy') {
-              var pct = data.pct || 0;
+              var pct = pctNow;
               if (pct >= 75) state = 'busyC';
               else if (pct >= 40) state = 'busyB';
               else state = 'busy';

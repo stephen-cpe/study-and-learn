@@ -22,12 +22,12 @@ GENERATE_STAGES = [
 PROCESS_STAGES = [
     {"stage": 0, "label": "Uploading files",          "pct": 0,   "mascot": "Receiving files...", "mascot_state": "busy"},
     {"stage": 1, "label": "Parsing documents",         "pct": 10,  "mascot": "Parsing docs...", "mascot_state": "busy"},
-    {"stage": 2, "label": "OCR scanning pages",        "pct": 25,  "mascot": "OCR scan...", "mascot_state": "busy"},
-    {"stage": 3, "label": "Analyzing figures",         "pct": 40,  "mascot": "Analyzing figs...", "mascot_state": "busy"},
-    {"stage": 4, "label": "Building knowledge index",  "pct": 55,  "mascot": "Building index...", "mascot_state": "busy"},
-    {"stage": 5, "label": "Generating summary",        "pct": 70,  "mascot": "Summarizing...", "mascot_state": "busy"},
-    {"stage": 6, "label": "Checking relevance",        "pct": 80,  "mascot": "Relevance check...", "mascot_state": "busy"},
-    {"stage": 7, "label": "Creating study path",       "pct": 90,  "mascot": "Building path...", "mascot_state": "busy"},
+    {"stage": 2, "label": "OCR scanning pages",        "pct": 20,  "mascot": "OCR scan...", "mascot_state": "busy"},
+    {"stage": 3, "label": "Analyzing figures",         "pct": 32,  "mascot": "Analyzing figs...", "mascot_state": "busy"},
+    {"stage": 4, "label": "Building knowledge index",  "pct": 42,  "mascot": "Building index...", "mascot_state": "busy"},
+    {"stage": 5, "label": "Reading all pages",         "pct": 55,  "mascot": "Reading through every section...", "mascot_state": "busy"},
+    {"stage": 6, "label": "Checking relevance",        "pct": 85,  "mascot": "Relevance check...", "mascot_state": "busy"},
+    {"stage": 7, "label": "Creating study path",       "pct": 93,  "mascot": "Building path...", "mascot_state": "busy"},
     {"stage": 8, "label": "Complete",                  "pct": 100, "mascot": "All done, {name}!", "mascot_state": "happy"},
 ]
 

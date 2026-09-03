@@ -77,7 +77,7 @@ def test_process_stages_labels():
     assert PROCESS_STAGES[2]['label'] == 'OCR scanning pages'
     assert PROCESS_STAGES[3]['label'] == 'Analyzing figures'
     assert PROCESS_STAGES[4]['label'] == 'Building knowledge index'
-    assert PROCESS_STAGES[5]['label'] == 'Generating summary'
+    assert PROCESS_STAGES[5]['label'] == 'Reading all pages'
     assert PROCESS_STAGES[6]['label'] == 'Checking relevance'
     assert PROCESS_STAGES[7]['label'] == 'Creating study path'
     assert PROCESS_STAGES[8]['label'] == 'Complete'
@@ -140,9 +140,9 @@ def test_update_progress_process_stages():
     update_progress(task_id, 5)
     progress = get_progress(task_id)
     assert progress['stage'] == 5
-    assert progress['pct'] == 70
-    assert progress['label'] == 'Generating summary'
-    assert progress['mascot'] == 'Summarizing...'
+    assert progress['pct'] == 55
+    assert progress['label'] == 'Reading all pages'
+    assert progress['mascot'] == 'Reading through every section...'
 
 
 def test_update_progress_bounds():

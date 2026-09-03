@@ -84,23 +84,48 @@ def _resolve_filenames() -> List[str]:
     return _db_get_filenames(current_user) or []
 
 
+def _resolve_content_digest(path_id: Optional[str] = None) -> str:
+    """Return the full-coverage document digest, preferring session, then DB.
+
+    The digest is produced at processing time by the map-reduce pipeline and
+    stored on the StudyPath.  Lesson generation reuses it so the LLM is
+    grounded in the entire document without re-running the map step.
+    """
+    from src.models import StudyPath
+    digest = session.get('content_digest', '')
+    if digest:
+        return digest
+    if path_id:
+        path = StudyPath.query.filter_by(
+            id=path_id, user_id=current_user.id
+        ).first()
+        if path and path.content_digest:
+            return path.content_digest
+    path = get_most_recent_active_path(current_user)
+    return path.content_digest if path and path.content_digest else ''
+
+
 def _build_retriever(
     goal: str,
     texts: List[str],
     hashes: List[str],
     file_names: List[str] = None,
+    content_digest: str = "",
 ) -> Any:
     """Build the correct retriever (hashed or flat-text) for the current state.
 
     When both ``hashes`` and ``file_names`` are available, uses a
     sources-aware retriever that includes resolved filenames in the
-    source citation metadata.
+    source citation metadata.  ``content_digest`` (if present) is prepended
+    to every query result so the lesson generator is grounded in the full
+    document, not only the retrieved chunks.
 
     Args:
         goal: The learning goal for context queries.
         texts: Extracted flat text content.
         hashes: SHA-256 file hashes for content-keyed ChromaDB lookups.
         file_names: Original filenames (one per hash) for display.
+        content_digest: Full-coverage digest produced at processing time.
 
     Returns:
         A callable retriever that accepts a query string and returns a
@@ -112,7 +137,9 @@ def _build_retriever(
         make_retriever_from_hashes_with_names,
     )
     if hashes and file_names:
-        return make_retriever_from_hashes_with_names(goal, hashes, file_names)
+        return make_retriever_from_hashes_with_names(
+            goal, hashes, file_names, content_digest=content_digest
+        )
     if hashes:
         return make_retriever_from_hashes(goal, hashes)
     return make_retriever(goal, texts)

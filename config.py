@@ -66,6 +66,9 @@ class Config:
     OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", OLLAMA_MODEL_CLOUD_DEFAULT)
     OLLAMA_TIMEOUT = _int(os.environ.get("OLLAMA_TIMEOUT"), OLLAMA_TIMEOUT_DEFAULT)
     OLLAMA_NUM_CTX = _int(os.environ.get("OLLAMA_NUM_CTX"), OLLAMA_NUM_CTX_DEFAULT)
+    # RAG coverage scales with OLLAMA_NUM_CTX: the retrieval character budget
+    # is derived from the context window (minus a reserved prompt/output
+    # fraction), so a 256K/1M model automatically retrieves more chunks.
     RAG_TOP_K = _int(os.environ.get("RAG_TOP_K"), RAG_TOP_K_DEFAULT)
 
     # ── Local Ollama (alternative backend) ──────────────────────────────

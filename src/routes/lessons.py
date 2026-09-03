@@ -29,6 +29,7 @@ from src.repositories.lesson_repo import (
 from src.routes import PASS_THRESHOLD, bp
 from src.routes._helpers import (
     _build_retriever,
+    _resolve_content_digest,
     _resolve_filenames,
     _resolve_goal,
     _resolve_hashes,
@@ -82,7 +83,11 @@ def generate_lessons():
     extracted_texts = _resolve_texts()
     file_hashes_data = _resolve_hashes()
     file_names_data = _resolve_filenames()
-    retriever = _build_retriever(learning_goal, extracted_texts, file_hashes_data, file_names_data)
+    content_digest = _resolve_content_digest(path_id=path_id_val)
+    retriever = _build_retriever(
+        learning_goal, extracted_texts, file_hashes_data, file_names_data,
+        content_digest=content_digest,
+    )
 
     tts_enabled = getattr(current_user, 'tts_enabled', False)
     tts_speaker = getattr(current_user, 'tts_speaker', DEFAULT_TTS_SPEAKER) or DEFAULT_TTS_SPEAKER
@@ -234,6 +239,7 @@ def generate_lessons():
         path = StudyPath.query.filter_by(user_id=current_user.id, status=PATH_STATUS_ACTIVE).order_by(StudyPath.created_at.desc()).first()
     if path:
         path.extracted_texts = None
+        path.content_digest = None
         db.session.commit()
 
     flash(f'Generated {len(modules)} lessons successfully!', 'success')
@@ -596,7 +602,9 @@ def retake_lesson(module_index):
     texts = _resolve_texts()
     hashes_data = _resolve_hashes()
     names_data = _resolve_filenames()
-    retriever = _build_retriever(goal, texts, hashes_data, names_data)
+    retake_digest = _resolve_content_digest(path_id=path_id)
+    retriever = _build_retriever(goal, texts, hashes_data, names_data,
+                                 content_digest=retake_digest)
 
     difficulty = lesson.get('difficulty', DEFAULT_DIFFICULTY)
     tts_enabled = lesson.get('tts_enabled', False)

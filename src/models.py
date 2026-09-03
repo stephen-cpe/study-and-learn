@@ -92,6 +92,11 @@ class StudyPath(db.Model):
     extracted_texts = db.Column(db.Text, nullable=True)
     file_hashes = db.Column(db.Text, nullable=True)
     file_names = db.Column(db.Text, nullable=True)
+    # Full-coverage map-reduce digest of every extracted chunk, stored at
+    # processing time and reused by lesson generation so the LLM is grounded
+    # in the entire document rather than only the retrieved chunks.  Cleared
+    # after lesson generation (same lifecycle as extracted_texts).
+    content_digest = db.Column(db.Text, nullable=True)
     generation_completed_at = db.Column(DateTime, nullable=True)
     created_at = db.Column(DateTime, default=_utcnow)
     updated_at = db.Column(DateTime, default=_utcnow, onupdate=_utcnow)

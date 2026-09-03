@@ -43,6 +43,7 @@ CREATE TABLE study_paths (
     extracted_texts        TEXT         NULL,
     file_hashes            TEXT         NULL,
     file_names             TEXT         NULL,
+    content_digest         TEXT         NULL,
     generation_completed_at TIMESTAMP   NULL,
     created_at             TIMESTAMP    NULL,
     updated_at             TIMESTAMP    NULL,
@@ -105,7 +106,7 @@ CREATE TABLE alembic_version (
     CONSTRAINT pk_alembic_version PRIMARY KEY (version_num)
 );
 
-INSERT INTO alembic_version (version_num) VALUES ('f6a7b8c9d0e1');
+INSERT INTO alembic_version (version_num) VALUES ('g7h8i9j0k1l2');
 
 -- 6. Seed users (development only -- not for production)
 --

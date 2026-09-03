@@ -31,6 +31,14 @@ def env_int(name: str, fallback: int) -> int:
         return fallback
 
 
+def env_float(name: str, fallback: float) -> float:
+    """Read float env var *name* at CALL time, or *fallback* if unset/invalid."""
+    try:
+        return float(os.environ[name])
+    except (KeyError, TypeError, ValueError):
+        return fallback
+
+
 # ── Named call-time defaults ────────────────────────────────────────────
 # The local and cloud chat-model defaults are intentionally different: a
 # small CPU model for local dev, a cloud-served model when OLLAMA_MODEL
@@ -45,3 +53,16 @@ RAG_TOP_K_DEFAULT = 20
 EMBEDDING_MODEL_DEFAULT = "qwen3-embedding:0.6b"
 OCR_MODEL_DEFAULT = "glm-ocr"
 VISION_MODEL_DEFAULT = "glm-5.3-flash:cloud"
+
+# ── RAG retrieval / coverage budget defaults ─────────────────────────────
+# These control how much of the uploaded document actually reaches the LLM.
+# They are read at CALL time so tests can monkeypatch env vars and so the
+# defaults scale automatically with OLLAMA_NUM_CTX (see rag_budget.py).
+RAG_PER_COLLECTION_TOP_K_DEFAULT = 12
+# Hard ceiling on retrieved-context chars.  Derived from OLLAMA_NUM_CTX when
+# unset (see rag_budget.get_context_budget_chars).  Set RAG_MAX_CONTEXT_CHARS
+# explicitly to force a smaller budget regardless of the model's window.
+RAG_MAX_CONTEXT_CHARS_DEFAULT = 120000
+SUMMARY_MAP_ENABLED_DEFAULT = True       # ``RAG_SUMMARY_MAP`` env toggle
+SUMMARY_MAP_MAX_SECTION_CHARS_DEFAULT = 6000
+SUMMARY_MAP_MAX_SECTIONS_DEFAULT = 80

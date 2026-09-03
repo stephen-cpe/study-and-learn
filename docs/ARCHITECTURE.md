@@ -27,9 +27,14 @@ The application follows a service-oriented web architecture that separates HTTP 
 1. **Ingestion & Deduplication:** An authenticated user submits a learning goal and up to five files. The system computes SHA-256 hashes to bypass redundant processing for previously seen documents.
 2. **Extraction & OCR:** Text is extracted via standard parsers. If documents are scanned or image-based, an AI-powered local OCR pipeline extracts text, tables, and figures.
 3. **RAG Indexing:** Extracted text is chunked, embedded, and stored in content-addressed vector collections.
-4. **AI Analysis:** The system generates a summary and performs a relevance check. Weak matches gate further generation to save compute and prevent hallucinations — relevance gating blocks lesson generation for documents that do not match the learning goal, avoiding hallucinated study paths.
-5. **Lesson Generation:** For valid matches, the system sequentially generates slide decks, inline checkpoints, and mixed-type quizzes. Opt-in TTS narration is generated asynchronously in a background worker.
-6. **Interactive Learning:** Learners navigate the custom slide deck. Progression is gated by an 80% pass threshold on final quizzes.
+4. **Full-Coverage Map Step ("reading" the whole document):** Every extracted chunk is summarized in reading order into a concatenated *document digest* (bounded sections; per-section LLM failure degrades to verbatim text so coverage is never silently lost). This guarantees the model is grounded in **all** of the document, not only the chunks similarity search surfaces. Toggleable via `RAG_SUMMARY_MAP`; section size/count and the digest/retrieval split scale with the context window.
+5. **AI Analysis:** The digest + a token-budget-sized retrieved context are combined into the prompt for the summary, relevance check, and curriculum. Weak matches gate further generation to save compute and prevent hallucinations — relevance gating blocks lesson generation for documents that do not match the learning goal.
+6. **Lesson Generation:** For valid matches, the system sequentially generates slide decks, inline checkpoints, and mixed-type quizzes, each grounded in the cached digest plus per-module budgeted retrieval (cross-module chunk dedup still applies). Opt-in TTS narration is generated asynchronously in a background worker.
+7. **Interactive Learning:** Learners navigate the custom slide deck. Progression is gated by an 80% pass threshold on final quizzes.
+
+### Context-Window-Aware Retrieval Budget
+The number of chunks and the total context characters delivered to the LLM are derived from `OLLAMA_NUM_CTX` (the model's context window) minus a reserved prompt/output fraction (`rag_budget.py`). `RAG_MAX_CONTEXT_CHARS` (default ~120 000 chars) is a hard ceiling. Selecting a 256 K or 1 M context model automatically raises the retrieval budget roughly 2×/8× with no code change. The results page reports a *document coverage* percentage so users can verify how much of their material actually reached the model.
+
 
 ---
 
@@ -133,9 +138,9 @@ On-disk deduplication is enforced at the upload layer: files are saved with a ha
 ### 5.2 Source Provenance Pipeline & Cross-Module Chunk Dedup
 A common failure mode in RAG systems is "lost provenance," where retrieved text is stripped of its metadata before reaching the LLM. A pipeline preserves chunk-level metadata (source hash, filename, chunk ID) through the LangChain retriever, into the lesson JSON, and finally to the frontend. This allows the "View Sources" modal to display exact document excerpts with zero risk of LLM hallucination.
 
-To prevent content repetition across modules, a cross-module chunk dedup mechanism tracks which chunk IDs have been used by earlier modules. When generating lesson N+1, the retriever excludes chunks already consumed by modules 1..N, forcing each module to cover different document content. This directly addresses the problem of modules overlapping or repeating verbatim. The `chunk_id` field is injected into each chunk's metadata by `store_chunks` at storage time, ensuring the dedup filter has the metadata it needs to match against.
+To prevent content repetition across modules, a cross-module chunk dedup mechanism tracks which chunk IDs have been used by earlier modules. When generating lesson N+1, the retriever excludes chunks already consumed by modules 1..N, forcing each module to cover different document content. `chunk_id` is namespaced by collection (`<collection>:chunk_N`) at storage time so identical positions in different files never collide in the filter.
 
-The RAG retrieval depth is configurable via the `RAG_TOP_K` environment variable (default 20 chunks per retrieval). The processing route uses a higher value (40) for summary and curriculum generation to give the model a broader view of the document's scope when deciding how many modules to create.
+The RAG retrieval depth is context-window-aware: `rag_budget.get_top_k_for_budget()` and `get_context_budget_chars()` derive per-collection depth and the character ceiling from `OLLAMA_NUM_CTX` (default 131072 / 128K tokens) with a hard cap from `RAG_MAX_CONTEXT_CHARS` (default ~120K chars). The processing route additionally runs a **full-coverage map step** (`build_full_coverage_context`) that summarizes every extracted chunk into a `content_digest` (persisted on `StudyPath`, reused by lesson generation), combining it with budget-sized retrieval so the model grounds lessons in the entire document. The results page surfaces a *coverage ratio* badge showing how much extracted text was delivered to the model.
 
 ### 5.3 Configurable Context Window & JSON Mode
 The local Ollama API context window is configurable via the `OLLAMA_NUM_CTX` environment variable (default 131072, i.e. 128K tokens). This works across all Ollama Cloud models, which range from 128K to 1M context windows. The value controls how much document text the model can process per call.
