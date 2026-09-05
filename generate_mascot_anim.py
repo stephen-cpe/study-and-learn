@@ -62,7 +62,7 @@ EYE_LEFT = (305, 290, 360, 357)
 EYE_RIGHT = (453, 289, 505, 357)
 CHEST_YELLOW = (360, 475, 378, 490)
 CHEST_BLUE = (394, 475, 413, 490)
-CHEST_GREEN = (425, 444, 444, 491)
+CHEST_GREEN = (425, 475, 444, 490)
 CHEST_LIGHTS = [
     ('yellow', CHEST_YELLOW),
     ('blue', CHEST_BLUE),
@@ -580,10 +580,10 @@ def save_individual_frames(frames: list[Image.Image], prefix: str,
 def build_idle_frames(base: Image.Image) -> list[Image.Image]:
     """14 unique frames – sway + chest LED chase + 3-frame blink + pulse.
 
-    The blink is staged like the original GIF: wink (one eye half-close)
-    → full dark (both eyes, screen-off look) → half-gray recovery → open.
-    This reads as a natural blink at 120px, unlike the old single-frame
-    wink which looked like a twitch.
+    The blink is symmetric: both eyes half-close → full dark (both
+    eyes, screen-off look) → half-gray recovery → open.  This reads as
+    a natural blink at 120px, unlike a single-eye wink which looks
+    like a twitch.
     """
     n = IDLE_FRAMES
     frames: list[Image.Image] = []
@@ -595,12 +595,12 @@ def build_idle_frames(base: Image.Image) -> list[Image.Image]:
             frame = antenna_glow(frame, 1.35)
         # 3-frame blink sequence (frames 8-10)
         if i == 8:
-            # wink: right eye lower half gray
+            # half-close: both eyes bottom half gray (matches frame 10)
             img = frame.copy()
             draw = ImageDraw.Draw(img)
-            x0, y0, x1, y1 = EYE_RIGHT
-            cut = y0 + (y1 - y0) // 2
-            draw.rectangle((x0, cut, x1, y1), fill=HALF_EYE_GRAY)
+            for (x0, y0, x1, y1) in (EYE_LEFT, EYE_RIGHT):
+                cut = y0 + (y1 - y0) // 2
+                draw.rectangle((x0, cut, x1, y1), fill=HALF_EYE_GRAY)
             frame = img
         elif i == 9:
             # full close: both eyes dark (screen-off)
@@ -668,7 +668,9 @@ def build_happy_frames(base: Image.Image) -> list[Image.Image]:
     (sy 0.88, like crouching before a jump), then a bouncy hop with
     rising particles, then a land squash.  Sparkles are small diamond
     dots (NOT plus-shaped — a plus reads as a sniper crosshair at 120px).
-    All three chest lights brighten during the hop.
+    All three chest lights stay on during the hop with a running chase
+    (active light boosted brighter, others still bright) so the chest
+    reads as blinking/running, not static.
     """
     pose = [
         # (dy, sx, sy, sparkle_phase)
@@ -692,7 +694,12 @@ def build_happy_frames(base: Image.Image) -> list[Image.Image]:
     for i, (dyi, sxi, syi, sph) in enumerate(pose):
         frame = base.copy()
         frame = recolor_eyes(frame, (45, 235, 100))
-        frame = all_chest_on(frame, boost=1.45)
+        # Running chest lights: all stay bright (celebration), but the
+        # active light pops brighter each frame so the chest visibly
+        # chases instead of sitting static.
+        chase_order = ('yellow', 'blue', 'green')
+        frame = chest_cycle(frame, chase_order[i % 3],
+                            dim_factor=1.25, boost=1.6)
         if sph:
             frame = add_rising_particles(frame, sph, count=5)
         if i in (3, 5):

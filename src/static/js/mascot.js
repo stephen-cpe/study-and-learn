@@ -122,8 +122,15 @@
     var mascot = document.getElementById('robot-mascot');
     if (!mascot) return;
 
-    var normalized = (state || 'idle').toLowerCase();
-    if (VALID_MASCOT_STATES.indexOf(normalized) === -1) {
+    var rawState = (state || 'idle');
+    var normalized = null;
+    for (var v = 0; v < VALID_MASCOT_STATES.length; v++) {
+      if (VALID_MASCOT_STATES[v].toLowerCase() === rawState.toLowerCase()) {
+        normalized = VALID_MASCOT_STATES[v];
+        break;
+      }
+    }
+    if (normalized === null) {
       normalized = 'idle';
     }
     if (_currentMascotState === normalized) return;
