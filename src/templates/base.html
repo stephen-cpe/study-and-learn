@@ -22,6 +22,16 @@
             {% if current_user.is_authenticated %}
             <div class="d-flex align-items-center gap-3">
                 <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-primary btn-sm nav-dashboard-btn">Dashboard</a>
+                <div class="dropdown" id="task-bell-wrap">
+                    <button type="button" class="task-bell-btn" id="task-bell-btn"
+                            data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Background tasks" aria-label="Notifications">
+                        <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24" focusable="false" aria-hidden="true"><path d="M16 19a4 4 0 11-8 0H4.765C3.21 19 2.25 17.304 3.05 15.97l1.806-3.01A1 1 0 005 12.446V8a7 7 0 0114 0v4.446c0 .181.05.36.142.515l1.807 3.01c.8 1.333-.161 3.029-1.716 3.029H16ZM12 3a5 5 0 00-5 5v4.446a3 3 0 01-.428 1.543L4.765 17h14.468l-1.805-3.01A3 3 0 0117 12.445V8a5 5 0 00-5-5Zm-2 16a2 2 0 104 0h-4Z"></path></svg>
+                        <span class="task-bell-badge" id="task-bell-badge" style="display: none;">0</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end retro-dropdown-menu task-bell-menu" id="task-bell-menu" aria-labelledby="task-bell-btn">
+                        <li><span class="dropdown-item-text text-muted">No background tasks.</span></li>
+                    </ul>
+                </div>
                 <div class="dropdown">
                     <a href="#" class="user-avatar-toggle d-flex align-items-center" data-bs-toggle="dropdown" aria-expanded="false">
                         <img src="{{ url_for('static', filename='images/avatars/' ~ current_user.avatar) }}" alt="User Avatar" class="user-avatar">
@@ -138,6 +148,131 @@
           modalEl.addEventListener('hidden.bs.modal', function () {
             pendingForm = null;
           });
+        });
+      })();
+    </script>
+    <script>
+      // Navbar task bell (Phase 1): lightweight ~15s poll of GET /tasks.
+      // Shows unread finished tasks (ready/failed) as a badge; each row
+      // deep-links to its result_url and marks itself read on click.
+      // Per-page 2s pollers keep doing live detail — the bell is the
+      // durable cross-tab signal. Auth-gated: no bell markup when logged out.
+          (function () {
+            var POLL_MS = 15000;
+            function render(tasks, unread) {
+          var badge = document.getElementById('task-bell-badge');
+          var menu = document.getElementById('task-bell-menu');
+          if (!badge || !menu) return;
+          if (unread > 0) {
+            badge.style.display = '';
+            badge.textContent = String(unread > 9 ? '9+' : unread);
+          } else {
+            badge.style.display = 'none';
+          }
+          menu.innerHTML = '';
+
+          function refresh() {
+            fetch('/tasks', { headers: { 'Accept': 'application/json' } })
+              .then(function (r) { return r.ok ? r.json() : null; })
+              .then(function (data) {
+                if (data) render(data.tasks || [], data.unread || 0);
+              })
+              .catch(function () {});
+          }
+
+          var header = document.createElement('li');
+          header.className = 'task-bell-header';
+          var title = document.createElement('span');
+          title.className = 'task-bell-header-title';
+          title.textContent = 'Notifications';
+          header.appendChild(title);
+          var hasFinished = tasks.some(function (t) { return t.status !== 'running'; });
+          if (hasFinished) {
+            var clearBtn = document.createElement('button');
+            clearBtn.type = 'button';
+            clearBtn.className = 'task-bell-clear';
+            clearBtn.textContent = 'Clear finished';
+            clearBtn.addEventListener('click', function (ev) {
+              ev.stopPropagation();
+              fetch('/tasks/clear', { method: 'POST' })
+                .catch(function () {})
+                .finally(refresh);
+            });
+            header.appendChild(clearBtn);
+          }
+          menu.appendChild(header);
+
+          if (!tasks.length) {
+            var empty = document.createElement('li');
+            empty.innerHTML = '<span class="dropdown-item-text text-muted">Nothing here yet.</span>';
+            menu.appendChild(empty);
+            return;
+          }
+          tasks.slice(0, 10).forEach(function (t) {
+            var li = document.createElement('li');
+            var stateIcon = t.status === 'ready' ? '✅' : (t.status === 'failed' ? '❌' : '⏳');
+            var fallback = t.kind === 'generate' ? 'Generate lessons' : 'Process materials';
+            var meta = t.status === 'ready' ? 'Finished — tap to open'
+              : (t.status === 'failed' ? (t.error || 'Did not finish') : 'Running…');
+
+            var row = document.createElement(t.result_url ? 'a' : 'span');
+            row.className = 'dropdown-item task-bell-row task-'
+              + (t.status === 'ready' ? 'done' : (t.status === 'failed' ? 'failed' : 'running'));
+            if (t.result_url) row.href = t.result_url;
+
+            var main = document.createElement('span');
+            main.className = 'task-bell-row-main';
+            var titleEl = document.createElement('span');
+            titleEl.className = 'task-bell-row-title';
+            titleEl.textContent = stateIcon + ' ' + (t.label || fallback);
+            var metaEl = document.createElement('span');
+            metaEl.className = 'task-bell-row-meta';
+            metaEl.textContent = meta;
+            main.appendChild(titleEl);
+            main.appendChild(metaEl);
+            row.appendChild(main);
+
+            if (t.status !== 'running') {
+              var x = document.createElement('button');
+              x.type = 'button';
+              x.className = 'task-bell-dismiss';
+              x.title = 'Dismiss';
+              x.setAttribute('aria-label', 'Dismiss notification');
+              x.textContent = '✕';
+              x.addEventListener('click', function (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                fetch('/tasks/' + encodeURIComponent(t.task_id) + '/dismiss', { method: 'POST' })
+                  .catch(function () {})
+                  .finally(refresh);
+              });
+              row.appendChild(x);
+            }
+            if (t.result_url) {
+              row.addEventListener('click', function (ev) {
+                ev.preventDefault();
+                var target = t.result_url || '/';
+                fetch('/tasks/' + encodeURIComponent(t.task_id) + '/read', { method: 'POST' })
+                  .catch(function () {})
+                  .finally(function () { window.location.href = target; });
+              });
+            }
+            li.appendChild(row);
+            menu.appendChild(li);
+          });
+        }
+        function poll() {
+          if (!document.getElementById('task-bell-btn')) return;
+          fetch('/tasks', { headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (data) {
+              if (data) render(data.tasks || [], data.unread || 0);
+            })
+            .catch(function () {});
+        }
+        document.addEventListener('DOMContentLoaded', function () {
+          poll();
+          setInterval(poll, POLL_MS);
         });
       })();
     </script>

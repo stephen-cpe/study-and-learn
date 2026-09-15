@@ -364,6 +364,10 @@ def _build_pdf(lesson, slides, quiz_questions, checkpoints, sources, score, now)
             pdf.set_font('Helvetica', 'B', 10)
             pdf.set_text_color(10, 22, 40)
             type_label = ' (Select all)' if qtype == 'multi_select' else ''
+            if qtype == 'ordering':
+                type_label = ' (Order 1-{})'.format(len(q.get('items', [])))
+            elif qtype == 'matching':
+                type_label = ' (Match pairs)'
             pdf.multi_cell(0, 5.5, _clean(f'Q: {q.get("prompt", "")}{type_label}'))
             answer_text = ''
             if qtype == 'mcq':
@@ -390,6 +394,25 @@ def _build_pdf(lesson, slides, quiz_questions, checkpoints, sources, score, now)
                         answer_text = opts[idx]
                 else:
                     answer_text = str(q.get('answer', ''))
+            elif qtype == 'ordering':
+                items = q.get('items', [])
+                order = q.get('answer_order', [])
+                try:
+                    sequenced = [items[i] for i in order if 0 <= i < len(items)]
+                except (TypeError, IndexError):
+                    sequenced = []
+                if sequenced:
+                    answer_text = ' > '.join(str(s) for s in sequenced)
+            elif qtype == 'matching':
+                lefts = q.get('lefts', [])
+                rights = q.get('rights', [])
+                indices = q.get('answer_indices', [])
+                pairs = []
+                for li, ri in enumerate(indices):
+                    if 0 <= li < len(lefts) and isinstance(ri, int) and 0 <= ri < len(rights):
+                        pairs.append(f'{lefts[li]} -> {rights[ri]}')
+                if pairs:
+                    answer_text = '; '.join(pairs)
             if answer_text:
                 pdf.set_x(pdf.l_margin)
                 pdf.set_font('Helvetica', 'B', 9)

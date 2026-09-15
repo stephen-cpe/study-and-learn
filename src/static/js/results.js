@@ -56,6 +56,8 @@
   document.addEventListener('DOMContentLoaded', function () {
     if (document.getElementById('summary-content')) {
       window.initResultsPage();
+      // Phase 0: resume the cosmetic poll if generation was in flight.
+      if (window.resumeBackgroundTask) window.resumeBackgroundTask();
     }
   });
 })();

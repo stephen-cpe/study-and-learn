@@ -649,3 +649,59 @@ class TestDeckEmitsPersistedCheckpointAnswers:
             body = c.get(f'/lessons/0?path_id={path_id}').get_data(
                 as_text=True)
         assert 'data-checkpoint-answers=' in body
+
+
+# ── Quiz inputs must survive server-side rendering ───────────────────────
+
+
+class TestDeckQuizInputsRendered:
+    def _quiz(self):
+        return {'questions': [
+            {'id': 'q1', 'type': 'mcq', 'prompt': 'MCQ?',
+             'options': ['A', 'B', 'C', 'D'], 'answer_index': 0,
+             'explanation': 'E'},
+            {'id': 'q2', 'type': 'true_false', 'prompt': 'TF?',
+             'answer': True, 'explanation': 'E'},
+            {'id': 'q3', 'type': 'multi_select', 'prompt': 'MS?',
+             'options': ['A', 'B', 'C', 'D'], 'answer_indices': [0, 1],
+             'explanation': 'E'},
+            {'id': 'q4', 'type': 'cloze_dropdown', 'prompt': 'Cloze ___.',
+             'options': ['A', 'B'], 'answer_index': 0, 'explanation': 'E'},
+            {'id': 'q5', 'type': 'ordering', 'prompt': 'Order.',
+             'items': ['A', 'B', 'C', 'D'], 'answer_order': [0, 1, 2, 3],
+             'explanation': 'E'},
+            {'id': 'q6', 'type': 'matching', 'prompt': 'Match.',
+             'lefts': ['L1', 'L2'], 'rights': ['R1', 'R2'],
+             'answer_indices': [0, 1], 'explanation': 'E'},
+        ]}
+
+    def test_all_quiz_inputs_present_in_deck_html(self, grade_client):
+        """Regression: every quiz type must render a submittable control.
+        The deck JS collects answers from these elements — a missing
+        control silently blocks submission ("Please answer all
+        questions")."""
+        from src.services.lesson_orchestrator import build_deck_layout
+        slides = [
+            {'type': 'title', 'title': 'T', 'subtitle': 'S'},
+            {'type': 'content', 'heading': 'H', 'bullets': ['a', 'b']},
+        ]
+        layout = build_deck_layout(slides, {})
+        app, user = grade_client
+        path_id = _seed_path(app, user, module_overrides=[{
+            'lesson': {'module_title': 'Module 1', 'slides': slides,
+                       'deck_layout': layout},
+            'quiz': self._quiz(),
+        }])
+        with app.test_client() as c:
+            c.post('/login', data={'username': 'gradetester',
+                                   'password': 'pass'})
+            body = c.get(f'/lessons/0?path_id={path_id}').get_data(
+                as_text=True)
+        assert 'type="radio"' in body
+        assert 'type="checkbox"' in body
+        assert 'cloze-select' in body
+        assert 'q-order-select' in body
+        assert 'q-matching-select' in body
+        # Ordering ranks are constrained dropdowns, never free input.
+        assert 'type="number"' not in body
+        assert 'q-order-rank' not in body

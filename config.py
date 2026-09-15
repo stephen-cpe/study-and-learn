@@ -14,7 +14,6 @@ import sys
 
 from config_defaults import (
     EMBEDDING_MODEL_DEFAULT,
-    OCR_MODEL_DEFAULT,
     OLLAMA_BASE_URL_DEFAULT,
     OLLAMA_CLOUD_BASE_URL_DEFAULT,
     OLLAMA_MODEL_CLOUD_DEFAULT,
@@ -73,7 +72,8 @@ class Config:
 
     # ── Local Ollama (alternative backend) ──────────────────────────────
     OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", OLLAMA_BASE_URL_DEFAULT)
-    OLLAMA_OCR_MODEL = os.environ.get("OLLAMA_OCR_MODEL", OCR_MODEL_DEFAULT)
+    # OCR and vision share one model (glm-5.3-flash:cloud). ``OLLAMA_OCR_MODEL``
+    # is no longer read — leftovers in old .env files are ignored.
     OLLAMA_VISION_MODEL = os.environ.get(
         "OLLAMA_VISION_MODEL", VISION_MODEL_DEFAULT
     )
@@ -82,6 +82,10 @@ class Config:
     )
 
     # ── OCR / vision pipeline ───────────────────────────────────────────
+    # Vision OCR is ON by default (OCR_FULL=true) but smart-gated per file:
+    # text-layer PDFs skip rendering + LLM calls (see vision_parser
+    #._pdf_needs_vision_ocr). Set OCR_FULL=false to force text-layer-only
+    # extraction everywhere (e.g. offline / zero-cost mode).
     OCR_MAX_IMAGE_DIMENSION = _int(
         os.environ.get("OCR_MAX_IMAGE_DIMENSION"), 2048
     )
@@ -91,9 +95,9 @@ class Config:
     OCR_TIMEOUT_PER_PAGE = _int(
         os.environ.get("OCR_TIMEOUT_PER_PAGE"), 120
     )
-    OCR_FULL = _bool(os.environ.get("OCR_FULL"))
+    OCR_FULL = _bool(os.environ.get("OCR_FULL"), True)
     OCR_FIGURE_DESCRIPTION = _bool(
-        os.environ.get("OCR_FIGURE_DESCRIPTION"), False
+        os.environ.get("OCR_FIGURE_DESCRIPTION"), True
     )
 
     # ── Poppler (cross-platform PDF rendering) ──────────────────────────

@@ -99,6 +99,47 @@ def progress():
     return jsonify(status)
 
 
+@bp.route('/tasks')
+@login_required
+def list_background_tasks():
+    """Return the user's durable background tasks + unread badge count."""
+    from src.services import background_tasks as _bt
+    tasks = _bt.list_tasks(current_user.id)
+    return jsonify({'tasks': tasks, 'unread': _bt.unread_count(current_user.id)})
+
+
+@bp.route('/tasks/<task_id>/read', methods=['POST'])
+@login_required
+def mark_background_task_read(task_id):
+    """Mark a background task as read (clears it from the bell badge)."""
+    from src.services import background_tasks as _bt
+    ok = _bt.mark_read(task_id, current_user.id)
+    if not ok:
+        return jsonify({'error': 'Task not found'}), 404
+    return jsonify({'success': True, 'unread': _bt.unread_count(current_user.id)})
+
+
+@bp.route('/tasks/<task_id>/dismiss', methods=['POST'])
+@login_required
+def dismiss_background_task(task_id):
+    """Delete one finished task so it disappears from the bell menu."""
+    from src.services import background_tasks as _bt
+    ok = _bt.dismiss_task(task_id, current_user.id)
+    if not ok:
+        return jsonify({'error': 'Task not found or still running'}), 404
+    return jsonify({'success': True, 'unread': _bt.unread_count(current_user.id)})
+
+
+@bp.route('/tasks/clear', methods=['POST'])
+@login_required
+def clear_background_tasks():
+    """Delete all finished tasks for the bell menu (running ones are kept)."""
+    from src.services import background_tasks as _bt
+    cleared = _bt.clear_finished(current_user.id)
+    return jsonify({'success': True, 'cleared': cleared,
+                    'unread': _bt.unread_count(current_user.id)})
+
+
 @bp.route('/mascot/line')
 @login_required
 def mascot_line():
@@ -168,6 +209,8 @@ def process():
     def _error(msg):
         if is_ajax:
             if task_id:
+                from src.services import background_tasks as _bt
+                _bt.fail_task(task_id, error=msg)
                 progress_tracker.cleanup_task(task_id)
             return jsonify({'error': msg}), 400
         flash(msg, 'error')
@@ -186,6 +229,10 @@ def process():
             stages=progress_tracker.PROCESS_STAGES,
             display_name=current_user.display_name,
         )
+        # Durable bell record (Phase 1): other tabs poll /tasks for this.
+        from src.services import background_tasks as _bt
+        _bt.create_task(task_id, current_user.id, kind='process',
+                        label=f"Processing: {goal[:80]}")
 
     upload_folder = current_app.config['UPLOAD_FOLDER']
     os.makedirs(upload_folder, exist_ok=True)
@@ -200,6 +247,8 @@ def process():
     for file in valid_files:
         if not allowed_file(file.filename):
             if is_ajax:
+                from src.services import background_tasks as _bt
+                _bt.fail_task(task_id, error=f'Invalid file type: {file.filename}')
                 progress_tracker.cleanup_task(task_id)
                 return jsonify({'error': f'Invalid file type: {file.filename}'}), 400
             flash(f'Skipping invalid file type: {file.filename}', 'warning')
@@ -255,6 +304,8 @@ def process():
                 if is_ajax and task_id:
                     progress_tracker.mark_error(task_id, mascot_msg="Couldn't read a file")
                 if is_ajax:
+                    from src.services import background_tasks as _bt
+                    _bt.fail_task(task_id, error=f'Error extracting {original_filename}: {str(e)}')
                     progress_tracker.cleanup_task(task_id)
                     return jsonify({'error': f'Error extracting {original_filename}: {str(e)}'}), 400
                 flash(f'Error extracting {original_filename}: {str(e)}', 'error')
@@ -276,6 +327,8 @@ def process():
             if is_ajax and task_id:
                 progress_tracker.mark_error(task_id, mascot_msg="Couldn't read a file")
             if is_ajax:
+                from src.services import background_tasks as _bt
+                _bt.fail_task(task_id, error=f'Error extracting {original_filename}: {str(e)}')
                 progress_tracker.cleanup_task(task_id)
                 return jsonify({'error': f'Error extracting {original_filename}: {str(e)}'}), 400
             flash(f'Error extracting {original_filename}: {str(e)}', 'error')
@@ -283,6 +336,8 @@ def process():
 
     if not extracted_texts:
         if is_ajax:
+            from src.services import background_tasks as _bt
+            _bt.fail_task(task_id, error='No valid files to process')
             progress_tracker.cleanup_task(task_id)
             return jsonify({'error': 'No valid files to process'}), 400
         flash('No valid files to process', 'error')
@@ -386,6 +441,9 @@ def process():
             if not current_user.can_start_new_lesson():
                 flash('You already have 3 active lessons. Complete or cancel one before starting a new one.', 'error')
                 if is_ajax:
+                    from src.services import background_tasks as _bt
+                    _bt.finish_task(task_id, result_url=url_for('main.dashboard'),
+                                    label='At cap — see dashboard')
                     progress_tracker.cleanup_task(task_id)
                     return jsonify({'redirect': url_for('main.dashboard')})
                 return redirect(url_for('main.dashboard'))
@@ -394,9 +452,15 @@ def process():
                               extracted_texts=extracted_texts,
                               file_hashes=file_hashes,
                               file_names=filenames,
-                              content_digest=content_digest or None)
+                              content_digest=content_digest or None,
+                              modules=study_path.get('modules'),
+                              summary=summary,
+                              relevance_result=relevance_result)
 
         if is_ajax:
+            from src.services import background_tasks as _bt
+            _bt.finish_task(task_id, result_url=url_for('main.results'),
+                            label=f"Results: {goal[:80]}")
             progress_tracker.update_progress(task_id, 8)
             progress_tracker.cleanup_task(task_id)
             return jsonify({'redirect': url_for('main.results')})
@@ -409,6 +473,8 @@ def process():
         if is_ajax and task_id:
             progress_tracker.mark_error(task_id, mascot_msg='Processing failed — please retry')
         if is_ajax:
+            from src.services import background_tasks as _bt
+            _bt.fail_task(task_id, error=str(e))
             progress_tracker.cleanup_task(task_id)
             return jsonify({'error': str(e)}), 500
         flash(str(e), 'error')
@@ -418,6 +484,8 @@ def process():
         if is_ajax and task_id:
             progress_tracker.mark_error(task_id, mascot_msg='Unexpected error — please retry')
         if is_ajax:
+            from src.services import background_tasks as _bt
+            _bt.fail_task(task_id, error='An unexpected error occurred. Please try again.')
             progress_tracker.cleanup_task(task_id)
             return jsonify({'error': 'An unexpected error occurred. Please try again.'}), 500
         flash('An unexpected error occurred. Please try again.', 'error')

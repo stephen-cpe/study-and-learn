@@ -352,3 +352,103 @@ def test_narration_script_last_module_congratulatory(monkeypatch):
     # The Results slot (last deck entry) is the outro of the deck contract.
     assert script[-1]['slide_index'] == layout[-1]['deck_index']
     assert 'congratulations' in script[-1]['text'].lower() or 'completing' in script[-1]['text'].lower()
+
+
+def test_lesson_prompt_instructs_latex_for_formulas(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    import src.services.lesson_generator as lg_module
+    captured_prompt = {}
+
+    def mock_call_ollama(prompt, model=None):
+        captured_prompt['prompt'] = prompt
+        return '{"module_title": "Math", "slides": [{"type": "title", "title": "Math", "subtitle": "Test"}]}'
+
+    monkeypatch.setattr(lg_module, 'call_ollama', mock_call_ollama)
+
+    generate_lesson("Algebra", "Learn algebra", None)
+    prompt = captured_prompt['prompt']
+    assert 'LaTeX' in prompt or 'latex' in prompt.lower()
+    assert '$...$' in prompt or '$E=mc^2$' in prompt
+
+
+def test_narration_prompt_forbids_latex(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    import src.services.lesson_generator as lg_module
+    from src.services.lesson_orchestrator import build_deck_layout
+    captured_prompt = {}
+
+    def mock_call_ollama(prompt, model=None):
+        captured_prompt['prompt'] = prompt
+        return json.dumps([
+            {'slide_index': -1, 'text': 'Hello Alice! Let us begin.'},
+            {'slide_index': 0, 'text': 'Welcome.'},
+            {'slide_index': 1, 'text': 'Quiz time.'},
+            {'slide_index': 2, 'text': 'Well done.'},
+        ])
+
+    monkeypatch.setattr(lg_module, 'call_ollama', mock_call_ollama)
+
+    slides = [{'type': 'title', 'title': 'Algebra', 'subtitle': 'Intro'}]
+    layout = build_deck_layout(slides, {})
+    generate_narration_script('Algebra', 'Alice', deck_layout=layout)
+    prompt = captured_prompt['prompt']
+    assert 'plain words' in prompt.lower()
+    assert 'NEVER emit LaTeX' in prompt
+
+
+def test_narration_prompt_includes_learner_memories(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    import src.services.lesson_generator as lg_module
+    from src.services.lesson_orchestrator import build_deck_layout
+    captured_prompt = {}
+
+    def mock_call_ollama(prompt, model=None):
+        captured_prompt['prompt'] = prompt
+        return json.dumps([
+            {'slide_index': -1, 'text': 'Hello Alice! Welcome back.'},
+            {'slide_index': 0, 'text': 'Welcome.'},
+            {'slide_index': 1, 'text': 'Quiz time.'},
+            {'slide_index': 2, 'text': 'Well done.'},
+        ])
+
+    monkeypatch.setattr(lg_module, 'call_ollama', mock_call_ollama)
+
+    slides = [{'type': 'title', 'title': 'Algebra', 'subtitle': 'Intro'}]
+    layout = build_deck_layout(slides, {})
+    generate_narration_script(
+        'Algebra', 'Alice', deck_layout=layout,
+        learner_memories=['Passed quiz for Photosynthesis with 90%'],
+    )
+    assert 'LEARNER CONTEXT' in captured_prompt['prompt']
+    assert 'Passed quiz for Photosynthesis with 90%' in captured_prompt['prompt']
+
+
+def test_narration_prompt_omits_context_without_memories(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    import src.services.lesson_generator as lg_module
+    from src.services.lesson_orchestrator import build_deck_layout
+    captured_prompt = {}
+
+    def mock_call_ollama(prompt, model=None):
+        captured_prompt['prompt'] = prompt
+        return json.dumps([
+            {'slide_index': -1, 'text': 'Hello Alice! Let us begin.'},
+            {'slide_index': 0, 'text': 'Welcome.'},
+            {'slide_index': 1, 'text': 'Quiz time.'},
+            {'slide_index': 2, 'text': 'Well done.'},
+        ])
+
+    monkeypatch.setattr(lg_module, 'call_ollama', mock_call_ollama)
+
+    slides = [{'type': 'title', 'title': 'Algebra', 'subtitle': 'Intro'}]
+    layout = build_deck_layout(slides, {})
+    generate_narration_script('Algebra', 'Alice', deck_layout=layout)
+    assert 'LEARNER CONTEXT' not in captured_prompt['prompt']

@@ -127,6 +127,17 @@
     {% endfor %}
 </div>
 
+{% if path_status == 'active' %}
+<div class="card suggestion-card mb-4" id="suggestion-card" data-path-id="{{ path_id }}">
+    <div class="card-body">
+        <h3 class="suggestion-title">Keep Learning</h3>
+        <p class="text-muted">Based on your documents, here is what to learn next once you are ready.</p>
+        <button type="button" class="btn btn-outline-primary" id="find-suggestions-btn">Find Suggested Topics</button>
+        <div id="suggestion-list" class="mt-3" aria-live="polite"></div>
+    </div>
+</div>
+{% endif %}
+
 <div class="action-buttons mb-4">
     <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-primary">Back to Dashboard</a>
     {% if path_status == 'active' %}
@@ -246,6 +257,86 @@
             btn.textContent = 'Retake Lesson';
             alert('Error regenerating the lesson. Please try again.');
           });
+      });
+    });
+  })();
+</script>
+<script>
+  // Suggest-next card (slice 5): fetch/generate/dismiss follow-up topics.
+  // Lives beside the other page scripts so the lessons-grid →
+  // action-buttons markup adjacency (relied on by card-scoping tests)
+  // stays intact.
+  (function () {
+    'use strict';
+    var card = document.getElementById('suggestion-card');
+    if (!card) return;
+    var pathId = card.dataset.pathId || '';
+    var btn = document.getElementById('find-suggestions-btn');
+    var list = document.getElementById('suggestion-list');
+    if (!btn || !list) return;
+
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+        return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c];
+      });
+    }
+
+    function render(items, allCovered) {
+      list.innerHTML = '';
+      if (!items.length) {
+        var done = document.createElement('p');
+        done.className = 'text-muted';
+        done.textContent = allCovered
+          ? 'All materials covered — nicely done.'
+          : 'No suggestions right now. Complete more modules first.';
+        list.appendChild(done);
+        return;
+      }
+      items.forEach(function (s) {
+        var wrap = document.createElement('div');
+        wrap.className = 'suggestion-entry card mb-2';
+        wrap.innerHTML =
+          '<div class="card-body">' +
+          '<h4>' + esc(s.title) + '</h4>' +
+          (s.reason ? '<p>' + esc(s.reason) + '</p>' : '') +
+          (s.source_refs ? '<p class="text-muted"><small>From: ' + esc(s.source_refs) + '</small></p>' : '') +
+          '<button type="button" class="btn btn-primary btn-sm sg-generate">Generate Materials</button> ' +
+          '<button type="button" class="btn btn-outline-secondary btn-sm sg-dismiss">Dismiss</button>' +
+          '</div>';
+        wrap.querySelector('.sg-generate').addEventListener('click', function () {
+          this.disabled = true;
+          this.textContent = 'Generating...';
+          fetch('/suggestions/accept', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ suggestion_id: s.id })
+          }).then(function (r) { return r.json(); }).then(function (data) {
+            if (data.redirect) { window.location.href = data.redirect; }
+          }).catch(function () { alert('Could not generate materials. Please try again.'); });
+        });
+        wrap.querySelector('.sg-dismiss').addEventListener('click', function () {
+          fetch('/suggestions/dismiss', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ suggestion_id: s.id })
+          }).then(function () { wrap.remove(); }).catch(function () {});
+        });
+        list.appendChild(wrap);
+      });
+    }
+
+    btn.addEventListener('click', function () {
+      btn.disabled = true;
+      btn.textContent = 'Looking...';
+      fetch('/suggestions?path_id=' + encodeURIComponent(pathId), {
+        headers: { 'Accept': 'application/json' }
+      }).then(function (r) { return r.json(); }).then(function (data) {
+        render(data.suggestions || [], !!data.all_covered);
+        btn.disabled = false;
+        btn.textContent = 'Refresh Suggestions';
+      }).catch(function () {
+        btn.disabled = false;
+        btn.textContent = 'Find Suggested Topics';
       });
     });
   })();

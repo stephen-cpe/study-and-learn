@@ -132,6 +132,7 @@ def settings():
     if request.method == 'POST':
         old_nick = current_user.nickname
         old_diff = current_user.lesson_difficulty
+        old_speaker = current_user.tts_speaker
         _, message = apply_settings(
             current_user,
             avatar=request.form.get('avatar'),
@@ -151,6 +152,9 @@ def settings():
         if current_user.lesson_difficulty != old_diff:
             _sm(current_user.id, 'semantic',
                 f"Prefers {current_user.lesson_difficulty} difficulty")
+        if current_user.tts_speaker != old_speaker:
+            _sm(current_user.id, 'procedural',
+                f"Prefers TTS voice {current_user.tts_speaker}")
 
         flash(message, 'success')
         return redirect(url_for('main.settings'))

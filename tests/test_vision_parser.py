@@ -128,12 +128,23 @@ class TestOcrPageFull:
         assert "[Figure OCR]" in result
 
     def test_default_text_only(self, test_png_path, monkeypatch):
-        monkeypatch.delenv("OCR_FULL", raising=False)
+        # Explicit opt-out preserves the legacy text-only contract.
+        # (Unset OCR_FULL now means vision ON → full text+table+figure.)
+        monkeypatch.setenv("OCR_FULL", "false")
         from src.services.vision_parser import ocr_page_full
         result = ocr_page_full(test_png_path)
         assert "[Text OCR]" in result
         assert "[Table OCR]" not in result
         assert "[Figure OCR]" not in result
+
+    def test_default_is_full_when_unset(self, test_png_path, monkeypatch):
+        # Consolidated default: vision OCR ON — unset means full passes.
+        monkeypatch.delenv("OCR_FULL", raising=False)
+        from src.services.vision_parser import ocr_page_full
+        result = ocr_page_full(test_png_path)
+        assert "[Text OCR]" in result
+        assert "[Table OCR]" in result
+        assert "[Figure OCR]" in result
 
 
 class TestDescribeFigure:
@@ -145,10 +156,19 @@ class TestDescribeFigure:
         assert len(result) > 0
 
     def test_disabled_by_default(self, test_png_path, monkeypatch):
-        monkeypatch.delenv("OCR_FIGURE_DESCRIPTION", raising=False)
+        # Explicit opt-out still disables figure descriptions.
+        monkeypatch.setenv("OCR_FIGURE_DESCRIPTION", "false")
         from src.services.vision_parser import describe_figure
         result = describe_figure(test_png_path)
         assert result == ""
+
+    def test_enabled_by_default_when_unset(self, test_png_path, monkeypatch):
+        # Consolidated default: figure descriptions ON when unset.
+        monkeypatch.delenv("OCR_FIGURE_DESCRIPTION", raising=False)
+        from src.services.vision_parser import describe_figure
+        result = describe_figure(test_png_path)
+        assert isinstance(result, str)
+        assert len(result) > 0
 
     def test_model_unavailable_returns_empty(self, test_png_path, monkeypatch):
         """When Ollama reports the model as missing, describe_figure()
@@ -379,3 +399,98 @@ class TestConcurrentHandling:
             result = register_content("h" * 64, "text")
             assert result == "doc_fallback"
             mock_db.session.rollback.assert_called_once()
+
+
+class TestConsolidatedVisionModel:
+    def test_ocr_page_uses_vision_model_not_glm_ocr(self, test_png_path, monkeypatch):
+        """ocr_page() must use the consolidated vision model (flash) via the
+        active backend — never the removed local-only glm-ocr + force_local."""
+        monkeypatch.setenv("AI_MOCK", "false")
+        from src.services import vision_parser as vp
+
+        calls = {}
+
+        def fake_call(prompt, model=None, **kwargs):
+            calls["model"] = model
+            calls["force_local"] = kwargs.get("force_local", False)
+            return "extracted text"
+
+        with patch.object(vp, "call_ollama", side_effect=fake_call):
+            result = vp.ocr_page(test_png_path, mode="text")
+        assert result == "extracted text"
+        assert calls["model"] == "glm-5.3-flash:cloud"
+        assert calls["force_local"] is False
+
+    def test_ocr_page_respects_vision_model_override(self, test_png_path, monkeypatch):
+        monkeypatch.setenv("AI_MOCK", "false")
+        monkeypatch.setenv("OLLAMA_VISION_MODEL", "custom-vision:cloud")
+        from src.services import vision_parser as vp
+
+        calls = {}
+
+        def fake_call(prompt, model=None, **kwargs):
+            calls["model"] = model
+            return "text"
+
+        with patch.object(vp, "call_ollama", side_effect=fake_call):
+            vp.ocr_page(test_png_path, mode="text")
+        assert calls["model"] == "custom-vision:cloud"
+
+
+class TestSmartOcrGate:
+    def test_text_pdf_skips_vision(self, tmp_path, monkeypatch):
+        """A text-layer PDF must NOT render pages or call the LLM."""
+        monkeypatch.setenv("OCR_FULL", "true")
+        from pypdf import PdfWriter
+
+        pdf_path = os.path.join(tmp_path, "text.pdf")
+        writer = PdfWriter()
+        writer.add_blank_page(width=612, height=792)
+        writer.write(pdf_path)
+        # Real text PDFs in uploads carry 20k+ chars; simulate with body.
+        body = "Lorem ipsum dolor sit amet. " * 200  # ~5.6k chars
+
+        from src.services import vision_parser as vp
+        with patch.object(vp, "_pdf_needs_vision_ocr", return_value=False) as mock_gate, \
+             patch("src.services.vision_parser.is_content_registered", return_value=None), \
+             patch("src.services.vision_parser.register_content") as mock_reg, \
+             patch("src.services.vision_parser.render_pdf_pages") as mock_render, \
+             patch.object(vp, "ocr_page_full") as mock_ocr, \
+             patch("src.services.document_parser.extract_text", return_value=body):
+            from src.services.document_parser import extract_text_with_vision
+            text = extract_text_with_vision(pdf_path)
+            assert body[:50] in text
+            mock_gate.assert_called_once()
+            mock_render.assert_not_called()
+            mock_ocr.assert_not_called()
+            mock_reg.assert_called_once()
+
+    def test_scanned_pdf_triggers_vision(self, tmp_path, monkeypatch):
+        """A scanned PDF (no text layer) must proceed to vision OCR."""
+        monkeypatch.setenv("OCR_FULL", "true")
+        from src.services import vision_parser as vp
+
+        pdf_path = os.path.join(tmp_path, "scanned.pdf")
+        with open(pdf_path, "wb") as f:
+            f.write(b"%PDF-fake")
+
+        with patch.object(vp, "_pdf_needs_vision_ocr", return_value=True), \
+             patch("src.services.vision_parser.is_content_registered", return_value=None), \
+             patch("src.services.vision_parser.register_content"), \
+             patch("src.services.vision_parser.render_pdf_pages", return_value=[]) as mock_render, \
+             patch("src.services.document_parser.extract_text", return_value=""):
+            from src.services.document_parser import extract_text_with_vision
+            extract_text_with_vision(pdf_path)
+            mock_render.assert_called_once()
+
+    def test_needs_ocr_empty_text(self, tmp_path):
+        from src.services.vision_parser import _pdf_needs_vision_ocr
+        p = os.path.join(tmp_path, "x.pdf")
+        with open(p, "wb") as f:
+            f.write(b"dummy")
+        assert _pdf_needs_vision_ocr(p, "") is True
+        assert _pdf_needs_vision_ocr(p, "   ") is True
+
+    def test_needs_ocr_never_raises(self, tmp_path):
+        from src.services.vision_parser import _pdf_needs_vision_ocr
+        assert _pdf_needs_vision_ocr("/nonexistent/missing.pdf", "some text") is True

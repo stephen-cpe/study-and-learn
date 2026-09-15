@@ -22,6 +22,19 @@ HUMOR_NOTE = (
     "lesson is enough.\n"
 )
 
+MATH_NOTE = (
+    "MATH NOTE: When a slide needs a mathematical formula or equation, write it "
+    "as LaTeX wrapped in $...$ (inline) or $$...$$ (display) — e.g. "
+    "$E=mc^2$ or $$\\sum_{i=1}^{n} x_i$$. Never use Unicode approximations "
+    "(like ∑, √, ²) for real formulas. The deck renders LaTeX with KaTeX.\n"
+)
+
+NARRATION_MATH_NOTE = (
+    "Speak any mathematics in plain words a listener can follow (e.g. "
+    "\"E equals m c squared\") — NEVER emit LaTeX, dollar signs, or "
+    "backslashes in narration text; it is read aloud by text-to-speech.\n"
+)
+
 
 def build_rag_context_for_module(
     module_title: str,
@@ -101,7 +114,8 @@ PEDAGOGICAL REQUIREMENTS:
    and is DIFFERENT from other modules' content. Teach ONLY what is in this module's Context.
    Do NOT repeat content from other modules — each module covers a distinct topic.
 
-{HUMOR_NOTE}
+ {HUMOR_NOTE}
+{MATH_NOTE}
 OUTPUT RULES:
 - Respond with ONLY a JSON object — no prose, no markdown, no preamble.
 - Every slide MUST have a "type" field that is exactly one of: title, content, example, summary.
@@ -243,6 +257,7 @@ def generate_narration_script(
     is_last_module: bool = False,
     difficulty: str = 'Normal',
     deck_layout: list = None,
+    learner_memories: list = None,
 ) -> list:
     """Generate a tutor-voice narration script for a lesson module.
 
@@ -278,6 +293,10 @@ def generate_narration_script(
             ``build_deck_layout`` — the script is keyed by deck_index
             and includes entries for every deck slot (content,
             checkpoint, quiz, results).
+        learner_memories: Optional list of short strings describing what
+            is known about the learner (TTS voice preference, passed
+            modules, pace). When provided, the intro may reference at
+            most one genuinely relevant fact; otherwise ignored.
 
     Returns:
         List of dicts with 'slide_index' (int) and 'text' (str).
@@ -342,10 +361,23 @@ def generate_narration_script(
         f"Encourage them — pass or fail, learning is the goal."
     )
 
+    # Learner memory callback (TTS memory): at most one natural reference.
+    memories = [m for m in (learner_memories or []) if isinstance(m, str) and m.strip()][:10]
+    if memories:
+        learner_context_block = (
+            "LEARNER CONTEXT (things we know about this learner):\n"
+            + "\n".join(f"- {m.strip()}" for m in memories)
+            + "\nYou may reference at most ONE of these facts naturally in the "
+              "intro (-1) where genuinely relevant (e.g. a callback to a "
+              "module they passed). Never force it; never list facts.\n"
+        )
+    else:
+        learner_context_block = ""
+
     prompt = f"""You are a friendly, enthusiastic tutor creating audio narration for an interactive lesson deck.
 The learner's name is {username}. The lesson is about: {module_title}.
 Difficulty: {difficulty}.
-
+{learner_context_block}
 The deck is a sequence of slots, each with its own deck_index. The JS player
 plays audio for the active slot. You must produce exactly one narration
 entry per deck slot, using the slot's deck_index as the slide_index in
@@ -371,11 +403,11 @@ ALSO write an intro entry with slide_index=-1: 2 sentences. Address
 DECK LAYOUT (one narration per slot, indexed by deck_index):
 {layout_text}
 
-OTHER INSTRUCTIONS:
-- {outro_instruction}
-- Use analogies, transitions, and conversational language appropriate for
-  the difficulty level.
-- RESPOND WITH ONLY a JSON array. No prose, no markdown.
+ OTHER INSTRUCTIONS:
+ - {outro_instruction}
+ - Use analogies, transitions, and conversational language appropriate for
+   the difficulty level.
+ - {NARRATION_MATH_NOTE}- RESPOND WITH ONLY a JSON array. No prose, no markdown.
 
 JSON FORMAT:
 [

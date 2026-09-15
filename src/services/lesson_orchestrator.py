@@ -201,6 +201,7 @@ def build_module_artifacts(
     path_id: str = None,
     module_index: int = 0,
     used_chunk_ids: set = None,
+    learner_memories: list = None,
 ) -> Dict[str, Any]:
     """
     Generate (or reuse) lesson slides, inline checkpoints, and a final quiz
@@ -227,6 +228,9 @@ def build_module_artifacts(
             each module to cover different document content. The set is
             mutated in-place — new chunk IDs from this module's retrieval
             are added so subsequent modules see them.
+        learner_memories: Optional list of short strings about the learner
+            (voice preference, passed modules). Passed through to the
+            narration generator for at-most-one natural callback.
 
     Returns:
         dict with keys: 'lesson', 'quiz', 'checkpoints', 'sources'.
@@ -272,12 +276,13 @@ def build_module_artifacts(
             is_last_module=is_last_module,
             difficulty=difficulty,
             deck_layout=deck_layout,
+            learner_memories=learner_memories,
         )
         lesson_data['narration'] = narration
     else:
         lesson_data['narration'] = []
 
-    quiz_data = generate_quiz(module_title, slides, retriever, n_questions=5, difficulty=difficulty)
+    quiz_data = generate_quiz(module_title, slides, retriever, n_questions=6, difficulty=difficulty)
     lesson_data['deck_layout'] = deck_layout
 
     return {

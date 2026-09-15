@@ -241,6 +241,11 @@ def build_rag_context_from_hashes_with_sources(
         for source in result.get("sources", []):
             sh = source.get("source_hash", "")
             source["filename"] = hash_to_name.get(sh, sh[:12] + "...")
+        try:
+            from src.services.figure_store import attach_figures as _attach_figures
+            _attach_figures(result.get("sources", []))
+        except Exception as e:
+            logger.warning("Figure attach failed: %s", str(e))
         return result
     except Exception as e:
         logger.warning("Multi-collection retrieval with sources failed: %s", str(e))

@@ -90,16 +90,15 @@ If you will run with `AI_BACKEND=local` (the default) and no `OLLAMA_MODEL` over
 ```bash
 ollama pull qwen3:0.6b
 ollama pull qwen3-embedding:0.6b
-ollama pull glm-ocr
 ```
 
-The default models are working placeholders — override `OLLAMA_MODEL` with any chat model from the Ollama library that fits your hardware (e.g. a larger model for better quality). The embedding (`qwen3-embedding:0.6b`) and OCR (`glm-ocr`) models are also overridable via `OLLAMA_EMBEDDING_MODEL` and `OLLAMA_OCR_MODEL`.
+The default models are working placeholders — override `OLLAMA_MODEL` with any chat model from the Ollama library that fits your hardware (e.g. a larger model for better quality). The embedding (`qwen3-embedding:0.6b`) model is overridable via `OLLAMA_EMBEDDING_MODEL`.
 
-Note: `config_defaults.py` ships `gemma4:cloud` as the cloud-mode default for `OLLAMA_MODEL`. To run locally, set `AI_BACKEND=local` and `OLLAMA_MODEL=qwen3:0.6b` in your `.env` (see `.env.example`). Any chat model can be substituted via `OLLAMA_MODEL`.
+Note: `config_defaults.py` ships `gemma4:31b-cloud` as the cloud-mode default for `OLLAMA_MODEL`. To run locally, set `AI_BACKEND=local` and `OLLAMA_MODEL=qwen3:0.6b` in your `.env` (see `.env.example`). Any chat model can be substituted via `OLLAMA_MODEL`.
 
-**For cloud deployment (`AI_BACKEND=cloud`):** You only need to pull `qwen3-embedding:0.6b` locally — the embedding model runs on the server for ChromaDB RAG retrieval (Ollama Cloud does not expose the `/api/embed` endpoint). The chat model runs on Ollama Cloud and does NOT need to be pulled locally. The default cloud chat model is `gemma4:cloud`; override `OLLAMA_MODEL` to use any other cloud chat model. See `digitalocean-deployment-guide.md` for full deployment instructions.
+**For cloud deployment (`AI_BACKEND=cloud`):** You only need to pull `qwen3-embedding:0.6b` locally — the embedding model runs on the server for ChromaDB RAG retrieval (Ollama Cloud does not expose the `/api/embed` endpoint). The chat model runs on Ollama Cloud and does NOT need to be pulled locally. The default cloud chat model is `gemma4:31b-cloud`; override `OLLAMA_MODEL` to use any other cloud chat model. See `digitalocean-deployment-guide.md` for full deployment instructions.
 
-`glm-ocr` (0.9B) is the local OCR model. Pulling it alone does NOT enable OCR — OCR is additionally gated by `OCR_FULL=true` (default `false`). With `OCR_FULL=false` the app uses traditional text-layer extraction even if `glm-ocr` is installed; set `OCR_FULL=true` to run AI-powered OCR on PDFs and images. Set `OCR_FIGURE_DESCRIPTION=true` to additionally generate cloud figure descriptions. Note: figure descriptions use `OLLAMA_VISION_MODEL` (default `glm-5.3-flash:cloud`) and require `AI_BACKEND=cloud` with valid `OLLAMA_CLOUD_API_KEY` — they do not run on a purely local setup.
+OCR and vision are consolidated onto `OLLAMA_VISION_MODEL` (default `glm-5.3-flash:cloud`, natively multimodal Text+Image, 1M context). Vision OCR is ON by default (`OCR_FULL=true`) but smart-gated per file: text-layer PDFs skip rendering + LLM calls entirely — vision runs only on scanned/image-heavy PDFs, plus direct image uploads. Set `OCR_FULL=false` to force text-layer-only extraction everywhere. Figure descriptions use the same vision model and require `AI_BACKEND=cloud` with valid `OLLAMA_CLOUD_API_KEY`.
 
 ### 7. Create .env file
 
@@ -135,9 +134,9 @@ The `AI_BACKEND` env var selects the AI provider. The default is `local` (Ollama
    ```
    AI_BACKEND=cloud
    OLLAMA_CLOUD_API_KEY=your-api-key-here
-   OLLAMA_MODEL=gemma4:cloud
+   OLLAMA_MODEL=gemma4:31b-cloud
    ```
-   The default cloud chat model is `gemma4:cloud`; substitute any other cloud chat model you prefer.
+   The default cloud chat model is `gemma4:31b-cloud`; substitute any other cloud chat model you prefer.
 
 2. Restart the application. All AI calls will route through the Ollama Cloud API instead of your local Ollama instance.
 

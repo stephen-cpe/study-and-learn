@@ -1,8 +1,8 @@
 """
 Quiz generation service for the Study-and-Learn MVP.
 
-Generates mixed-type quizzes (mcq, true_false, multi_select, cloze_dropdown)
-and inline comprehension checkpoints grounded in RAG context. Applies
+Generates mixed-type quizzes (mcq, true_false, multi_select, cloze_dropdown,
+ordering, matching) and inline comprehension checkpoints grounded in RAG context. Applies
 pedagogical safeguards: plausible distractors, diversified true/false
 answers, shuffled option ordering, and cloze dropdown with plausible choices.
 """
@@ -82,7 +82,58 @@ def _shuffle_questions(
             indices = q.get('answer_indices', [])
             if isinstance(indices, list) and all(isinstance(x, int) and 0 <= x < len(options) for x in indices):
                 q['options'], q['answer_indices'] = _shuffle_options(options, indices, False)
+        elif qtype == 'ordering':
+            items = q.get('items', [])
+            order = q.get('answer_order', [])
+            shuffled = _shuffle_sequence(items, order)
+            if shuffled is not None:
+                q['items'], q['answer_order'] = shuffled
+        elif qtype == 'matching':
+            rights = q.get('rights', [])
+            indices = q.get('answer_indices', [])
+            shuffled = _shuffle_sequence(rights, indices)
+            if shuffled is not None:
+                q['rights'], q['answer_indices'] = shuffled
     return questions
+
+
+def _shuffle_sequence(
+    display: List[str],
+    correct: List[int],
+) -> Any:
+    """Shuffle a display list while remapping a correct-index sequence.
+
+    Used by ordering (display ``items`` + ``answer_order``) and matching
+    (display ``rights`` + per-left ``answer_indices``): the correct values
+    are resolved before shuffling, then re-indexed into the new order.
+
+    Returns (shuffled_display, new_correct) or None when the input is not
+    a clean permutation (duplicates, out-of-range) — callers keep the
+    original ordering in that case.
+    """
+    if not isinstance(display, list) or not isinstance(correct, list):
+        return None
+    if len(display) < 2 or len(correct) != len(display):
+        return None
+    if sorted(correct) != list(range(len(display))):
+        # matching answer_indices need not be a permutation (several lefts
+        # may share a right in theory) — fall back to value mapping only
+        # when every correct entry is in range; duplicates keep positions.
+        if not all(isinstance(x, int) and 0 <= x < len(display) for x in correct):
+            return None
+    try:
+        # Validate indexability without keeping the values.
+        [display[i] for i in correct]
+    except (IndexError, TypeError):
+        return None
+    if len(set(map(str, display))) != len(display):
+        return None
+    indexed = list(enumerate(display))
+    random.shuffle(indexed)
+    old_to_new = {old: new for new, (old, _) in enumerate(indexed)}
+    shuffled = [text for _, text in indexed]
+    new_correct = [old_to_new[i] for i in correct]
+    return shuffled, new_correct
 
 
 def _diversify_true_false(
@@ -211,6 +262,8 @@ For each question type:
 - true_false: A clear factual statement. Include prompt, answer (boolean), explanation.
 - multi_select: 4 options, 2-3 correct. Include prompt, options array, answer_indices array (0-based), explanation.
 - cloze_dropdown: A sentence with a key concept replaced by '___'. Provide 3-4 short, plausible options in an 'options' array. One must be the correct answer at 'answer_index'. The wrong options must be plausible enough that a learner who hasn't read carefully might choose them. Do NOT use obviously wrong options. The correct answer should not always be at the same index — vary the position. Include prompt (with ___), options array, answer_index (0-based), explanation.
+- ordering: A process, sequence, or timeline with 4 steps in SCRAMBLED display order. Include prompt (e.g. "Put these steps in the correct order, 1 = first"), items array (4 distinct steps, scrambled — never already sorted), answer_order array (the display indices in correct sequence: e.g. items ["Boil","Chop","Serve","Cook"] are correctly ordered Chop, Boil, Cook, Serve, so answer_order is [1,0,3,2]), explanation.
+- matching: 4 term/definition pairs. Include prompt (e.g. "Match each term to its definition"), lefts array (4 terms, fixed), rights array (4 definitions, SCRAMBLED — never in matching order), answer_indices array (for each left, the 0-based index into rights of its correct match), explanation.
 
 Respond with ONLY a JSON object — no prose, no markdown, no commentary.
 
@@ -254,6 +307,23 @@ JSON FORMAT:
       "options": ["H2O", "CO2", "NaCl", "O2"],
       "answer_index": 0,
       "explanation": "Water is composed of two hydrogen atoms and one oxygen atom, giving it the chemical formula H2O."
+    }},
+    {{
+      "id": "q6",
+      "type": "ordering",
+      "prompt": "Put these steps of a science experiment in the correct order (1 = first).",
+      "items": ["Analyze the results", "Form a hypothesis", "Write the conclusion", "Run the experiment"],
+      "answer_order": [1, 3, 0, 2],
+      "explanation": "The scientific method runs: hypothesis, experiment, analysis, conclusion."
+    }},
+    {{
+      "id": "q7",
+      "type": "matching",
+      "prompt": "Match each term to its correct definition.",
+      "lefts": ["Hypothesis", "Experiment", "Analysis", "Conclusion"],
+      "rights": ["A summary of what was learned", "An educated guess", "Interpreting the data", "A controlled test"],
+      "answer_indices": [1, 3, 2, 0],
+      "explanation": "Each term pairs with its definition: a hypothesis is an educated guess, an experiment is a controlled test, analysis interprets data, and the conclusion summarizes learning."
     }}
   ]
 }}
@@ -266,7 +336,7 @@ def generate_quiz(
     module_title: str,
     slides: List[Dict[str, Any]],
     retriever: Optional[Callable[[str], Dict[str, Any]]],
-    n_questions: int = 5,
+    n_questions: int = 6,
     difficulty: str = 'Normal',
 ) -> Dict[str, Any]:
     """Generate a mixed-type quiz for a module grounded in RAG context.
@@ -276,7 +346,9 @@ def generate_quiz(
         slides: The lesson slides to base quiz questions on.
         retriever: A callable that returns RAG context for a query string,
             or None if unavailable.
-        n_questions: Number of questions to generate (default 5).
+        n_questions: Number of questions to generate (default 6 — one per
+            type: mcq, true_false, multi_select, cloze_dropdown, ordering,
+            matching).
         difficulty: One of 'Easy', 'Normal', 'Hard'. Controls vocabulary
             and question complexity. Defaults to 'Normal'.
 
@@ -303,7 +375,8 @@ def generate_quiz(
         except Exception as e:
             logger.warning("RAG retrieval failed for quiz '%s': %s", module_title, str(e))
 
-    question_types = ['mcq', 'true_false', 'multi_select', 'cloze_dropdown']
+    question_types = ['mcq', 'true_false', 'multi_select', 'cloze_dropdown',
+                      'ordering', 'matching']
     type_mix = _build_type_mix(n_questions, question_types)
 
     prompt = _build_quiz_prompt(
@@ -599,6 +672,43 @@ def _validate_questions(
                     'answer_index': q['answer_index'],
                     'explanation': q.get('explanation', '')
                 })
+        elif qtype == 'ordering':
+            items = q.get('items', [])
+            order = q.get('answer_order', [])
+            if (all(k in q for k in ['prompt', 'items', 'answer_order'])
+                    and isinstance(items, list) and 3 <= len(items) <= 5
+                    and isinstance(order, list)
+                    and sorted(order) == list(range(len(items)))
+                    and len(set(map(str, items))) == len(items)):
+                valid.append({
+                    'id': q.get('id', f'q{len(valid)+1}'),
+                    'type': 'ordering',
+                    'prompt': q['prompt'],
+                    'items': items,
+                    'answer_order': list(order),
+                    'explanation': q.get('explanation', '')
+                })
+        elif qtype == 'matching':
+            lefts = q.get('lefts', [])
+            rights = q.get('rights', [])
+            indices = q.get('answer_indices', [])
+            if (all(k in q for k in ['prompt', 'lefts', 'rights', 'answer_indices'])
+                    and isinstance(lefts, list) and isinstance(rights, list)
+                    and isinstance(indices, list)
+                    and 3 <= len(lefts) <= 5 and len(rights) == len(lefts)
+                    and len(indices) == len(lefts)
+                    and all(isinstance(x, int) and 0 <= x < len(rights) for x in indices)
+                    and len(set(map(str, lefts))) == len(lefts)
+                    and len(set(map(str, rights))) == len(rights)):
+                valid.append({
+                    'id': q.get('id', f'q{len(valid)+1}'),
+                    'type': 'matching',
+                    'prompt': q['prompt'],
+                    'lefts': lefts,
+                    'rights': rights,
+                    'answer_indices': list(indices),
+                    'explanation': q.get('explanation', '')
+                })
         elif qtype == 'fill_blank':
             if all(k in q for k in ['prompt', 'options', 'answer_index']):
                 valid.append({
@@ -630,7 +740,7 @@ def _validate_questions(
     return valid
 
 
-def _fallback_quiz(n_questions: int = 5, module_title: str = '',
+def _fallback_quiz(n_questions: int = 6, module_title: str = '',
                    slides: list = None) -> dict:
     """Return a topic-aware fallback quiz when AI generation fails.
 
@@ -784,6 +894,21 @@ def _fallback_quiz(n_questions: int = 5, module_title: str = '',
             'answer_indices': [0, 2],
             'explanation': f'Reviewing and thinking about {title} helps you learn.'
         })
+
+    # 6. An ordering fallback about the study process itself.
+    questions.append({
+        'id': 'q6',
+        'type': 'ordering',
+        'prompt': f'Put these study steps for {title} in a sensible order (1 = first).',
+        'items': [
+            'Practice with examples',
+            'Review the key terms',
+            'Check your answers',
+            'Understand the core principles',
+        ],
+        'answer_order': [1, 3, 0, 2],
+        'explanation': f'A sensible order is: review key terms, understand principles, practice, then check answers for {title}.'
+    })
 
     sliced = questions[:n_questions]
     sliced = _shuffle_questions(sliced)

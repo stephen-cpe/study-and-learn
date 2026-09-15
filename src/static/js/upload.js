@@ -75,21 +75,25 @@
       var taskId = window.generateTaskId();
       window.setBubblePersistent('Receiving your study materials...');
       window.showBubbleBar(0);
+      // Phase 0: persist so a refresh resumes the poll instead of dying.
+      window.saveBackgroundTask('process', taskId);
       var formData = new FormData();
       formData.append('learning_goal', goalInput.value.trim());
       formData.append('task_id', taskId);
       selectedFiles.forEach(function (file) {
         formData.append('files', file);
       });
-      fetch(form.action, { method: 'POST', body: formData })
+      fetch(form.action, { method: 'POST', body: formData, keepalive: true })
         .then(function (response) {
           if (response.ok) {
             var ct = (response.headers.get('content-type') || '');
             if (ct.indexOf('application/json') !== -1) {
               return response.json().then(function (data) {
                 if (data.redirect) {
+                  window.clearBackgroundTask();
                   window.location.href = data.redirect;
                 } else if (data.error) {
+                  window.clearBackgroundTask();
                   window._mascotTalk(data.error);
                   window.showBubbleBar(0);
                   window._progressActive = false;
@@ -103,6 +107,7 @@
           }
           response.json().then(function (data) {
             var msg = (data && data.error) ? data.error : 'Upload failed. Please try again.';
+            window.clearBackgroundTask();
             window._mascotTalk(msg);
             window.showBubbleBar(0);
             window._progressActive = false;
@@ -129,6 +134,8 @@
   document.addEventListener('DOMContentLoaded', function () {
     if (document.getElementById('unified-form')) {
       window.initUploadPage();
+      // Phase 0: resume the cosmetic poll if a task was in flight.
+      if (window.resumeBackgroundTask) window.resumeBackgroundTask();
     }
   });
 })();

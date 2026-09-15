@@ -376,6 +376,43 @@
                     } else {
                         allAnswered = false;
                     }
+                } else if (qtype === 'ordering') {
+                    // Rank dropdowns (1..N, one per item). Values are
+                    // constrained by the <select> options; duplicates are
+                    // still rejected here and surfaced via #quiz-error.
+                    const selects = qq.querySelectorAll('.q-order-select');
+                    const count = selects.length;
+                    const rankByItem = new Array(count).fill(0);
+                    let valid = count > 0;
+                    selects.forEach(function (select) {
+                        const item = parseInt(select.dataset.item);
+                        const rank = parseInt(select.value);
+                        if (!rank || rank < 1 || rank > count) { valid = false; return; }
+                        if (rankByItem[item]) { valid = false; return; }
+                        rankByItem[item] = rank;
+                    });
+                    if (valid && rankByItem.every(function (r) { return r > 0; })) {
+                        // Convert per-item ranks to correct-sequence form:
+                        // order[rank-1] = display index.
+                        const order = new Array(count);
+                        rankByItem.forEach(function (rank, item) { order[rank - 1] = item; });
+                        answers.push(order);
+                    } else {
+                        allAnswered = false;
+                    }
+                } else if (qtype === 'matching') {
+                    const selects = qq.querySelectorAll('.q-matching-select');
+                    const picks = [];
+                    let valid = selects.length > 0;
+                    selects.forEach(function (select) {
+                        if (select.value === '') { valid = false; return; }
+                        picks.push(parseInt(select.value));
+                    });
+                    if (valid) {
+                        answers.push(picks);
+                    } else {
+                        allAnswered = false;
+                    }
                 } else if (qtype === 'fill_blank') {
                     const select = qq.querySelector('.cloze-select');
                     if (select) {

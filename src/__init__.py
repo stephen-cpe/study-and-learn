@@ -104,6 +104,18 @@ def create_app():
     from src import routes
     app.register_blueprint(routes.bp)
 
+    # ── Sweep orphaned background tasks ─────────────────────────────────
+    # Rows left 'running' by a previous process (Ctrl+C, restart, redeploy)
+    # can never resolve — their request handlers died with it. Flip them
+    # to failed so the bell stops showing "running…" forever. Best-effort:
+    # missing tables (fresh DB before migrations) must never break startup.
+    try:
+        with app.app_context():
+            from src.services.background_tasks import sweep_orphaned_tasks
+            sweep_orphaned_tasks()
+    except Exception:
+        logger.debug("Background-task sweep skipped at startup", exc_info=True)
+
     # ── Cache control for HTML and static files ─────────────────────────
     # Flask's default static-file handler sends strong cache headers
     # (12-hour max-age), which causes the browser to keep stale

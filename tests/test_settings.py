@@ -435,3 +435,48 @@ class TestStaticAssetLayout:
             sprite = self.MASCOTS_DIR / state / f'mascot-{state}-sprite.png'
             assert gif.is_file(), f'Missing {gif}'
             assert sprite.is_file(), f'Missing {sprite}'
+
+
+# ── TTS voice memory (slice 3) ─────────────────────────────────────────────
+
+
+class TestTtsVoiceMemory:
+    def test_speaker_change_stores_procedural_memory(self, app, client, make_user):
+        make_user()
+        _login(client)
+        client.post(
+            '/settings',
+            data={
+                'avatar': 'avatar-0.png',
+                'tts_enabled': 'on',
+                'tts_speaker': 'Emma',
+                'lesson_difficulty': 'Normal',
+                'nickname': '',
+                'full_name': '',
+            },
+            follow_redirects=False,
+        )
+        with app.app_context():
+            from src.models import MascotMemory
+            rows = MascotMemory.query.filter_by(memory_type='procedural').all()
+            assert any('Emma' in (r.content or '') for r in rows)
+
+    def test_unchanged_speaker_stores_no_voice_memory(self, app, client, make_user):
+        make_user(tts_speaker='Ava')
+        _login(client)
+        client.post(
+            '/settings',
+            data={
+                'avatar': 'avatar-0.png',
+                'tts_enabled': '',
+                'tts_speaker': 'Ava',
+                'lesson_difficulty': 'Normal',
+                'nickname': '',
+                'full_name': '',
+            },
+            follow_redirects=False,
+        )
+        with app.app_context():
+            from src.models import MascotMemory
+            rows = MascotMemory.query.filter_by(memory_type='procedural').all()
+            assert all('TTS voice' not in (r.content or '') for r in rows)

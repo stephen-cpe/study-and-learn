@@ -97,6 +97,13 @@ class StudyPath(db.Model):
     # in the entire document rather than only the retrieved chunks.  Cleared
     # after lesson generation (same lifecycle as extracted_texts).
     content_digest = db.Column(db.Text, nullable=True)
+    # Durable study-plan snapshot for post-generation features (suggest-next):
+    # the planned modules, the document summary, and the relevance verdict.
+    # Unlike extracted_texts/content_digest these are NEVER cleared — they
+    # are small and needed long after generation (session data expires).
+    modules_json = db.Column(db.Text, nullable=True)
+    summary_text = db.Column(db.Text, nullable=True)
+    relevance_json = db.Column(db.Text, nullable=True)
     generation_completed_at = db.Column(DateTime, nullable=True)
     created_at = db.Column(DateTime, default=_utcnow)
     updated_at = db.Column(DateTime, default=_utcnow, onupdate=_utcnow)
@@ -163,3 +170,85 @@ class MascotMemory(db.Model):
 
     def __repr__(self) -> str:
         return f"<MascotMemory type={self.memory_type} content={self.content[:60]!r}>"
+
+
+SUGGESTION_STATUS_PENDING = 'pending'
+SUGGESTION_STATUS_ACCEPTED = 'accepted'
+SUGGESTION_STATUS_DISMISSED = 'dismissed'
+SUGGESTION_STATUS_COMPLETED = 'completed'
+
+
+class Suggestion(db.Model):
+    """A suggested next topic for a study path (suggest-next feature).
+
+    Suggestions are computed from document coverage (unpassed modules +
+    LLM diff of taught vs planned topics) and shown on the lessons page.
+    Accepting one generates a full module via the standard lesson
+    machinery; dismissing hides it permanently. ``status`` is one of
+    pending/accepted/dismissed/completed.
+    """
+    __tablename__ = 'suggestion'
+
+    id = db.Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), nullable=False)
+    user_id = db.Column(String(36), db.ForeignKey('users.id'), nullable=False, index=True)
+    study_path_id = db.Column(String(36), db.ForeignKey('study_paths.id'), nullable=False, index=True)
+    title = db.Column(String(200), nullable=False)
+    reason = db.Column(Text, nullable=True)
+    source_refs = db.Column(Text, nullable=True)
+    status = db.Column(String(20), default=SUGGESTION_STATUS_PENDING, nullable=False)
+    created_at = db.Column(DateTime, default=_utcnow)
+    updated_at = db.Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+    VALID_STATUSES = (
+        SUGGESTION_STATUS_PENDING,
+        SUGGESTION_STATUS_ACCEPTED,
+        SUGGESTION_STATUS_DISMISSED,
+        SUGGESTION_STATUS_COMPLETED,
+    )
+
+    user = db.relationship('User', backref=db.backref('suggestions', lazy='dynamic'))
+    study_path = db.relationship('StudyPath', backref=db.backref('suggestions', lazy='dynamic'))
+
+    def __repr__(self) -> str:
+        return f"<Suggestion {self.title} status={self.status}>"
+
+
+TASK_KIND_PROCESS = 'process'
+TASK_KIND_GENERATE = 'generate'
+TASK_STATUS_RUNNING = 'running'
+TASK_STATUS_READY = 'ready'
+TASK_STATUS_FAILED = 'failed'
+
+
+class BackgroundTask(db.Model):
+    """Durable cross-tab record for long-running user tasks (bell UX).
+
+    ``task_id`` is the client-generated UUID (also used as the
+    progress_tracker key). While the in-page 2s poller gives live detail,
+    this row is the durable cross-tab signal: any tab polls ``/tasks`` and
+    deep-links via ``result_url`` once ``status`` flips to ready/failed.
+    ``read`` drives the navbar bell badge (unread finished tasks).
+    """
+    __tablename__ = 'background_task'
+
+    id = db.Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), nullable=False)
+    task_id = db.Column(String(64), unique=True, index=True, nullable=False)
+    user_id = db.Column(String(36), db.ForeignKey('users.id'), nullable=False, index=True)
+    kind = db.Column(String(20), default=TASK_KIND_PROCESS, nullable=False)
+    status = db.Column(String(20), default=TASK_STATUS_RUNNING, nullable=False)
+    pct = db.Column(Integer, nullable=True)
+    label = db.Column(String(200), nullable=True)
+    path_id = db.Column(String(36), nullable=True)
+    result_url = db.Column(String(500), nullable=True)
+    error = db.Column(Text, nullable=True)
+    read = db.Column(Boolean, default=False, nullable=False)
+    created_at = db.Column(DateTime, default=_utcnow)
+    updated_at = db.Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+    VALID_KINDS = (TASK_KIND_PROCESS, TASK_KIND_GENERATE)
+    VALID_STATUSES = (TASK_STATUS_RUNNING, TASK_STATUS_READY, TASK_STATUS_FAILED)
+
+    user = db.relationship('User', backref=db.backref('background_tasks', lazy='dynamic'))
+
+    def __repr__(self) -> str:
+        return f"<BackgroundTask {self.kind} status={self.status}>"

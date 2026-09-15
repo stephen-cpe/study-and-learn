@@ -19,24 +19,69 @@
   }
 
   window.formatSlideText = function () {
+    // NOTE: this formatter rewrites elements via textContent → innerHTML,
+    // which DESTROYS any child <input>/<select> elements. It must only
+    // ever target text-only elements — never .q-option labels (they wrap
+    // the quiz radio/checkbox inputs) and never .results-detail (its
+    // graded HTML is injected after formatting runs).
     document.querySelectorAll(
       '.slide li, ' +
       '.slide .slide-notes, ' +
       '.slide .example-body, ' +
       '.slide .subtitle, ' +
       '.question-prompt, ' +
-      '.checkpoint-feedback'
+      '.checkpoint-feedback, ' +
+      '.q-prompt, ' +
+      '.checkpoint-option, ' +
+      '.q-ordering-item, ' +
+      '.q-matching-left'
     ).forEach(function (el) {
       var text = el.textContent;
+      // Protect LaTeX math spans BEFORE the lightweight markdown regexes
+      // run — `*`/`__` patterns would otherwise corrupt expressions like
+      // `$a*b$` or `$x_{i}$`. Placeholders are restored before sanitize so
+      // KaTeX auto-render sees the original `$...$` in the text nodes.
+      var mathStore = [];
+      function stash(m) {
+        mathStore.push(m);
+        return '@@DECKMATH' + (mathStore.length - 1) + '@@';
+      }
+      text = text.replace(/\$\$[\s\S]+?\$\$/g, stash);
+      text = text.replace(/\\\[[\s\S]+?\\\]/g, stash);
+      text = text.replace(/\\\((.+?)\\\)/g, stash);
+      text = text.replace(/\$[^$\n]+?\$/g, stash);
       text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
       text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
       text = text.replace(/__(.+?)__/g, '<u>$1</u>');
       text = text.replace(/`(.+?)`/g, '<code>$1</code>');
       text = text.replace(/^\s*\*\s+/gm, '\u2022 ');
+      text = text.replace(/@@DECKMATH(\d+)@@/g, function (m, i) {
+        return mathStore[parseInt(i, 10)] || m;
+      });
       el.innerHTML = (typeof DOMPurify !== 'undefined')
         ? DOMPurify.sanitize(text)
         : text;
     });
+    // Render math AFTER sanitize+insert: KaTeX writes its own DOM directly
+    // so its output never passes through the sanitizer.
+    window.renderDeckMath(document.body);
+  };
+
+  // Render `$...$` / `$$...$$` / `\(...\)` / `\[...\]` math via KaTeX
+  // auto-render. Decorative only — never throws, never blocks the deck.
+  window.renderDeckMath = function (root) {
+    if (typeof renderMathInElement === 'undefined') return;
+    try {
+      renderMathInElement(root || document.body, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '$', right: '$', display: false },
+          { left: '\\(', right: '\\)', display: false },
+          { left: '\\[', right: '\\]', display: true }
+        ],
+        throwOnError: false
+      });
+    } catch (e) { /* math must never break the lesson */ }
   };
 
   window.initDeckPage = function () {
@@ -98,6 +143,7 @@
             feedbackEl.style.display = 'block';
             feedbackEl.className = 'checkpoint-feedback ' + (result.correct ? 'correct' : 'incorrect');
             feedbackEl.textContent = (result.correct ? 'Correct! ' : 'Incorrect. ') + (result.explanation || '');
+            if (window.renderDeckMath) window.renderDeckMath(feedbackEl);
           }
           checkpointAnswers[slideIndex] = userValue;
           callback();
@@ -124,7 +170,10 @@
         body: JSON.stringify(body)
       })
         .then(function (r) { return r.json(); })
-        .then(function (data) { deck.showResults(data); })
+        .then(function (data) {
+          deck.showResults(data);
+          if (window.renderDeckMath) window.renderDeckMath(document.body);
+        })
         .catch(function () { alert('Error grading quiz. Please try again.'); });
     };
 
@@ -269,7 +318,7 @@
   }
 
   function initClozeSelects() {
-    document.querySelectorAll('.cloze-select, .checkpoint-select').forEach(function (select) {
+    document.querySelectorAll('.cloze-select, .checkpoint-select, .q-order-select, .q-matching-select').forEach(function (select) {
       select.addEventListener('change', function () {
         select.classList.toggle('has-value', select.value !== '');
       });

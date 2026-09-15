@@ -73,6 +73,10 @@ def generate_lessons():
     task_id = body.get('task_id', '') or session.sid
     progress_tracker.create_task(task_id=task_id,
                                  display_name=current_user.display_name)
+    # Durable bell record (Phase 1): other tabs poll /tasks for this.
+    from src.services import background_tasks as _bt
+    _bt.create_task(task_id, current_user.id, kind='generate',
+                    label=f"Lessons: {(study_path.get('title') or learning_goal or '')[:80]}")
 
     modules = study_path['modules']
 
@@ -101,6 +105,17 @@ def generate_lessons():
     # forcing the LLM to cover different document content per module.
     used_chunk_ids = set()
 
+    # TTS memory: learner facts for narration callbacks. Never raises —
+    # get_memories degrades to [] so generation never blocks on memory.
+    try:
+        from src.services.mascot_memory import get_memories as _get_memories
+        learner_memories = [
+            m.get('content', '') for m in _get_memories(current_user.id, limit=10)
+        ]
+        learner_memories = [m for m in learner_memories if m]
+    except Exception:
+        learner_memories = []
+
     progress_tracker.update_progress(task_id, 1)
 
     try:
@@ -119,6 +134,7 @@ def generate_lessons():
                 path_id=path_id_val,
                 module_index=i,
                 used_chunk_ids=used_chunk_ids,
+                learner_memories=learner_memories,
             )
             progress_tracker.update_progress(task_id, 3)
 
@@ -153,6 +169,8 @@ def generate_lessons():
         # handler still logs the traceback.
         logger.error("Lesson generation failed: %s", str(e), exc_info=True)
         progress_tracker.mark_error(task_id, mascot_msg='AI generation failed — retry')
+        from src.services import background_tasks as _bt
+        _bt.fail_task(task_id, error='AI generation failed — please retry')
         raise
 
     # Surface a warning if any module's quiz fell back to the
@@ -243,6 +261,15 @@ def generate_lessons():
         db.session.commit()
 
     flash(f'Generated {len(modules)} lessons successfully!', 'success')
+    # Bell record flips to ready now (lessons are viewable; TTS audio may
+    # still generate in the background — the lessons page badges show that).
+    from src.services import background_tasks as _bt
+    _bt.finish_task(
+        task_id,
+        result_url=url_for('main.lessons', path_id=path_id_val),
+        label=f"Lessons ready: {(study_path.get('title') or learning_goal or '')[:80]}",
+        path_id=path_id_val or '',
+    )
     return jsonify({
         'redirect': url_for('main.lessons', path_id=path_id_val),
         'task_id': task_id,
@@ -610,6 +637,14 @@ def retake_lesson(module_index):
     tts_enabled = lesson.get('tts_enabled', False)
     tts_speaker = lesson.get('tts_speaker', DEFAULT_TTS_SPEAKER) or DEFAULT_TTS_SPEAKER
     username = current_user.display_name
+    try:
+        from src.services.mascot_memory import get_memories as _get_memories
+        learner_memories = [
+            m.get('content', '') for m in _get_memories(current_user.id, limit=10)
+        ]
+        learner_memories = [m for m in learner_memories if m]
+    except Exception:
+        learner_memories = []
 
     artifacts = build_module_artifacts(
         {'title': module_title},
@@ -620,6 +655,7 @@ def retake_lesson(module_index):
         tts_enabled=tts_enabled,
         username=username,
         tts_speaker=tts_speaker,
+        learner_memories=learner_memories,
     )
 
     lessons_data[module_index]['quiz'] = artifacts['quiz']
@@ -743,6 +779,261 @@ def lesson_audio_manifest(module_index):
     from src.services.tts_service import get_audio_manifest
     manifest = get_audio_manifest(path_id or '', module_index)
     return jsonify(manifest or {})
+
+
+@bp.route('/figures/<file_hash>/<filename>')
+@login_required
+def serve_figure(file_hash, filename):
+    """Serve a persisted source-figure thumbnail.
+
+    Figures are content-addressed by upload file hash (shared across
+    users/paths like Chroma collections), so authorization checks that
+    the hash appears in the ``file_hashes`` of ANY StudyPath owned by the
+    current user — never deleted by per-path lifecycle routes.
+    """
+    import json as _json
+    import os as _os
+    if (".." in filename or "/" in filename or "\\" in filename
+            or not file_hash or not filename):
+        return ('', 404)
+    try:
+        from src.models import StudyPath as _StudyPath
+        allowed = False
+        paths = _StudyPath.query.filter_by(user_id=current_user.id).all()
+        for p in paths:
+            try:
+                hashes = _json.loads(p.file_hashes) if p.file_hashes else []
+            except (TypeError, ValueError):
+                continue
+            if file_hash in hashes:
+                allowed = True
+                break
+        if not allowed:
+            return ('', 404)
+        from src.services.figure_store import FIGURES_DIR as _FIGURES_DIR
+        full_path = _os.path.join(_FIGURES_DIR, file_hash, filename)
+        if not _os.path.isfile(full_path):
+            return ('', 404)
+        from flask import send_file as _send_file
+        return _send_file(full_path, mimetype='image/png', conditional=True)
+    except Exception as e:
+        logger.warning("serve_figure failed for %s: %s", str(file_hash)[:8], str(e))
+        return ('', 404)
+
+
+def _suggestion_path_or_404(path_id):
+    """Return the user's StudyPath or a (json, 404) tuple."""
+    from src.models import StudyPath
+    path = StudyPath.query.filter_by(id=path_id, user_id=current_user.id).first()
+    if not path:
+        return None, (jsonify({'error': 'Study path not found'}), 404)
+    return path, None
+
+
+@bp.route('/suggestions', methods=['GET'])
+@login_required
+def list_suggestions():
+    """Return pending suggestions + coverage state for a path.
+
+    Returns cached pending rows when present; otherwise computes fresh
+    internal suggestions (document-grounded, no web search), persists
+    them as pending, and returns them. ``all_covered`` is true when every
+    module is passed and the LLM proposes nothing new.
+    """
+    import json as _json
+    path_id = _resolve_path_id()
+    path, err = _suggestion_path_or_404(path_id)
+    if err:
+        return err
+    from src.models import Suggestion
+    pending = Suggestion.query.filter_by(
+        study_path_id=path.id, user_id=current_user.id,
+        status='pending',
+    ).order_by(Suggestion.created_at.asc()).all()
+    if pending:
+        lessons_data = get_lessons(current_user, path_id=path.id)
+        all_passed = bool(lessons_data) and all(l.get('passed') for l in lessons_data)
+        return jsonify({
+            'suggestions': [
+                {'id': s.id, 'title': s.title, 'reason': s.reason,
+                 'source_refs': s.source_refs, 'status': s.status}
+                for s in pending
+            ],
+            'all_covered': all_passed,
+        })
+
+    lessons_data = get_lessons(current_user, path_id=path.id)
+    try:
+        modules = _json.loads(path.modules_json) if path.modules_json else []
+    except (TypeError, ValueError):
+        modules = []
+    # Overlay live pass/score state onto the planned modules.
+    by_title = {}
+    for lesson in lessons_data:
+        by_title[(lesson.get('module_title') or '').strip().lower()] = lesson
+    for m in modules:
+        live = by_title.get((m.get('title') or '').strip().lower(), {})
+        m['passed'] = bool(live.get('passed'))
+        m['completed'] = bool(live.get('completed'))
+        m['score'] = live.get('score')
+    try:
+        relevance = _json.loads(path.relevance_json) if path.relevance_json else {}
+    except (TypeError, ValueError):
+        relevance = {}
+    missing = relevance.get('missing_material', '') if isinstance(relevance, dict) else ''
+
+    from src.services.suggest_next import compute_suggestions
+    computed = compute_suggestions(
+        path.learning_goal or '', modules,
+        summary=path.summary_text or '', missing_material=missing or '',
+    )
+    from src import db as _db
+    rows = []
+    for item in computed.get('suggestions', []):
+        row = Suggestion(
+            user_id=current_user.id, study_path_id=path.id,
+            title=item['title'], reason=item.get('reason', ''),
+            source_refs=item.get('source_refs', ''), status='pending',
+        )
+        _db.session.add(row)
+        rows.append(row)
+    if rows:
+        _db.session.commit()
+    all_passed = bool(lessons_data or modules) and all(
+        m.get('passed') for m in modules
+    ) if (lessons_data or modules) else False
+    return jsonify({
+        'suggestions': [
+            {'id': s.id, 'title': s.title, 'reason': s.reason,
+             'source_refs': s.source_refs, 'status': s.status}
+            for s in rows
+        ],
+        'all_covered': all_passed and not rows,
+    })
+
+
+@bp.route('/suggestions/dismiss', methods=['POST'])
+@login_required
+def dismiss_suggestion():
+    """Dismiss a pending suggestion (hides it permanently)."""
+    data = request.get_json(silent=True) or {}
+    suggestion_id = data.get('suggestion_id', '')
+    from src.models import Suggestion
+    row = Suggestion.query.filter_by(id=suggestion_id, user_id=current_user.id).first()
+    if not row:
+        return jsonify({'error': 'Suggestion not found'}), 404
+    from src import db as _db
+    row.status = 'dismissed'
+    _db.session.commit()
+    return jsonify({'success': True})
+
+
+@bp.route('/suggestions/accept', methods=['POST'])
+@login_required
+def accept_suggestion():
+    """Generate a full module for an accepted suggestion.
+
+    Reuses the standard lesson machinery (retriever → artifacts → save →
+    TTS worker) scoped to the suggested topic, appended as a new module so
+    sequential gating keeps working. Returns a deck redirect.
+    """
+    import json as _json
+    data = request.get_json(silent=True) or {}
+    suggestion_id = data.get('suggestion_id', '')
+    from src.models import Suggestion
+    row = Suggestion.query.filter_by(id=suggestion_id, user_id=current_user.id).first()
+    if not row or row.status != 'pending':
+        return jsonify({'error': 'Suggestion not found or already handled'}), 404
+    path_id = row.study_path_id
+    path, err = _suggestion_path_or_404(path_id)
+    if err:
+        return err
+
+    lessons_data = get_lessons(current_user, path_id=path.id) or []
+    new_index = len(lessons_data)
+    goal = path.learning_goal or ''
+    retriever = _build_retriever(goal, [], _resolve_hashes(), _resolve_filenames(),
+                                 content_digest='')
+    difficulty = getattr(current_user, 'lesson_difficulty', DEFAULT_DIFFICULTY) or DEFAULT_DIFFICULTY
+    tts_enabled = getattr(current_user, 'tts_enabled', False)
+    tts_speaker = getattr(current_user, 'tts_speaker', DEFAULT_TTS_SPEAKER) or DEFAULT_TTS_SPEAKER
+    try:
+        from src.services.mascot_memory import get_memories as _get_memories
+        learner_memories = [
+            m.get('content', '') for m in _get_memories(current_user.id, limit=10)
+        ]
+        learner_memories = [m for m in learner_memories if m]
+    except Exception:
+        learner_memories = []
+
+    try:
+        artifacts = build_module_artifacts(
+            {'title': row.title},
+            goal,
+            retriever,
+            difficulty=difficulty,
+            tts_enabled=tts_enabled,
+            username=current_user.display_name,
+            tts_speaker=tts_speaker,
+            next_module_title=None,
+            is_last_module=True,
+            path_id=path.id,
+            module_index=new_index,
+            used_chunk_ids=set(),
+            learner_memories=learner_memories,
+        )
+    except Exception as e:
+        logger.error("Suggested-module generation failed for '%s': %s", row.title, str(e))
+        return jsonify({'error': 'Could not generate materials for this suggestion. Please try again.'}), 500
+
+    lessons_data.append({
+        'index': new_index,
+        'module_title': row.title,
+        'estimated_effort': 'N/A',
+        'lesson': artifacts['lesson'],
+        'quiz': artifacts['quiz'],
+        'checkpoints': artifacts['checkpoints'],
+        'sources': artifacts.get('sources', []),
+        'difficulty': difficulty,
+        'tts_enabled': tts_enabled,
+        'tts_speaker': tts_speaker if tts_enabled else None,
+        'tts_audio_status': 'pending' if tts_enabled else 'n/a',
+        'completed': False,
+        'score': None,
+        'passed': False,
+    })
+    save_lessons(lessons_data, current_user, path_id=path.id)
+
+    # Keep the durable plan snapshot aware of the added module.
+    try:
+        modules = _json.loads(path.modules_json) if path.modules_json else []
+    except (TypeError, ValueError):
+        modules = []
+    modules.append({'title': row.title, 'estimated_effort': 'N/A'})
+    path.modules_json = _json.dumps(modules)
+
+    from src import db as _db
+    row.status = 'accepted'
+    _db.session.commit()
+
+    _store_mascot_memory(current_user.id, 'episodic', f"Accepted suggestion '{row.title}'")
+
+    if tts_enabled and path.id:
+        try:
+            from src.services.tts_worker import spawn_tts_background_task
+            spawn_tts_background_task(
+                flask_app=current_app._get_current_object(),
+                user_id=current_user.id,
+                path_id=path.id,
+                task_id=session.sid,
+            )
+        except Exception as e:
+            logger.warning("TTS background thread failed to spawn for suggestion: %s", str(e))
+
+    return jsonify({
+        'success': True,
+        'redirect': url_for('main.lesson_deck', module_index=new_index, path_id=path.id),
+    })
 
 
 def get_most_recent_active_path_id() -> str:

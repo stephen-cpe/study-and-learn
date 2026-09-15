@@ -102,7 +102,7 @@ def test_fallback_quiz():
 
 def test_fallback_quiz_default_count():
     result = _fallback_quiz(module_title='Test Module')
-    assert len(result['questions']) == 5
+    assert len(result['questions']) == 6
 
 
 def test_summarize_slides():
@@ -452,3 +452,135 @@ def test_quiz_prompt_difficulty_hard(monkeypatch):
 
     assert 'AUDIENCE — Hard' in p
     assert 'age 14–15' in p
+
+
+def test_ordering_validation_accepts_valid():
+    valid = _validate_questions([{
+        'id': 'q1', 'type': 'ordering',
+        'prompt': 'Order the steps.',
+        'items': ['Boil', 'Chop', 'Serve', 'Cook'],
+        'answer_order': [1, 0, 3, 2],
+        'explanation': 'E',
+    }], 1)
+    assert len(valid) == 1
+    assert valid[0]['type'] == 'ordering'
+    assert valid[0]['answer_order'] == [1, 0, 3, 2]
+
+
+def test_ordering_validation_rejects_bad_permutation():
+    assert _validate_questions([{
+        'id': 'q1', 'type': 'ordering', 'prompt': 'P',
+        'items': ['A', 'B', 'C', 'D'],
+        'answer_order': [0, 0, 1, 2],
+        'explanation': 'E',
+    }], 1) == []
+    assert _validate_questions([{
+        'id': 'q1', 'type': 'ordering', 'prompt': 'P',
+        'items': ['A', 'A', 'B', 'C'],
+        'answer_order': [0, 1, 2, 3],
+        'explanation': 'E',
+    }], 1) == []
+
+
+def test_matching_validation_accepts_valid():
+    valid = _validate_questions([{
+        'id': 'q1', 'type': 'matching',
+        'prompt': 'Match them.',
+        'lefts': ['A', 'B', 'C'],
+        'rights': ['3', '1', '2'],
+        'answer_indices': [1, 2, 0],
+        'explanation': 'E',
+    }], 1)
+    assert len(valid) == 1
+    assert valid[0]['type'] == 'matching'
+
+
+def test_matching_validation_rejects_mismatched_lengths():
+    assert _validate_questions([{
+        'id': 'q1', 'type': 'matching', 'prompt': 'P',
+        'lefts': ['A', 'B'],
+        'rights': ['1', '2', '3'],
+        'answer_indices': [0, 1],
+        'explanation': 'E',
+    }], 1) == []
+
+
+def test_ordering_grading_exact_only():
+    from src.services.grader import get_correct_answer, grade_single_question
+    q = {'type': 'ordering', 'items': ['A', 'B', 'C', 'D'],
+         'answer_order': [1, 0, 3, 2]}
+    assert grade_single_question(q, [1, 0, 3, 2]) is True
+    assert grade_single_question(q, [0, 1, 2, 3]) is False
+    assert grade_single_question(q, [1, 0, 3]) is False
+    assert grade_single_question(q, 'nope') is False
+    assert grade_single_question(q, None) is False
+    assert get_correct_answer(q) == [1, 0, 3, 2]
+
+
+def test_matching_grading_exact_only():
+    from src.services.grader import get_correct_answer, grade_single_question
+    q = {'type': 'matching', 'lefts': ['A', 'B'],
+         'rights': ['2', '1'], 'answer_indices': [1, 0]}
+    assert grade_single_question(q, [1, 0]) is True
+    assert grade_single_question(q, [0, 1]) is False
+    assert grade_single_question(q, [1]) is False
+    assert grade_single_question(q, None) is False
+    assert get_correct_answer(q) == [1, 0]
+
+
+def test_ordering_options_shuffled_preserves_mapping(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    import json as _json
+
+    import src.services.quiz_generator as qg_module
+
+    def mock_call_ollama(prompt, model=None):
+        return _json.dumps({"questions": [{
+            "id": "q1", "type": "ordering",
+            "prompt": "Order.",
+            "items": ["D", "B", "A", "C"],
+            "answer_order": [2, 1, 3, 0],
+            "explanation": "A,B,C,D."
+        }]})
+
+    monkeypatch.setattr(qg_module, 'call_ollama', mock_call_ollama)
+    result = generate_quiz("Seq Module", [], None, n_questions=1)
+    q = result['questions'][0]
+    assert q['type'] == 'ordering'
+    # Correct values in order must still read A,B,C,D after shuffle.
+    assert [q['items'][i] for i in q['answer_order']] == ['A', 'B', 'C', 'D']
+
+
+def test_quiz_prompt_contains_ordering_matching_specs(monkeypatch):
+    monkeypatch.setenv('AI_MOCK', 'true')
+    monkeypatch.setenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+    import src.services.quiz_generator as qg_module
+    captured_prompt = {}
+
+    def mock_call_ollama(prompt, model=None):
+        captured_prompt['prompt'] = prompt
+        return '{"questions": []}'
+
+    monkeypatch.setattr(qg_module, 'call_ollama', mock_call_ollama)
+
+    generate_quiz("Test Module", [], None, n_questions=6)
+    p = captured_prompt['prompt']
+    assert 'ordering' in p
+    assert 'matching' in p
+    assert 'answer_order' in p
+    assert 'answer_indices' in p
+
+
+def test_fallback_quiz_has_six_with_ordering():
+    fb = _fallback_quiz(6, module_title='Cells', slides=[])
+    assert len(fb['questions']) == 6
+    types = [q['type'] for q in fb['questions']]
+    assert 'ordering' in types
+
+
+def test_build_type_mix_six_types():
+    mix = _build_type_mix(6, ['mcq', 'true_false', 'multi_select',
+                              'cloze_dropdown', 'ordering', 'matching'])
+    assert sum(mix.values()) == 6
+    assert all(v == 1 for v in mix.values())

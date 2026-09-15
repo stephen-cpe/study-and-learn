@@ -175,7 +175,10 @@ def create_study_path(user, title: str, learning_goal: str,
                       extracted_texts: List[str] = None,
                       file_hashes: List[str] = None,
                       file_names: List[str] = None,
-                      content_digest: str = None) -> StudyPath:
+                      content_digest: str = None,
+                      modules: List[Dict] = None,
+                      summary: str = None,
+                      relevance_result: Dict = None) -> StudyPath:
     path = StudyPath(
         user_id=user.id,
         title=title,
@@ -190,6 +193,15 @@ def create_study_path(user, title: str, learning_goal: str,
         path.file_names = json.dumps(file_names)
     if content_digest is not None:
         path.content_digest = content_digest
+    # Durable snapshot for post-generation features (suggest-next).
+    # Never cleared — session data expires and extracted_texts is nulled
+    # after generation, but suggestions need the plan + summary later.
+    if modules is not None:
+        path.modules_json = json.dumps(modules)
+    if summary is not None:
+        path.summary_text = summary
+    if relevance_result is not None:
+        path.relevance_json = json.dumps(relevance_result)
     db.session.add(path)
     db.session.commit()
     return path

@@ -1,6 +1,7 @@
 """
 Grading service — evaluates learner answers against question definitions.
-Supports mcq, true_false, multi_select, cloze_dropdown, and fill_blank question types.
+Supports mcq, true_false, multi_select, cloze_dropdown, fill_blank,
+ordering, and matching question types.
 """
 from typing import Any
 
@@ -15,6 +16,18 @@ def _safe_int(value: Any, default: int = -1) -> int:
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def _safe_int_list(value: Any) -> list:
+    """Normalize a learner answer to a list of ints for sequence grading.
+
+    Non-list input grades as incorrect (never raises). Each element falls
+    back to -2 so malformed entries can never accidentally match a valid
+    0-based index.
+    """
+    if not isinstance(value, list):
+        return []
+    return [_safe_int(x, -2) for x in value]
 
 
 def grade_single_question(question: dict, user_answer: Any) -> bool:
@@ -55,6 +68,22 @@ def grade_single_question(question: dict, user_answer: Any) -> bool:
             "acceptable_answers", [question.get("answer", "")]
         )
         return ua.lower() in [a.strip().lower() for a in acceptable if isinstance(a, str)]
+    elif qtype == "ordering":
+        # Exact sequence match (all-or-nothing, like multi_select): the
+        # learner's order of display indices must equal answer_order.
+        if not isinstance(user_answer, list):
+            return False
+        correct = question.get("answer_order", [])
+        user = _safe_int_list(user_answer)
+        return len(user) == len(correct) == len(question.get("items", [])) and user == list(correct)
+    elif qtype == "matching":
+        # Exact pairs match (all-or-nothing): per-left chosen rights index
+        # must equal answer_indices.
+        if not isinstance(user_answer, list):
+            return False
+        correct = question.get("answer_indices", [])
+        user = _safe_int_list(user_answer)
+        return len(user) == len(correct) == len(question.get("lefts", [])) and user == list(correct)
     return False
 
 
@@ -73,4 +102,8 @@ def get_correct_answer(question: dict) -> Any:
         if "answer_index" in question:
             return question.get("answer_index")
         return question.get("answer")
+    elif qtype == "ordering":
+        return question.get("answer_order")
+    elif qtype == "matching":
+        return question.get("answer_indices")
     return None

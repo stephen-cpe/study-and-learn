@@ -27,6 +27,113 @@
     return 'task-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
   };
 
+  // Phase 0 background resume (no backend change): the in-flight task_id
+  // is persisted in sessionStorage so a refresh resumes the cosmetic poll
+  // instead of losing everything. The server-side POST keeps running
+  // regardless; completion is signaled durably via GET /tasks (the bell).
+  var BG_KEY = 'sal_bg_task';
+  window.saveBackgroundTask = function (kind, taskId) {
+    try {
+      sessionStorage.setItem(BG_KEY, JSON.stringify({
+        kind: kind, taskId: taskId, startedAt: Date.now()
+      }));
+    } catch (e) { /* private mode — resume unavailable */ }
+  };
+
+  window.loadBackgroundTask = function () {
+    try {
+      var raw = sessionStorage.getItem(BG_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  };
+
+  window.clearBackgroundTask = function () {
+    try { sessionStorage.removeItem(BG_KEY); } catch (e) {}
+  };
+
+  // Resume a stored task after a refresh. The durable /tasks row is
+  // authoritative: we only restart the cosmetic poll when the server
+  // still reports the task as running. Finished, failed, or unknown
+  // tasks clear the stored entry instead of polling a dead task forever
+  // (the orphaned-poll bug: after a server restart the POST is gone but
+  // the stored task_id + filesystem progress cache outlive it).
+  // Mascot speech stays plain retro text — no emoji, no icons.
+  window.resumeBackgroundTask = function () {
+    var stored = window.loadBackgroundTask();
+    if (!stored || !stored.taskId) return false;
+    // Stale entries (older than 2h, the server hard-timeout) are dropped.
+    if (Date.now() - (stored.startedAt || 0) > 7200000) {
+      window.clearBackgroundTask();
+      return false;
+    }
+    var onUploadPage = stored.kind === 'process' && document.getElementById('unified-form');
+    var onResultsPage = stored.kind === 'generate' && document.getElementById('generate-lessons-btn');
+    if (!onUploadPage && !onResultsPage) return false;
+
+    function openButton(label, url) {
+      if (!onResultsPage) return;
+      var btn = document.getElementById('generate-lessons-btn');
+      btn.textContent = label;
+      btn.disabled = false;
+      btn.addEventListener('click', function () {
+        window.location.href = url;
+      });
+    }
+
+    function startLivePoll() {
+      window.setBubblePersistent('Resuming — still working...');
+      window.showBubbleBar(0);
+      window.startProcessProgressPoll(stored.taskId);
+      if (onResultsPage) {
+        var btn = document.getElementById('generate-lessons-btn');
+        btn.disabled = true;
+        btn.textContent = 'Working in background...';
+      }
+    }
+
+    fetch('/tasks', { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        var row = null;
+        (data && data.tasks || []).forEach(function (t) {
+          if (t.task_id === stored.taskId) row = t;
+        });
+        if (!row) {
+          // Unknown to the server (DB reset, or never recorded) —
+          // drop it rather than polling a task that can never resolve.
+          window.clearBackgroundTask();
+          return;
+        }
+        if (row.status !== 'running') {
+          window.clearBackgroundTask();
+          if (row.result_url && (onResultsPage || onUploadPage)) {
+            window.setBubblePersistent(row.status === 'ready'
+              ? 'Previous task finished — opening it now...'
+              : 'Previous task did not finish — please retry.');
+            if (row.status === 'ready') {
+              if (onResultsPage) {
+                openButton(stored.kind === 'generate' ? 'Open Lessons' : 'Open Results', row.result_url);
+              } else {
+                window.location.href = row.result_url;
+              }
+            }
+          } else {
+            window.setBubblePersistent(row.status === 'ready'
+              ? 'Previous task finished — see Tasks up top.'
+              : 'Previous task did not finish — please retry.');
+          }
+          return;
+        }
+        startLivePoll();
+      })
+      .catch(function () {
+        // Offline/transient: fall back to the cosmetic poll; its
+        // no-task auto-stop still bounds the damage.
+        startLivePoll();
+      });
+    return true;
+  };
+
   window.setBubblePersistent = function (text) {
     window._progressActive = true;
     var bubble = document.getElementById('speech-bubble');
@@ -72,6 +179,11 @@
     var PROCESS_ERROR_STICKY_MS = 8000;
     var _lastPct = 0;
     var _lastActivityAt = Date.now();  // reset whenever pct changes
+    // Dead-task guard: the server deletes progress entries on completion
+    // and a restarted server has no record of in-flight POSTs at all.
+    // After several straight 'No task' answers, stop polling and drop a
+    // matching stored entry instead of hitting /progress forever.
+    var _noTaskStreak = 0;
 
     _processPollInterval = setInterval(function () {
       var elapsed = Date.now() - startTime;
@@ -87,7 +199,19 @@
       fetch('/progress?task_id=' + encodeURIComponent(taskId))
         .then(function (r) { return r.json(); })
         .then(function (data) {
-          if (data.stage === undefined || data.stage < 0) return;
+          if (data.stage === undefined || data.stage < 0) {
+            _noTaskStreak += 1;
+            if (_noTaskStreak >= 5) {
+              window.stopProcessProgressPoll();
+              try {
+                var stored = window.loadBackgroundTask
+                  ? window.loadBackgroundTask() : null;
+                if (stored && stored.taskId === taskId) window.clearBackgroundTask();
+              } catch (e) {}
+            }
+            return;
+          }
+          _noTaskStreak = 0;
           // Sticky-error for the process poll (upload/parse flow),
           // mirroring the generate-lessons poll. Prevents a
           // background task from clobbering mascot-error.gif.
@@ -134,6 +258,8 @@
     var taskId = window.generateTaskId();
     window.setBubblePersistent('Parsing docs...');
     window.showBubbleBar(0);
+    // Phase 0: persist so a refresh resumes instead of losing the task.
+    window.saveBackgroundTask('generate', taskId);
 
     var resolvedRedirectUrl = null;
     var resolvedPathId = null;
@@ -141,11 +267,13 @@
     fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ task_id: taskId })
+      body: JSON.stringify({ task_id: taskId }),
+      keepalive: true
     })
       .then(function (r) { return r.json().catch(function () { return {}; }); })
       .then(function (resp) {
         if (resp.redirect) {
+          window.clearBackgroundTask();
           resolvedRedirectUrl = resp.redirect;
           // Extract path_id from the redirect URL for the status poll.
           // Format: /lessons?path_id=<uuid>  (or /lessons/<i>?path_id=...)

@@ -3,6 +3,8 @@
 -- Usage: psql -U postgres -d study_and_learn -f init_db.sql
 
 -- Drop existing tables if they exist (for clean migration)
+DROP TABLE IF EXISTS background_task CASCADE;
+DROP TABLE IF EXISTS suggestion CASCADE;
 DROP TABLE IF EXISTS mascot_memory CASCADE;
 DROP TABLE IF EXISTS content_registry CASCADE;
 DROP TABLE IF EXISTS lesson_progress CASCADE;
@@ -44,6 +46,9 @@ CREATE TABLE study_paths (
     file_hashes            TEXT         NULL,
     file_names             TEXT         NULL,
     content_digest         TEXT         NULL,
+    modules_json           TEXT         NULL,
+    summary_text           TEXT         NULL,
+    relevance_json         TEXT         NULL,
     generation_completed_at TIMESTAMP   NULL,
     created_at             TIMESTAMP    NULL,
     updated_at             TIMESTAMP    NULL,
@@ -100,13 +105,63 @@ CREATE TABLE mascot_memory (
 
 CREATE INDEX ix_mascot_memory_user_id ON mascot_memory (user_id);
 
--- 6. alembic_version stamp
+-- 6. suggestion (suggest-next topics per user + study path)
+CREATE TABLE suggestion (
+    id              VARCHAR(36)  NOT NULL,
+    user_id         VARCHAR(36)  NOT NULL,
+    study_path_id   VARCHAR(36)  NOT NULL,
+    title           VARCHAR(200) NOT NULL,
+    reason          TEXT         NULL,
+    source_refs     TEXT         NULL,
+    status          VARCHAR(20)  NOT NULL DEFAULT 'pending',
+    created_at      TIMESTAMP    NULL,
+    updated_at      TIMESTAMP    NULL,
+    CONSTRAINT pk_suggestion PRIMARY KEY (id),
+    CONSTRAINT fk_suggestion_user
+        FOREIGN KEY (user_id) REFERENCES users (id),
+    CONSTRAINT fk_suggestion_study_path
+        FOREIGN KEY (study_path_id) REFERENCES study_paths (id),
+    CONSTRAINT chk_suggestion_status
+        CHECK (status IN ('pending', 'accepted', 'dismissed', 'completed'))
+);
+
+CREATE INDEX ix_suggestion_user_id ON suggestion (user_id);
+CREATE INDEX ix_suggestion_study_path_id ON suggestion (study_path_id);
+
+-- 7. background_task (durable cross-tab records for the navbar bell)
+CREATE TABLE background_task (
+    id              VARCHAR(36)  NOT NULL,
+    task_id         VARCHAR(64)  NOT NULL,
+    user_id         VARCHAR(36)  NOT NULL,
+    kind            VARCHAR(20)  NOT NULL DEFAULT 'process',
+    status          VARCHAR(20)  NOT NULL DEFAULT 'running',
+    pct             INTEGER      NULL,
+    label           VARCHAR(200) NULL,
+    path_id         VARCHAR(36)  NULL,
+    result_url      VARCHAR(500) NULL,
+    error           TEXT         NULL,
+    read            BOOLEAN      NOT NULL DEFAULT FALSE,
+    created_at      TIMESTAMP    NULL,
+    updated_at      TIMESTAMP    NULL,
+    CONSTRAINT pk_background_task PRIMARY KEY (id),
+    CONSTRAINT fk_background_task_user
+        FOREIGN KEY (user_id) REFERENCES users (id),
+    CONSTRAINT chk_background_task_kind
+        CHECK (kind IN ('process', 'generate')),
+    CONSTRAINT chk_background_task_status
+        CHECK (status IN ('running', 'ready', 'failed'))
+);
+
+CREATE UNIQUE INDEX ix_background_task_task_id ON background_task (task_id);
+CREATE INDEX ix_background_task_user_id ON background_task (user_id);
+
+-- 7. alembic_version stamp
 CREATE TABLE alembic_version (
     version_num VARCHAR(32) NOT NULL,
     CONSTRAINT pk_alembic_version PRIMARY KEY (version_num)
 );
 
-INSERT INTO alembic_version (version_num) VALUES ('g7h8i9j0k1l2');
+INSERT INTO alembic_version (version_num) VALUES ('i9j0k1l2m3n4');
 
 -- 6. Seed users (development only -- not for production)
 --

@@ -8,6 +8,7 @@
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logo.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/deck-base.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/deck-components.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 </head>
 <body>
     <div class="deck-container" data-module-index="{{ module_index }}" data-path-id="{{ path_id or '' }}" data-resume-slide="{{ lesson.get('deck_position', 0) }}" data-tts-enabled="{{ 'true' if lesson.get('tts_enabled') else 'false' }}" data-tts-speaker="{{ lesson.get('tts_speaker', 'Ava') or 'Ava' }}" data-checkpoint-answers="{{ lesson.get('checkpoint_user_answers', {}) | tojson }}">
@@ -149,6 +150,8 @@
                              {% if q.type == 'true_false' %}data-answer="{{ q.answer|lower }}"{% endif %}
                              {% if q.type == 'multi_select' %}data-answer="{{ q.answer_indices|join(',') }}"{% endif %}
                              {% if q.type == 'cloze_dropdown' %}data-answer="{{ q.answer_index }}"{% endif %}
+                             {% if q.type == 'ordering' %}data-answer="{{ q.answer_order|join(',') }}"{% endif %}
+                             {% if q.type == 'matching' %}data-answer="{{ q.answer_indices|join(',') }}"{% endif %}
                              {% if q.type == 'fill_blank' %}data-answer="{{ q.answer }}"{% endif %}>
                             <div class="q-prompt">{{ loop.index }}. {{ q.prompt }}</div>
                             {% if q.type == 'mcq' or q.type == 'multi_select' %}
@@ -173,6 +176,34 @@
                                     <option value="{{ loop.index0 }}">{{ opt }}</option>
                                     {% endfor %}
                                 </select>
+                            </div>
+                            {% elif q.type == 'ordering' %}
+                            <div class="q-options ordering-list">
+                                {% for item in q['items'] %}
+                                <div class="q-ordering-row">
+                                    <select class="q-select q-order-select" name="{{ q.id }}--{{ loop.index0 }}" data-qid="{{ q.id }}" data-item="{{ loop.index0 }}">
+                                        <option value="" disabled selected>#</option>
+                                        {% for _rank in q['items'] %}
+                                        <option value="{{ loop.index }}">{{ loop.index }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <span class="q-ordering-item">{{ item }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% elif q.type == 'matching' %}
+                            <div class="q-options matching-list">
+                                {% for left in q.lefts %}
+                                <div class="q-matching-row">
+                                    <span class="q-matching-left">{{ left }}</span>
+                                    <select class="q-select q-matching-select" name="{{ q.id }}--{{ loop.index0 }}" data-qid="{{ q.id }}" data-left="{{ loop.index0 }}">
+                                        <option value="" disabled selected>Select match...</option>
+                                        {% for r in q.rights %}
+                                        <option value="{{ loop.index0 }}">{{ r }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                {% endfor %}
                             </div>
                             {% elif q.type == 'fill_blank' %}
                             <input type="text" class="q-input" maxlength="20" data-qid="{{ q.id }}" name="{{ q.id }}" placeholder="Type a single word...">
@@ -228,6 +259,8 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
     <script src="{{ url_for('static', filename='js/csrf.js') }}"></script>
     <script src="{{ url_for('static', filename='js/mascot.js') }}"></script>
     <script src="{{ url_for('static', filename='js/progress.js') }}"></script>
@@ -247,6 +280,15 @@
                     <div class="source-entry-header">
                         <span class="source-filename">{{ src.filename }}</span>
                     </div>
+                    {% if src.figures %}
+                    <div class="source-figures">
+                        {% for fig in src.figures %}
+                        <a href="{{ fig.url }}" target="_blank" rel="noopener" title="{{ fig.caption or fig.label or 'Source figure' }}">
+                            <img src="{{ fig.url }}" alt="{{ fig.caption or fig.label or 'Source figure' }}" class="source-figure-thumb" loading="lazy">
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                     <div class="source-preview" data-expanded="false">
                         {{ src.text[:200] }}{% if src.text|length > 200 %}<span class="source-ellipsis">...</span><span class="source-full" style="display: none;">{{ src.text[200:] }}</span>{% endif %}
                     </div>

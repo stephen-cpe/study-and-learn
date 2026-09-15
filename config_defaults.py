@@ -44,15 +44,31 @@ def env_float(name: str, fallback: float) -> float:
 # small CPU model for local dev, a cloud-served model when OLLAMA_MODEL
 # is unset in cloud mode.
 OLLAMA_MODEL_LOCAL_DEFAULT = "qwen3:0.6b"
-OLLAMA_MODEL_CLOUD_DEFAULT = "gemma4:cloud"
+OLLAMA_MODEL_CLOUD_DEFAULT = "gemma4:31b-cloud"
 OLLAMA_BASE_URL_DEFAULT = "http://localhost:11434"
 OLLAMA_CLOUD_BASE_URL_DEFAULT = "https://ollama.com"
 OLLAMA_TIMEOUT_DEFAULT = 300
 OLLAMA_NUM_CTX_DEFAULT = 131072
 RAG_TOP_K_DEFAULT = 20
 EMBEDDING_MODEL_DEFAULT = "qwen3-embedding:0.6b"
-OCR_MODEL_DEFAULT = "glm-ocr"
+# OCR and vision are consolidated onto a single natively multimodal model.
+# ``glm-ocr`` (local-only) has been removed — all image OCR, table
+# extraction, and figure description now use VISION_MODEL_DEFAULT via the
+# active AI backend (Ollama Cloud ``glm-5.3-flash:cloud`` by default).
+# ``OCR_MODEL_DEFAULT`` is kept as a deprecated alias so old imports keep
+# working; new code should use ``VISION_MODEL_DEFAULT`` directly.
 VISION_MODEL_DEFAULT = "glm-5.3-flash:cloud"
+OCR_MODEL_DEFAULT = VISION_MODEL_DEFAULT
+
+# ── Smart OCR gating defaults ─────────────────────────────────────────────
+# Vision OCR is enabled by default (OCR_FULL=true) but only *runs* on PDFs
+# that actually need it: scanned/image-heavy files with little extractable
+# text. Text-layer PDFs skip rendering + LLM calls entirely.
+# A PDF needs vision OCR when total text-layer chars fall below
+# PDF_NEEDS_OCR_MIN_TOTAL_CHARS, or average chars/page fall below
+# PDF_NEEDS_OCR_MIN_CHARS_PER_PAGE, or embedded images outnumber pages.
+PDF_NEEDS_OCR_MIN_TOTAL_CHARS_DEFAULT = 1000
+PDF_NEEDS_OCR_MIN_CHARS_PER_PAGE_DEFAULT = 300
 
 # ── RAG retrieval / coverage budget defaults ─────────────────────────────
 # These control how much of the uploaded document actually reaches the LLM.

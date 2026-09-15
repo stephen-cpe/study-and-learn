@@ -45,6 +45,7 @@
 .checkpoint-option.selected {
     border-color: var(--deck-accent);
     background: rgba(0,180,216,0.25);
+    box-shadow: 0 0 10px rgba(0, 180, 216, 0.25);
 }
 
 .checkpoint-feedback {
@@ -87,6 +88,10 @@
     font-size: 0.65em;
 }
 
+#quiz-error {
+    font-size: 0.55em;
+}
+
 .quiz-container {
     display: flex;
     flex-direction: column;
@@ -117,18 +122,105 @@
 }
 
 .quiz-question .q-option {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 0.3em;
     color: var(--deck-text);
     cursor: pointer;
     font-size: 0.58em;
+    padding: 0.28em 0.5em 0.28em 1.9em;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
-.quiz-question .q-option input {
-    accent-color: var(--deck-accent);
-    margin: 0;
-    transform: scale(0.8);
+/* ── Custom retro radio/checkbox ──────────────────────────────────────
+   Native controls render unpredictably on the dark deck theme (tiny and
+   near-invisible depending on the browser's color-scheme handling), so the
+   real input stays functional-but-invisible (still focusable for keyboard
+   users and still queryable via :checked by deck-engine.js) while the
+   visible control is drawn with CSS in deck accent colors. */
+.quiz-question .q-option input[type="radio"],
+.quiz-question .q-option input[type="checkbox"] {
+    position: absolute;
+    left: 0.55em;
+    top: 50%;
+    width: 1.05em;
+    height: 1.05em;
+    margin: -0.525em 0 0 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.quiz-question .q-option::before {
+    content: "";
+    position: absolute;
+    left: 0.55em;
+    top: 50%;
+    width: 1.05em;
+    height: 1.05em;
+    margin-top: -0.525em;
+    box-sizing: border-box;
+    border: 2px solid var(--deck-accent);
+    background: rgba(5, 11, 20, 0.85);
+    box-shadow: 0 0 6px rgba(0, 180, 216, 0.25);
+    pointer-events: none;
+}
+
+.quiz-question .q-option:has(input[type="radio"])::before {
+    border-radius: 50%;
+}
+
+.quiz-question .q-option:has(input[type="checkbox"])::before {
+    border-radius: 3px;
+}
+
+.quiz-question .q-option:has(input[type="radio"]:checked)::after {
+    content: "";
+    position: absolute;
+    left: 0.55em;
+    top: 50%;
+    width: 1.05em;
+    height: 1.05em;
+    margin-top: -0.525em;
+    box-sizing: border-box;
+    background: radial-gradient(circle, var(--deck-accent-light) 0 32%, transparent 36%);
+    pointer-events: none;
+}
+
+.quiz-question .q-option:has(input[type="checkbox"]:checked)::after {
+    content: "✓";
+    position: absolute;
+    left: 0.55em;
+    top: 50%;
+    width: 1.05em;
+    height: 1.05em;
+    margin-top: -0.525em;
+    box-sizing: border-box;
+    color: var(--deck-accent-light);
+    font-size: 0.95em;
+    line-height: 1.05em;
+    text-align: center;
+    text-shadow: 0 0 6px rgba(0, 180, 216, 0.8);
+    pointer-events: none;
+}
+
+/* Picked choice is unmistakable: accent border + tinted fill + glow. */
+.quiz-question .q-option:has(input:checked) {
+    border-color: var(--deck-accent);
+    background: rgba(0, 180, 216, 0.12);
+    box-shadow: 0 0 10px rgba(0, 180, 216, 0.25);
+}
+
+.quiz-question .q-option:hover {
+    border-color: rgba(0, 180, 216, 0.45);
+    background: rgba(0, 180, 216, 0.06);
+}
+
+.quiz-question .q-option:has(input:focus-visible) {
+    outline: 2px solid var(--deck-accent-light);
+    outline-offset: 2px;
 }
 
 .quiz-question .q-input {
@@ -153,7 +245,9 @@
 }
 
 .cloze-select,
-.checkpoint-select {
+.checkpoint-select,
+.q-order-select,
+.q-matching-select {
     appearance: none;
     -webkit-appearance: none;
     -moz-appearance: none;
@@ -182,27 +276,35 @@
 }
 
 .cloze-select:focus,
-.checkpoint-select:focus {
+.checkpoint-select:focus,
+.q-order-select:focus,
+.q-matching-select:focus {
     outline: none;
     border-color: var(--deck-accent);
     box-shadow: 0 0 14px rgba(0, 180, 216, 0.35), inset 0 0 10px rgba(0, 180, 216, 0.12);
 }
 
 .cloze-select:hover:not(:disabled),
-.checkpoint-select:hover:not(:disabled) {
+.checkpoint-select:hover:not(:disabled),
+.q-order-select:hover:not(:disabled),
+.q-matching-select:hover:not(:disabled) {
     border-color: var(--deck-accent-light);
     background-color: rgba(0, 180, 216, 0.08);
 }
 
 .cloze-select:disabled,
-.checkpoint-select:disabled {
+.checkpoint-select:disabled,
+.q-order-select:disabled,
+.q-matching-select:disabled {
     opacity: 0.5;
     cursor: not-allowed;
     filter: grayscale(0.6);
 }
 
 .cloze-select option,
-.checkpoint-select option {
+.checkpoint-select option,
+.q-order-select option,
+.q-matching-select option {
     background: var(--deck-bg);
     color: var(--deck-text);
     /* Inherit font-family and font-size from the parent <select> so the
@@ -216,13 +318,17 @@
 }
 
 .cloze-select option:first-child,
-.checkpoint-select option:first-child {
+.checkpoint-select option:first-child,
+.q-order-select option:first-child,
+.q-matching-select option:first-child {
     color: var(--deck-accent-light);
     font-style: italic;
 }
 
 .cloze-select.has-value,
-.checkpoint-select.has-value {
+.checkpoint-select.has-value,
+.q-order-select.has-value,
+.q-matching-select.has-value {
     border-color: var(--deck-success);
     box-shadow: 0 0 12px rgba(126, 231, 135, 0.25);
 }
@@ -513,4 +619,63 @@
     font-size: 0.8em;
     font-style: italic;
     opacity: 0.7;
+}
+
+/* Source figures (slice 4): thumbnails of the original diagrams behind
+   the retrieved text. Click opens the full figure in a new tab. */
+.source-figures {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.5rem 0;
+}
+
+.source-figure-thumb {
+    max-width: 180px;
+    max-height: 140px;
+    border: 1px solid rgba(0, 180, 216, 0.4);
+    border-radius: 4px;
+    cursor: zoom-in;
+}
+
+/* Ordering / matching quiz inputs (slice 2) */
+.q-ordering-row,
+.q-matching-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.45rem;
+}
+
+/* Item/left labels carry no size of their own, so without these rules
+   they inherit the deck body's ~42px base and render giant next to the
+   compact (0.45–0.65em) prompts, options, and dropdowns. Matched to
+   .q-option (0.58em) for visual consistency. */
+.q-ordering-item {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.58em;
+    line-height: 1.35;
+    color: var(--deck-text);
+}
+
+/* Rank dropdowns (ordering quiz): narrow, cloze-family themed. The base
+   cloze theme above applies via .q-select; this only constrains width so
+   a rank picker doesn't stretch like a full answer dropdown. */
+.q-ordering-row .q-order-select {
+    flex: none;
+    width: 4.6em;
+    max-width: 4.6em;
+}
+
+.q-matching-left {
+    flex: 1 1 40%;
+    min-width: 0;
+    font-size: 0.58em;
+    line-height: 1.35;
+    color: var(--deck-text);
+}
+
+.q-matching-row .q-select {
+    flex: 1 1 55%;
 }
