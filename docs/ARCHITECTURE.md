@@ -47,30 +47,30 @@ The following diagram illustrates the end-to-end processing pipeline, highlighti
 flowchart TD
 A["Unified Form: Goal + Files"] --> B["POST /process Route<br/>(@login_required)"]
 B --> BCHK{"File hash in<br/>ContentRegistry?<br/>(route-level dedup)"}
-BCHK -->"Yes"| D["Chunker: LangChain Splitter"]
-BCHK -->"No"| EXT["extract_text_with_vision()"]
-EXT -->|".txt / .md"| BASIC["Basic raw-text read"]
+BCHK -->|Yes| D["Chunker: LangChain Splitter"]
+BCHK -->|No| EXT["extract_text_with_vision()"]
+EXT -->|txt md| BASIC["Basic raw-text read"]
 BASIC --> REG["register_content(hash, text)"]
 REG --> D
-EXT -->|".pdf / .docx / .pptx / images"| CACHE{"Cached in<br/>ContentRegistry?<br/>(parser-level dedup)"}
-CACHE -->"Yes"| D
-CACHE -->"No"| TXT["Basic text-layer extraction"]
+EXT -->|pdf docx pptx images| CACHE{"Cached in<br/>ContentRegistry?<br/>(parser-level dedup)"}
+CACHE -->|Yes| D
+CACHE -->|No| TXT["Basic text-layer extraction"]
 TXT --> VMODE{"File type?"}
-VMODE -->|".png / .jpg / .jpeg"| IMG["Images ALWAYS enter vision loop"]
-VMODE -->|".pdf / .docx / .pptx"| OFULL{"Vision OCR Enabled?<br/>(default Yes)"}
-OFULL -->|"No (opt-out)"| SKIP["Early return: basic text only"]
+VMODE -->|png jpg jpeg| IMG["Images ALWAYS enter vision loop"]
+VMODE -->|pdf docx pptx| OFULL{"Vision OCR Enabled?<br/>(default Yes)"}
+OFULL -->|No opt out| SKIP["Early return: basic text only"]
 SKIP --> REG
-OFULL -->|"Yes"| GATE{"Text layer sufficient?<br/>(smart gate)"}
-GATE -->|"Yes: plain-text docs"| SKIP
-GATE -->|"No: scanned / image-heavy"| IMG
+OFULL -->|Yes| GATE{"Text layer sufficient?<br/>(smart gate)"}
+GATE -->|Yes plain text docs| SKIP
+GATE -->|No scanned image heavy| IMG
 IMG --> OLOOP["Cloud vision loop<br/>(single multimodal model, per page/image)"]
 OLOOP --> OMULT["text + table + figure passes"]
 OMULT --> FMERGE
 FMERGE["merge OCR output"]
 FMERGE --> FDESC{"Figure Desc Enabled?<br/>(default Yes)"}
-FDESC -->"No"| FSKIP["Figure descriptions SKIPPED"]
+FDESC -->|No| FSKIP["Figure descriptions SKIPPED"]
 FSKIP --> DONE
-FDESC -->"Yes"| FIG["Vision: figure descriptions<br/>+ persist thumbnails"]
+FDESC -->|Yes| FIG["Vision: figure descriptions<br/>+ persist thumbnails"]
 FIG --> DONE["register_content & cleanup"]
 DONE --> D
 D --> E["Vector Store: Content-Keyed ChromaDB"]
@@ -79,31 +79,31 @@ F --> G["Summarizer (JSON mode)"]
 F --> H["Relevance Checker (JSON mode)"]
 F --> I["Curriculum Generator (JSON mode)"]
 G --> J["results.html: Summary, Relevance, Study Path"]
-H -->|"weak"| J
-H -->|"partial/strong"| J
-I -->|"if not weak"| J
+H -->|weak| J
+H -->|partial strong| J
+I -->|if not weak| J
 J --> K{"Weak match?"}
-K -->"Yes"| K2["Weak feedback card: gated"]
-K -->"No"| L{"Generate Interactive Lessons?"}
+K -->|Yes| K2["Weak feedback card: gated"]
+K -->|No| L{"Generate Interactive Lessons?"}
 L --> M["Lesson Generator: slides + sources"]
 L --> N["Quiz Generator: questions + checkpoints"]
 N --> NFB{"AI quiz parse OK?"}
-NFB -->"No"| NFB2["Topic-aware fallback quiz<br/>+ user flash warning"]
-NFB -->"Yes"| O
+NFB -->|No| NFB2["Topic-aware fallback quiz<br/>+ user flash warning"]
+NFB -->|Yes| O
 NFB2 --> O
 M --> M2["Narration Script Generator"]
 M2 --> M2b["Background TTS worker thread"]
-M2b -->|"sets completion signal"| O
-M2 -->|"if TTS disabled"| O
+M2b -->|sets completion signal| O
+M2 -->|if TTS disabled| O
 N --> O
 O --> lessons.html
 O["lessons.html: Module Grid + Gating"]
 O --> SG["Keep Learning card:<br/>GET /suggestions"]
 SG --> SGI{"Internal topics left?"}
-SGI -->"Yes"| SGA{"Accept → generate module<br/>Dismiss → hide"}
-SGI -->|"No, all passed"| WCHK{"Public topic +<br/>web enabled?"}
-WCHK -->|"Proprietary / disabled"| SGDONE["All covered"]
-WCHK -->|"Public + opt-in"| WEB["web_search → web_fetch<br/>→ LLM synthesis"]
+SGI -->|Yes| SGA{"Accept → generate module<br/>Dismiss → hide"}
+SGI -->|No all passed| WCHK{"Public topic +<br/>web enabled?"}
+WCHK -->|Proprietary disabled| SGDONE["All covered"]
+WCHK -->|Public opt in| WEB["web_search → web_fetch<br/>→ LLM synthesis"]
 WEB --> SGA
 SGA --> O
 O --> P["lesson_deck.html: Custom Slide Deck + TTS Player"]
@@ -114,18 +114,18 @@ Q --> R
 Q --> G2["POST /grade: AJAX, instant feedback"]
 R --> G2
 G2 --> S["Results Slide: score, pass/fail"]
-G2 -->|"inline audio_url"| ANN["Spoken results announcement<br/>(suppresses generic results audio,<br/>falls back to /tts/announce)"]
+G2 -->|inline audio url| ANN["Spoken results announcement<br/>(suppresses generic results audio,<br/>falls back to /tts/announce)"]
 S --> T{"Score >= 80%?"}
-T -->"Yes"| U["Unlock Next Module"]
-T -->"No"| V["Retake: Regenerate Quiz"]
+T -->|Yes| U["Unlock Next Module"]
+T -->|No| V["Retake: Regenerate Quiz"]
 V --> O
 FSRV["GET /figures → thumbnails<br/>in sources overlay"]
 DONE -.-> FSRV
 FSRV -.-> P
 BT["BackgroundTask rows<br/>(running → ready/failed)"]
-B -.->|"creates running row"| BT
-L -.->|"creates running row"| BT
-O -.->|"flips ready/failed"| BT
+B -.->|creates running row| BT
+L -.->|creates running row| BT
+O -.->|flips ready failed| BT
 BT --> BELL["Navbar bell + GET /tasks<br/>(badge, deep links, dismiss)"]
 MASCOT["GET /mascot/line<br/>(polled by mascot.js)"]
 MASCOT --> MLINES["Mascot LLM: persona +<br/>per-learner memory"]
