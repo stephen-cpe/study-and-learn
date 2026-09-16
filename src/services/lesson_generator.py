@@ -258,6 +258,7 @@ def generate_narration_script(
     difficulty: str = 'Normal',
     deck_layout: list = None,
     learner_memories: list = None,
+    tts_speaker: str = 'Ava',
 ) -> list:
     """Generate a tutor-voice narration script for a lesson module.
 
@@ -293,10 +294,14 @@ def generate_narration_script(
             ``build_deck_layout`` — the script is keyed by deck_index
             and includes entries for every deck slot (content,
             checkpoint, quiz, results).
-        learner_memories: Optional list of short strings describing what
-            is known about the learner (TTS voice preference, passed
-            modules, pace). When provided, the intro may reference at
-            most one genuinely relevant fact; otherwise ignored.
+        learner_memories: Optional list of short strings or
+            ``{'memory_type':..., 'content':...}`` dicts describing what
+            is known about the learner (TTS voice preference entries are
+            filtered out). Passed through ``tts_persona`` filtering for
+            at-most-one natural callback.
+        tts_speaker: One of 'Ava', 'Emma', 'Ryan', 'Andrew'. Selects the
+            tutor-voice style in the prompt (the voice itself is applied
+            at synthesis time by ``tts_service``).
 
     Returns:
         List of dicts with 'slide_index' (int) and 'text' (str).
@@ -362,21 +367,47 @@ def generate_narration_script(
     )
 
     # Learner memory callback (TTS memory): at most one natural reference.
-    memories = [m for m in (learner_memories or []) if isinstance(m, str) and m.strip()][:10]
-    if memories:
-        learner_context_block = (
-            "LEARNER CONTEXT (things we know about this learner):\n"
-            + "\n".join(f"- {m.strip()}" for m in memories)
-            + "\nYou may reference at most ONE of these facts naturally in the "
-              "intro (-1) where genuinely relevant (e.g. a callback to a "
-              "module they passed). Never force it; never list facts.\n"
+    # Memories live in the single MascotMemory table; tts_persona selects
+    # narration-relevant ones (struggle/mastery first, voice-pref dropped).
+    try:
+        from src.services.tts_persona import (
+            build_tts_context_block,
+            filter_memories_for_tts,
         )
-    else:
-        learner_context_block = ""
+        filtered = filter_memories_for_tts(learner_memories or [], limit=5)
+        tts_context_block = build_tts_context_block(
+            speaker=tts_speaker or 'Ava',
+            display_name=username,
+            difficulty=difficulty,
+            filtered_memories=filtered,
+        )
+        if filtered:
+            learner_context_block = (
+                "LEARNER CONTEXT (things we know about this learner):\n"
+                + "\n".join(f"- {m.strip()}" for m in filtered)
+                + "\nYou may reference at most ONE of these facts naturally in the "
+                  "intro (-1) where genuinely relevant (e.g. a callback to a "
+                  "module they passed). Never force it; never list facts.\n"
+            )
+        else:
+            learner_context_block = ""
+    except Exception:
+        tts_context_block = ""
+        memories = [m for m in (learner_memories or []) if isinstance(m, str) and m.strip()][:10]
+        if memories:
+            learner_context_block = (
+                "LEARNER CONTEXT (things we know about this learner):\n"
+                + "\n".join(f"- {m.strip()}" for m in memories)
+                + "\nYou may reference at most ONE of these facts naturally in the "
+                  "intro (-1) where genuinely relevant (e.g. a callback to a "
+                  "module they passed). Never force it; never list facts.\n"
+            )
+        else:
+            learner_context_block = ""
 
     prompt = f"""You are a friendly, enthusiastic tutor creating audio narration for an interactive lesson deck.
-The learner's name is {username}. The lesson is about: {module_title}.
-Difficulty: {difficulty}.
+{tts_context_block}
+The lesson is about: {module_title}.
 {learner_context_block}
 The deck is a sequence of slots, each with its own deck_index. The JS player
 plays audio for the active slot. You must produce exactly one narration

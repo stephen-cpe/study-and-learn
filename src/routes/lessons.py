@@ -107,12 +107,14 @@ def generate_lessons():
 
     # TTS memory: learner facts for narration callbacks. Never raises —
     # get_memories degrades to [] so generation never blocks on memory.
+    # Keep dicts (memory_type+content) so tts_persona can prioritize
+    # struggle/mastery signals and drop voice-pref echoes.
     try:
         from src.services.mascot_memory import get_memories as _get_memories
         learner_memories = [
-            m.get('content', '') for m in _get_memories(current_user.id, limit=10)
+            m for m in _get_memories(current_user.id, limit=10)
+            if isinstance(m, dict) and (m.get('content') or '').strip()
         ]
-        learner_memories = [m for m in learner_memories if m]
     except Exception:
         learner_memories = []
 
@@ -575,16 +577,31 @@ def grade_lesson(module_index):
         lessons_data[module_index]['passed'] = passed
         save_lessons(lessons_data, current_user, path_id=path_id)
 
-        # Memory: record quiz outcome
-        module_title = (lessons_data[module_index].get('title', '')
-                        if isinstance(lessons_data[module_index], dict)
-                        else f'Module {module_index + 1}')
+        # Memory: record quiz outcome (fix: lessons store
+        # 'module_title', not 'title' — the old lookup always wrote '').
+        mod = lessons_data[module_index] if isinstance(lessons_data[module_index], dict) else {}
+        module_title = mod.get('module_title') or mod.get('title') or f'Module {module_index + 1}'
         outcome = 'passed' if passed else 'did not pass'
         _store_mascot_memory(
             current_user.id, 'episodic',
             f"{outcome.capitalize()} quiz for '{module_title}' "
             f"with {score_pct}%"
         )
+        # Struggle / mastery signals feed the next narration intro via
+        # tts_persona filtering (voice-pref echoes are dropped there).
+        try:
+            if not passed and score_pct < 50:
+                _store_mascot_memory(
+                    current_user.id, 'semantic',
+                    f"Struggling with '{module_title}' — needs simpler review",
+                )
+            elif passed and score_pct >= 90:
+                _store_mascot_memory(
+                    current_user.id, 'episodic',
+                    f"Mastered '{module_title}' — ready for follow-ups",
+                )
+        except Exception:
+            pass
     else:
         # Persist the answered checkpoint(s) so a resumed session can
         # credit them on the final-quiz grade. Only record checkpoints
@@ -600,15 +617,74 @@ def grade_lesson(module_index):
             )
             save_lessons(lessons_data, current_user, path_id=path_id)
 
-    return jsonify({
+    resp = {
         'score': score_pct,
         'passed': passed,
         'threshold': PASS_THRESHOLD,
         'earned': earned_points,
         'total': total_points,
         'quiz_results': quiz_results,
-        'checkpoint_results': checkpoint_results
-    })
+        'checkpoint_results': checkpoint_results,
+    }
+    # Spoken results: synthesize the lesson_complete announcement inline
+    # so the deck can play it the moment results render (zero gap). This
+    # trades ~1-4s of grade latency (edge-tts, cached by text+speaker) for
+    # no second round-trip and no interruption of results audio — the
+    # results-slot narration is suppressed client-side when audio_url is
+    # present. Any failure degrades to available-without-url and the
+    # client falls back to POST /tts/announce, then to results audio.
+    # Grading itself never fails because of TTS.
+    try:
+        tts_on = bool(getattr(current_user, 'tts_enabled', False))
+    except Exception:
+        tts_on = False
+    if is_final_submission:
+        resp['announcement'] = {
+            'available': bool(tts_on),
+            'kind': 'lesson_complete',
+        }
+        if tts_on:
+            try:
+                from src.services.tts_announcement import (
+                    build_announcement_text,
+                    check_rate_limit,
+                )
+                _sugg = None
+                _sugg_external = False
+                try:
+                    from src.models import Suggestion as _Sug
+                    _row = _Sug.query.filter_by(
+                        study_path_id=path_id, user_id=current_user.id,
+                        status='pending',
+                    ).order_by(_Sug.created_at.asc()).first()
+                    if _row:
+                        _sugg = {'title': _row.title, 'reason': _row.reason or ''}
+                        _sugg_external = bool(getattr(_row, 'is_external', False))
+                except Exception:
+                    _sugg = None
+                if check_rate_limit(f"grade:{current_user.id}"):
+                    _mod = lessons_data[module_index] if isinstance(lessons_data[module_index], dict) else {}
+                    _mtitle = _mod.get('module_title') or _mod.get('title') or f'Module {module_index + 1}'
+                    _text = build_announcement_text(
+                        kind='lesson_complete',
+                        display_name=getattr(current_user, 'display_name', 'learner'),
+                        module_title=_mtitle,
+                        score=score_pct,
+                        passed=passed,
+                        suggestion=_sugg,
+                        is_external=_sugg_external,
+                    )
+                    from src.services.tts_service import generate_announcement_audio
+                    _speaker = getattr(current_user, 'tts_speaker', DEFAULT_TTS_SPEAKER) or DEFAULT_TTS_SPEAKER
+                    _result = generate_announcement_audio(current_user.id, _text, _speaker)
+                    _audio_url = url_for('main.tts_announcement_audio', ann_id=_result['ann_id'])
+                    if path_id:
+                        _audio_url += f"?path_id={path_id}"
+                    resp['announcement']['text'] = _result['text']
+                    resp['announcement']['audio_url'] = _audio_url
+            except Exception as e:
+                logger.warning("Inline grade announcement failed: %s", str(e))
+    return jsonify(resp)
 
 
 @bp.route('/lessons/<int:module_index>/retake', methods=['POST'])
@@ -637,12 +713,13 @@ def retake_lesson(module_index):
     tts_enabled = lesson.get('tts_enabled', False)
     tts_speaker = lesson.get('tts_speaker', DEFAULT_TTS_SPEAKER) or DEFAULT_TTS_SPEAKER
     username = current_user.display_name
+    prev_score = lesson.get('score')
     try:
         from src.services.mascot_memory import get_memories as _get_memories
         learner_memories = [
-            m.get('content', '') for m in _get_memories(current_user.id, limit=10)
+            m for m in _get_memories(current_user.id, limit=10)
+            if isinstance(m, dict) and (m.get('content') or '').strip()
         ]
-        learner_memories = [m for m in learner_memories if m]
     except Exception:
         learner_memories = []
 
@@ -699,6 +776,16 @@ def retake_lesson(module_index):
     # Return a redirect URL so the client navigates the user to the deck for
     # this module with the regenerated content, instead of blind-reloading
     # the results slide they clicked Retake on.
+    # Memory: retakes signal struggle — the next narration intro can
+    # acknowledge the retry instead of sounding like a first run.
+    try:
+        prev_txt = f" after scoring {prev_score}%" if prev_score is not None else ""
+        _store_mascot_memory(
+            current_user.id, 'episodic',
+            f"Retaking '{module_title}'{prev_txt}",
+        )
+    except Exception:
+        pass
     return jsonify({
         'success': True,
         'redirect': url_for('main.lesson_deck', module_index=module_index, path_id=path_id),
@@ -781,6 +868,119 @@ def lesson_audio_manifest(module_index):
     return jsonify(manifest or {})
 
 
+@bp.route('/tts/announce', methods=['POST'])
+@login_required
+def tts_announce():
+    """Generate a short on-demand TTS announcement (Stage 2).
+
+    Body: { path_id?, module_index?, kind: lesson_complete|suggestion,
+            suggestion?: {title, reason} }
+    - lesson_complete uses the graded module's title/score when
+      module_index is given, else the most recent completed module.
+    - suggestion prefers the caller-supplied suggestion (the Keep
+      Learning card already fetched it), else the oldest pending
+      Suggestion row. No LLM call happens here.
+    """
+    from src.services.tts_announcement import (
+        build_announcement_text,
+        check_rate_limit,
+    )
+    data = request.get_json(silent=True) or {}
+    kind = str(data.get('kind', 'lesson_complete') or 'lesson_complete')
+    if kind not in ('lesson_complete', 'suggestion'):
+        return jsonify({'error': 'Invalid kind'}), 400
+    if not getattr(current_user, 'tts_enabled', False):
+        return jsonify({'error': 'TTS disabled'}), 404
+    if not check_rate_limit(current_user.id):
+        return jsonify({'error': 'Rate limited, try in 60s'}), 429
+
+    path_id = data.get('path_id') or _resolve_path_id() or get_most_recent_active_path_id()
+    try:
+        module_index = data.get('module_index', None)
+        module_index = int(module_index) if module_index is not None else None
+    except (TypeError, ValueError):
+        module_index = None
+
+    module_title = None
+    score = None
+    passed = None
+    try:
+        lessons_data = get_lessons(current_user, path_id=path_id) if path_id else []
+    except Exception:
+        lessons_data = []
+    if module_index is not None and lessons_data and 0 <= module_index < len(lessons_data):
+        mod = lessons_data[module_index] or {}
+        module_title = mod.get('module_title') or mod.get('title')
+        score = mod.get('score')
+        passed = mod.get('passed')
+    elif kind == 'lesson_complete' and lessons_data:
+        # Most recent completed module, newest first.
+        for mod in reversed(lessons_data):
+            if mod.get('completed'):
+                module_title = mod.get('module_title') or mod.get('title')
+                score = mod.get('score')
+                passed = mod.get('passed')
+                break
+
+    suggestion = None
+    sugg_external = bool((data.get('suggestion') or {}).get('is_external', False)) \
+        if isinstance(data.get('suggestion'), dict) else False
+    if isinstance(data.get('suggestion'), dict) and str(data['suggestion'].get('title', '')).strip():
+        suggestion = {
+            'title': str(data['suggestion'].get('title', ''))[:200],
+            'reason': str(data['suggestion'].get('reason', ''))[:1000],
+        }
+    elif kind in ('lesson_complete', 'suggestion') and path_id:
+        try:
+            from src.models import Suggestion as _Sug
+            row = _Sug.query.filter_by(
+                study_path_id=path_id, user_id=current_user.id, status='pending',
+            ).order_by(_Sug.created_at.asc()).first()
+            if row:
+                suggestion = {'title': row.title, 'reason': row.reason or ''}
+                sugg_external = bool(getattr(row, 'is_external', False))
+        except Exception:
+            suggestion = None
+
+    text = build_announcement_text(
+        kind=kind,
+        display_name=getattr(current_user, 'display_name', 'learner'),
+        module_title=module_title,
+        score=score,
+        passed=passed,
+        suggestion=suggestion,
+        is_external=sugg_external,
+    )
+    speaker = getattr(current_user, 'tts_speaker', DEFAULT_TTS_SPEAKER) or DEFAULT_TTS_SPEAKER
+    try:
+        from src.services.tts_service import generate_announcement_audio
+        result = generate_announcement_audio(current_user.id, text, speaker)
+    except Exception as e:
+        logger.warning("TTS announce synthesis failed: %s", str(e))
+        return jsonify({'ok': False, 'pending': True, 'text': text}), 202
+    audio_url = url_for('main.tts_announcement_audio', ann_id=result['ann_id'])
+    if path_id:
+        audio_url += f"?path_id={path_id}"
+    return jsonify({
+        'ok': True,
+        'text': result['text'],
+        'audio_url': audio_url,
+        'from_cache': result['from_cache'],
+    })
+
+
+@bp.route('/tts/announcements/<ann_id>.mp3')
+@login_required
+def tts_announcement_audio(ann_id):
+    """Serve a user's announcement MP3 (per-user isolated)."""
+    from src.services.tts_service import get_announcement_path
+    full_path = get_announcement_path(current_user.id, ann_id or '')
+    if not full_path:
+        return ('', 404)
+    from flask import send_file
+    return send_file(str(full_path), mimetype='audio/mpeg', conditional=True)
+
+
 @bp.route('/figures/<file_hash>/<filename>')
 @login_required
 def serve_figure(file_hash, filename):
@@ -835,10 +1035,9 @@ def _suggestion_path_or_404(path_id):
 def list_suggestions():
     """Return pending suggestions + coverage state for a path.
 
-    Returns cached pending rows when present; otherwise computes fresh
-    internal suggestions (document-grounded, no web search), persists
-    them as pending, and returns them. ``all_covered`` is true when every
-    module is passed and the LLM proposes nothing new.
+    Order: cached pending → fresh internal (document-grounded) →
+    external web (only when internal empty + all passed + public topic
+    + WEB_SEARCH_ENABLED). External rows carry is_external/source_urls.
     """
     import json as _json
     path_id = _resolve_path_id()
@@ -846,6 +1045,17 @@ def list_suggestions():
     if err:
         return err
     from src.models import Suggestion
+
+    def _serialize(s):
+        try:
+            urls = _json.loads(s.source_urls) if s.source_urls else []
+        except (TypeError, ValueError):
+            urls = []
+        return {'id': s.id, 'title': s.title, 'reason': s.reason,
+                'source_refs': s.source_refs, 'status': s.status,
+                'is_external': bool(getattr(s, 'is_external', False)),
+                'source_urls': urls if isinstance(urls, list) else []}
+
     pending = Suggestion.query.filter_by(
         study_path_id=path.id, user_id=current_user.id,
         status='pending',
@@ -854,11 +1064,7 @@ def list_suggestions():
         lessons_data = get_lessons(current_user, path_id=path.id)
         all_passed = bool(lessons_data) and all(l.get('passed') for l in lessons_data)
         return jsonify({
-            'suggestions': [
-                {'id': s.id, 'title': s.title, 'reason': s.reason,
-                 'source_refs': s.source_refs, 'status': s.status}
-                for s in pending
-            ],
+            'suggestions': [_serialize(s) for s in pending],
             'all_covered': all_passed,
         })
 
@@ -894,6 +1100,7 @@ def list_suggestions():
             user_id=current_user.id, study_path_id=path.id,
             title=item['title'], reason=item.get('reason', ''),
             source_refs=item.get('source_refs', ''), status='pending',
+            is_external=False, source_urls='[]',
         )
         _db.session.add(row)
         rows.append(row)
@@ -902,13 +1109,54 @@ def list_suggestions():
     all_passed = bool(lessons_data or modules) and all(
         m.get('passed') for m in modules
     ) if (lessons_data or modules) else False
+    if rows:
+        return jsonify({
+            'suggestions': [_serialize(s) for s in rows],
+            'all_covered': False,
+            'source': 'internal',
+        })
+
+    # Internal exhausted → external web branch (opt-in, fail-closed).
+    # Only when every planned module is passed; proprietary topics,
+    # disabled flag, missing key, or any web failure return all_covered.
+    if not all_passed:
+        return jsonify({'suggestions': [], 'all_covered': False, 'source': 'internal'})
+    try:
+        file_names = _json.loads(path.file_names) if path.file_names else []
+    except (TypeError, ValueError):
+        file_names = []
+    if not isinstance(file_names, list):
+        file_names = []
+    from src.services.suggest_external import compute_external_suggestions
+    external = compute_external_suggestions(
+        path.learning_goal or '', modules,
+        summary=path.summary_text or '', file_names=file_names,
+    )
+    ext_rows = []
+    for item in (external.get('suggestions', []) or []):
+        try:
+            urls_json = _json.dumps(item.get('source_urls', []) or [])
+        except (TypeError, ValueError):
+            urls_json = '[]'
+        row = Suggestion(
+            user_id=current_user.id, study_path_id=path.id,
+            title=item['title'], reason=item.get('reason', ''),
+            source_refs=item.get('source_refs', ''), status='pending',
+            is_external=True, source_urls=urls_json,
+        )
+        _db.session.add(row)
+        ext_rows.append(row)
+    if ext_rows:
+        _db.session.commit()
+        return jsonify({
+            'suggestions': [_serialize(s) for s in ext_rows],
+            'all_covered': False,
+            'source': 'web',
+        })
     return jsonify({
-        'suggestions': [
-            {'id': s.id, 'title': s.title, 'reason': s.reason,
-             'source_refs': s.source_refs, 'status': s.status}
-            for s in rows
-        ],
-        'all_covered': all_passed and not rows,
+        'suggestions': [],
+        'all_covered': True,
+        'source': external.get('source', 'none'),
     })
 
 
@@ -952,17 +1200,58 @@ def accept_suggestion():
     lessons_data = get_lessons(current_user, path_id=path.id) or []
     new_index = len(lessons_data)
     goal = path.learning_goal or ''
-    retriever = _build_retriever(goal, [], _resolve_hashes(), _resolve_filenames(),
-                                 content_digest='')
+    is_external = bool(getattr(row, 'is_external', False))
+    if is_external:
+        # Web-grounded retriever (URL-capped): fetch stored verbatim URLs
+        # (max 2, 6k chars each). No doc text ever sent to the web here —
+        # we only READ the previously stored search results.
+        try:
+            stored_urls = _json.loads(row.source_urls) if row.source_urls else []
+        except (TypeError, ValueError):
+            stored_urls = []
+        if not isinstance(stored_urls, list):
+            stored_urls = []
+
+        def _web_retrieve(query: str, exclude_chunks: set = None):
+            from urllib.parse import urlparse as _urlparse
+            from src.services.web_search_service import web_fetch as _fetch
+            parts, sources = [], []
+            for u in (stored_urls or [])[:2]:
+                if not isinstance(u, str) or not u.startswith(('http://', 'https://')):
+                    continue
+                try:
+                    body = _fetch(u) or ''
+                except Exception:
+                    body = ''
+                if not body.strip():
+                    continue
+                parts.append(f"Source: {u}\n{body[:6000]}")
+                try:
+                    domain = _urlparse(u).netloc or u
+                except Exception:
+                    domain = u
+                sources.append({'filename': domain, 'url': u,
+                                'text': body[:2000], 'chunk_id': f"web:{u[:60]}"})
+            # Always include the suggestion reason so generation is
+            # grounded even when fetches fail (general-education fallback
+            # in lesson_generator handles empty context).
+            head = f"Suggested topic: {row.title}. {row.reason or ''}".strip()
+            context = (head + '\n\n' + '\n\n'.join(parts))[:12000] if parts else head
+            return {"context_text": context, "sources": sources}
+
+        retriever = _web_retrieve
+    else:
+        retriever = _build_retriever(goal, [], _resolve_hashes(), _resolve_filenames(),
+                                     content_digest='')
     difficulty = getattr(current_user, 'lesson_difficulty', DEFAULT_DIFFICULTY) or DEFAULT_DIFFICULTY
     tts_enabled = getattr(current_user, 'tts_enabled', False)
     tts_speaker = getattr(current_user, 'tts_speaker', DEFAULT_TTS_SPEAKER) or DEFAULT_TTS_SPEAKER
     try:
         from src.services.mascot_memory import get_memories as _get_memories
         learner_memories = [
-            m.get('content', '') for m in _get_memories(current_user.id, limit=10)
+            m for m in _get_memories(current_user.id, limit=10)
+            if isinstance(m, dict) and (m.get('content') or '').strip()
         ]
-        learner_memories = [m for m in learner_memories if m]
     except Exception:
         learner_memories = []
 

@@ -82,3 +82,12 @@ RAG_MAX_CONTEXT_CHARS_DEFAULT = 120000
 SUMMARY_MAP_ENABLED_DEFAULT = True       # ``RAG_SUMMARY_MAP`` env toggle
 SUMMARY_MAP_MAX_SECTION_CHARS_DEFAULT = 6000
 SUMMARY_MAP_MAX_SECTIONS_DEFAULT = 80
+
+# ── External web-suggestion defaults (opt-in, fail-closed) ─────────────
+# Web search fires ONLY when internal doc topics are exhausted AND the
+# topic classifies as public. Proprietary docs never touch the web.
+# Reuses OLLAMA_CLOUD_API_KEY/BASE_URL (no new secret).
+WEB_SEARCH_ENABLED_DEFAULT = False     # ``WEB_SEARCH_ENABLED`` env toggle
+WEB_SEARCH_MAX_RESULTS_DEFAULT = 5
+WEB_SEARCH_TIMEOUT_DEFAULT = 30
+WEB_SEARCH_SYNTH_MODEL_DEFAULT = "gpt-oss:20b-cloud"

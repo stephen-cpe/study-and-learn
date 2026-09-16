@@ -195,6 +195,10 @@ class Suggestion(db.Model):
     title = db.Column(String(200), nullable=False)
     reason = db.Column(Text, nullable=True)
     source_refs = db.Column(Text, nullable=True)
+    # External (web) suggestions: URLs copied verbatim from web_search
+    # results (never invented). Internal rows use defaults (False/'[]').
+    is_external = db.Column(Boolean, default=False, nullable=False)
+    source_urls = db.Column(Text, nullable=True)
     status = db.Column(String(20), default=SUGGESTION_STATUS_PENDING, nullable=False)
     created_at = db.Column(DateTime, default=_utcnow)
     updated_at = db.Column(DateTime, default=_utcnow, onupdate=_utcnow)

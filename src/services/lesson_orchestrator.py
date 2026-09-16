@@ -228,9 +228,10 @@ def build_module_artifacts(
             each module to cover different document content. The set is
             mutated in-place — new chunk IDs from this module's retrieval
             are added so subsequent modules see them.
-        learner_memories: Optional list of short strings about the learner
-            (voice preference, passed modules). Passed through to the
-            narration generator for at-most-one natural callback.
+        learner_memories: Optional list of short strings or memory dicts
+            about the learner (voice preference entries are filtered out
+            by ``tts_persona``). Passed through to the narration
+            generator for at-most-one natural callback.
 
     Returns:
         dict with keys: 'lesson', 'quiz', 'checkpoints', 'sources'.
@@ -277,6 +278,7 @@ def build_module_artifacts(
             difficulty=difficulty,
             deck_layout=deck_layout,
             learner_memories=learner_memories,
+            tts_speaker=tts_speaker,
         )
         lesson_data['narration'] = narration
     else:

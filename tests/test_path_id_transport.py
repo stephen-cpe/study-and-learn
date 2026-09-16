@@ -169,8 +169,19 @@ def test_retake_accepts_path_id_from_query_string(mock_lesson, mock_quiz, mock_t
 
 @patch('src.services.quiz_generator.call_ollama')
 @patch('src.services.lesson_generator.call_ollama')
-def test_grade_accepts_path_id_from_query_string(mock_lesson, mock_quiz, path_id_client):
+def test_grade_accepts_path_id_from_query_string(mock_lesson, mock_quiz, path_id_client, monkeypatch, tmp_path):
     """Sanity: /grade must continue to accept path_id from query string."""
+    # Inline grade announcements synthesize audio for TTS-on users —
+    # redirect synthesis to tmp + stub edge-tts so this stays offline.
+    from src.services import tts_service as tts_module
+    monkeypatch.setattr(tts_module, 'TTS_DIR', tmp_path)
+    monkeypatch.setattr(tts_module, 'ANNOUNCE_DIR', tmp_path / 'announcements')
+
+    async def mock_mp3(text, voice, out_path):
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_bytes(b'fake-audio')
+
+    monkeypatch.setattr(tts_module, '_generate_mp3', mock_mp3)
     app, user = path_id_client
     real_path_id = _seed_lessons(app, user, None, num_modules=1)
     with app.test_client() as c:

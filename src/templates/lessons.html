@@ -295,13 +295,27 @@
       items.forEach(function (s) {
         var wrap = document.createElement('div');
         wrap.className = 'suggestion-entry card mb-2';
+        var badge = s.is_external
+          ? ' <span class="badge bg-info" title="External reference — verify links">Web</span>' : '';
+        var extNote = s.is_external
+          ? '<p class="text-muted"><small>External reference — verify links.</small></p>' : '';
+        var extLinks = '';
+        if (s.is_external && s.source_urls && s.source_urls.length) {
+          extLinks = '<p class="text-muted"><small>Sources: ' + s.source_urls.map(function (u) {
+            var safe = esc(u);
+            return '<a href="' + safe + '" target="_blank" rel="noopener">' + safe + '</a>';
+          }).join(' · ') + '</small></p>';
+        }
         wrap.innerHTML =
           '<div class="card-body">' +
-          '<h4>' + esc(s.title) + '</h4>' +
+          '<h4>' + esc(s.title) + badge + '</h4>' +
           (s.reason ? '<p>' + esc(s.reason) + '</p>' : '') +
           (s.source_refs ? '<p class="text-muted"><small>From: ' + esc(s.source_refs) + '</small></p>' : '') +
+          extNote + extLinks +
           '<button type="button" class="btn btn-primary btn-sm sg-generate">Generate Materials</button> ' +
-          '<button type="button" class="btn btn-outline-secondary btn-sm sg-dismiss">Dismiss</button>' +
+          '<button type="button" class="btn btn-outline-secondary btn-sm sg-dismiss">Dismiss</button> ' +
+          '<button type="button" class="btn btn-outline-primary btn-sm sg-listen" title="Listen to this suggestion">Listen</button>' +
+          '<audio class="sg-audio" preload="none" style="display:none"></audio>' +
           '</div>';
         wrap.querySelector('.sg-generate').addEventListener('click', function () {
           this.disabled = true;
@@ -320,6 +334,33 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ suggestion_id: s.id })
           }).then(function () { wrap.remove(); }).catch(function () {});
+        });
+        wrap.querySelector('.sg-listen').addEventListener('click', function () {
+          var btnListen = this;
+          btnListen.disabled = true;
+          btnListen.textContent = 'Loading...';
+          fetch('/tts/announce', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              path_id: pathId,
+              kind: 'suggestion',
+              suggestion: { title: s.title, reason: s.reason || '', is_external: !!s.is_external }
+            })
+          }).then(function (r) { return r.json(); }).then(function (data) {
+            btnListen.disabled = false;
+            btnListen.textContent = 'Listen';
+            if (data && data.ok && data.audio_url) {
+              var audio = wrap.querySelector('.sg-audio');
+              audio.style.display = '';
+              audio.src = data.audio_url;
+              audio.load();
+              audio.play().catch(function () {});
+            }
+          }).catch(function () {
+            btnListen.disabled = false;
+            btnListen.textContent = 'Listen';
+          });
         });
         list.appendChild(wrap);
       });

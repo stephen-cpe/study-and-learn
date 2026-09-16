@@ -11,6 +11,7 @@ All text passed to Communicate() must be plain text only.
 import asyncio
 import json
 import logging
+import re
 import shutil
 from pathlib import Path
 
@@ -26,6 +27,10 @@ SPEAKER_VOICES = {
     'Andrew': 'en-US-AndrewNeural',
 }
 DEFAULT_VOICE = 'en-US-AvaNeural'
+
+# On-demand announcement clips (Stage 2) live outside per-module
+# manifests: data/tts/announcements/<user_id>/<sha>.mp3
+ANNOUNCE_DIR = TTS_DIR / 'announcements'
 
 
 def _get_voice(speaker: str) -> str:
@@ -91,6 +96,68 @@ def get_audio_manifest(path_id: str, module_index: int) -> dict | None:
         except Exception:
             return None
     return None
+
+
+def generate_announcement_audio(user_id: str, text: str, speaker: str) -> dict:
+    """Generate (or reuse) a short on-demand announcement MP3.
+
+    Cache key is sha1(text+speaker) per user, so repeat plays skip
+    edge-tts. Returns {'ann_id', 'rel_path', 'from_cache', 'text'}.
+    Raises on synthesis failure (caller maps to 202/500).
+    """
+    import asyncio as _asyncio
+    import hashlib as _hashlib
+
+    clean = (text or '').strip()
+    if not clean:
+        raise ValueError("empty announcement text")
+    safe_speaker = speaker if speaker in SPEAKER_VOICES else 'Ava'
+    voice = _get_voice(safe_speaker)
+    digest = _hashlib.sha1(f"{safe_speaker}\n{clean}".encode('utf-8')).hexdigest()[:16]
+    user_dir = ANNOUNCE_DIR / str(user_id)
+    user_dir.mkdir(parents=True, exist_ok=True)
+    out_path = user_dir / f"{digest}.mp3"
+    meta_path = user_dir / f"{digest}.json"
+    if out_path.exists():
+        return {
+            'ann_id': digest,
+            'rel_path': str(out_path.relative_to(TTS_DIR)),
+            'from_cache': True,
+            'text': clean,
+        }
+    loop = _asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(_generate_mp3(clean, voice, out_path))
+    finally:
+        loop.run_until_complete(loop.shutdown_asyncgens())
+        loop.close()
+    try:
+        meta_path.write_text(json.dumps({'text': clean, 'speaker': safe_speaker}))
+    except Exception:
+        pass
+    return {
+        'ann_id': digest,
+        'rel_path': str(out_path.relative_to(TTS_DIR)),
+        'from_cache': False,
+        'text': clean,
+    }
+
+
+def get_announcement_path(user_id: str, ann_id: str) -> Path | None:
+    """Return the MP3 path for a user's announcement, or None."""
+    if not ann_id or not user_id:
+        return None
+    if not re.fullmatch(r'[0-9a-f]{16}', ann_id or ''):
+        return None
+    candidate = ANNOUNCE_DIR / str(user_id) / f"{ann_id}.mp3"
+    try:
+        resolved = candidate.resolve()
+        base = ANNOUNCE_DIR.resolve()
+        if base not in resolved.parents:
+            return None
+    except Exception:
+        return None
+    return candidate if candidate.exists() else None
 
 
 def delete_lesson_audio(path_id: str) -> None:

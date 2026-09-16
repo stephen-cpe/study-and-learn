@@ -107,6 +107,11 @@ def _shuffle_sequence(
     (display ``rights`` + per-left ``answer_indices``): the correct values
     are resolved before shuffling, then re-indexed into the new order.
 
+    The shuffle is guaranteed non-trivial: the displayed order is never
+    already solved (a derangement when possible, otherwise at minimum not
+    the identity). Learners must always rearrange at least one item —
+    a pre-filled 1,2,3,4 is never the correct answer.
+
     Returns (shuffled_display, new_correct) or None when the input is not
     a clean permutation (duplicates, out-of-range) — callers keep the
     original ordering in that case.
@@ -128,11 +133,30 @@ def _shuffle_sequence(
         return None
     if len(set(map(str, display))) != len(display):
         return None
-    indexed = list(enumerate(display))
-    random.shuffle(indexed)
-    old_to_new = {old: new for new, (old, _) in enumerate(indexed)}
+    n = len(display)
+    for _ in range(20):
+        indexed = list(enumerate(display))
+        random.shuffle(indexed)
+        # Skip the identity shuffle (display unchanged → already solved).
+        if all(old == new for new, (old, _) in enumerate(indexed)):
+            continue
+        old_to_new = {old: new for new, (old, _) in enumerate(indexed)}
+        new_correct = [old_to_new[i] for i in correct]
+        # Require a derangement when the answer is a permutation (no
+        # position already correct); otherwise require non-identity.
+        if sorted(new_correct) == list(range(n)):
+            if all(new_correct[i] != i for i in range(n)):
+                break
+        elif new_correct != list(range(n)):
+            break
+    else:
+        # Deterministic fallback: rotate left by one. Always a derangement
+        # for n > 1 and preserves the correct-answer remapping below.
+        indexed = list(enumerate(display))
+        indexed = indexed[1:] + indexed[:1]
+        old_to_new = {old: new for new, (old, _) in enumerate(indexed)}
+        new_correct = [old_to_new[i] for i in correct]
     shuffled = [text for _, text in indexed]
-    new_correct = [old_to_new[i] for i in correct]
     return shuffled, new_correct
 
 

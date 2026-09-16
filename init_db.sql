@@ -113,6 +113,8 @@ CREATE TABLE suggestion (
     title           VARCHAR(200) NOT NULL,
     reason          TEXT         NULL,
     source_refs     TEXT         NULL,
+    is_external     BOOLEAN      NOT NULL DEFAULT FALSE,
+    source_urls     TEXT         NULL,
     status          VARCHAR(20)  NOT NULL DEFAULT 'pending',
     created_at      TIMESTAMP    NULL,
     updated_at      TIMESTAMP    NULL,
@@ -161,7 +163,7 @@ CREATE TABLE alembic_version (
     CONSTRAINT pk_alembic_version PRIMARY KEY (version_num)
 );
 
-INSERT INTO alembic_version (version_num) VALUES ('i9j0k1l2m3n4');
+INSERT INTO alembic_version (version_num) VALUES ('j0k1l2m3n4o5');
 
 -- 6. Seed users (development only -- not for production)
 --

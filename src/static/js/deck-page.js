@@ -171,8 +171,60 @@
       })
         .then(function (r) { return r.json(); })
         .then(function (data) {
+          // Stage 2 spoken results: the announcement replaces the generic
+          // results-slot narration (same voice, no overlap). Suppress the
+          // results audio that showResults() would otherwise trigger via
+          // deckSlideChanged, then play the announcement when ready. If
+          // synthesis fails, fall back to the results-slot audio so the
+          // learner is never left in silence.
+          var wantAnnounce = !!(data && data.announcement && data.announcement.available);
+          if (wantAnnounce) { window.__ttsSuppressNext = true; }
           deck.showResults(data);
           if (window.renderDeckMath) window.renderDeckMath(document.body);
+          // Inline fast-path: grade may already carry a synthesized
+          // audio_url (zero gap). Otherwise fetch POST /tts/announce,
+          // else fall back to the results-slot audio.
+          function playUrl(url) {
+            if (!url) return false;
+            if (typeof window.__ttsPlayUrl === 'function') {
+              window.__ttsPlayUrl(url);
+            } else {
+              var p = document.getElementById('tts-player');
+              if (!p) return false;
+              p.src = url; p.load(); p.play().catch(function () {});
+            }
+            return true;
+          }
+          function playResultsFallback() {
+            if (typeof window.__ttsPlayResultsFallback === 'function') {
+              window.__ttsPlayResultsFallback();
+            }
+          }
+          try {
+            if (wantAnnounce) {
+              if (data.announcement.audio_url) {
+                playUrl(data.announcement.audio_url);
+              } else {
+                fetch('/tts/announce', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    path_id: pathId,
+                    module_index: moduleIndex,
+                    kind: 'lesson_complete'
+                  })
+                }).then(function (r) { return r.json(); }).then(function (a) {
+                  if (a && a.ok && a.audio_url) {
+                    playUrl(a.audio_url);
+                  } else {
+                    playResultsFallback();
+                  }
+                }).catch(function () {
+                  playResultsFallback();
+                });
+              }
+            }
+          } catch (e) { /* announcements must never break grading */ }
         })
         .catch(function () { alert('Error grading quiz. Please try again.'); });
     };
@@ -318,9 +370,249 @@
   }
 
   function initClozeSelects() {
-    document.querySelectorAll('.cloze-select, .checkpoint-select, .q-order-select, .q-matching-select').forEach(function (select) {
+    document.querySelectorAll('.cloze-select, .checkpoint-select, .q-matching-select').forEach(function (select) {
+      // Matching selects arrive pre-matched server-side; reflect that
+      // immediately so the answered styling is truthful on load.
+      // (Ordering ranks are hidden inputs — no change listener needed.)
+      if (select.value !== '') select.classList.add('has-value');
       select.addEventListener('change', function () {
         select.classList.toggle('has-value', select.value !== '');
+      });
+    });
+  }
+
+  /* Touch (finger) drag for reorder controls — mobile-safe complement to
+     the HTML5 mouse drag above and the up/down buttons. Pointer Events
+     carry touch/pen drags; a touchstart fallback covers older browsers.
+     Mouse pointers are ignored here so laptop/desktop behavior is
+     byte-for-byte unchanged (HTML5 DnD path above). Buttons remain the
+     precise path on every device; finger-drag is the fast path. */
+  function enableTouchDrag(list, rowSelector, onDrop) {
+    var dragRow = null;
+
+    function clearTarget() {
+      list.querySelectorAll('.drag-over').forEach(function (el) { el.classList.remove('drag-over'); });
+    }
+
+    function targetFromPoint(x, y) {
+      var el = null;
+      try { el = document.elementFromPoint(x, y); } catch (err) { return null; }
+      if (!el || !el.closest) return null;
+      var row = el.closest(rowSelector);
+      return (row && list.contains(row)) ? row : null;
+    }
+
+    function autoScroll(y) {
+      var scroller = list.closest('.scroll-container');
+      if (!scroller) return;
+      var r = scroller.getBoundingClientRect();
+      if (y < r.top + 56) scroller.scrollTop -= 14;
+      else if (y > r.bottom - 56) scroller.scrollTop += 14;
+    }
+
+    function start(row) {
+      if (!row || dragRow) return;
+      dragRow = row;
+      requestAnimationFrame(function () { if (dragRow) dragRow.classList.add('dragging'); });
+    }
+
+    function move(x, y) {
+      if (!dragRow) return;
+      clearTarget();
+      var t = targetFromPoint(x, y);
+      if (t && t !== dragRow) t.classList.add('drag-over');
+      autoScroll(y);
+    }
+
+    function end(x, y) {
+      if (!dragRow) return;
+      var src = dragRow;
+      dragRow = null;
+      src.classList.remove('dragging');
+      var t = (x === undefined) ? null : targetFromPoint(x, y);
+      clearTarget();
+      if (t && t !== src) onDrop(src, t, y);
+    }
+
+    var usePointer = ('PointerEvent' in window);
+    list.querySelectorAll('.q-drag-handle').forEach(function (handle) {
+      if (usePointer) {
+        handle.addEventListener('pointerdown', function (e) {
+          if (e.pointerType === 'mouse') return;
+          e.preventDefault();
+          start(handle.closest(rowSelector));
+        });
+      } else {
+        handle.addEventListener('touchstart', function (e) {
+          if (e.touches.length !== 1) return;
+          e.preventDefault();
+          start(handle.closest(rowSelector));
+        }, { passive: false });
+      }
+    });
+    if (usePointer) {
+      document.addEventListener('pointermove', function (e) {
+        if (!dragRow) return;
+        move(e.clientX, e.clientY);
+      });
+      document.addEventListener('pointerup', function (e) {
+        if (!dragRow) return;
+        end(e.clientX, e.clientY);
+      });
+      document.addEventListener('pointercancel', function () { end(); });
+    } else {
+      document.addEventListener('touchmove', function (e) {
+        if (!dragRow || e.touches.length !== 1) return;
+        e.preventDefault();
+        move(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+      document.addEventListener('touchend', function (e) {
+        if (!dragRow) return;
+        var t = e.changedTouches[0];
+        end(t.clientX, t.clientY);
+      });
+      document.addEventListener('touchcancel', function () { end(); });
+    }
+  }
+
+  /* Ordering: drag handle + up/down buttons reorder rows in the DOM.
+     Rank = DOM position (badge + hidden .q-order-select value stay in
+     sync). data-item (original display index) never changes, so the
+     deck-engine grading mapping is untouched. Buttons are the
+     touch/keyboard-safe path; drag handles serve mouse users. */
+  function reindexOrderingList(list) {
+    var rows = list.querySelectorAll('.q-ordering-row');
+    rows.forEach(function (row, pos) {
+      var hidden = row.querySelector('.q-order-select');
+      if (hidden) hidden.value = String(pos + 1);
+      var badge = row.querySelector('.q-position-badge');
+      if (badge) badge.textContent = String(pos + 1);
+      var up = row.querySelector('.q-move-up');
+      var down = row.querySelector('.q-move-down');
+      if (up) up.disabled = (pos === 0);
+      if (down) down.disabled = (pos === rows.length - 1);
+    });
+  }
+
+  function initOrderingControls() {
+    var draggedRow = null;
+    document.querySelectorAll('.ordering-list').forEach(function (list) {
+      reindexOrderingList(list);
+      list.addEventListener('click', function (e) {
+        var btn = e.target.closest('.q-move-btn');
+        if (!btn || btn.disabled) return;
+        var row = btn.closest('.q-ordering-row');
+        if (!row) return;
+        var dir = parseInt(btn.dataset.move, 10) || 0;
+        var sibling = dir < 0 ? row.previousElementSibling : row.nextElementSibling;
+        while (sibling && !sibling.classList.contains('q-ordering-row')) {
+          sibling = dir < 0 ? sibling.previousElementSibling : sibling.nextElementSibling;
+        }
+        if (!sibling) return;
+        if (dir < 0) list.insertBefore(row, sibling);
+        else list.insertBefore(row, sibling.nextElementSibling);
+        reindexOrderingList(list);
+      });
+      list.querySelectorAll('.q-drag-handle').forEach(function (handle) {
+        handle.addEventListener('dragstart', function (e) {
+          draggedRow = handle.closest('.q-ordering-row');
+          try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', ''); } catch (err) {}
+          requestAnimationFrame(function () { if (draggedRow) draggedRow.classList.add('dragging'); });
+        });
+        handle.addEventListener('dragend', function () {
+          if (draggedRow) draggedRow.classList.remove('dragging');
+          draggedRow = null;
+          list.querySelectorAll('.drag-over').forEach(function (el) { el.classList.remove('drag-over'); });
+        });
+      });
+      list.querySelectorAll('.q-ordering-row').forEach(function (row) {
+        row.addEventListener('dragover', function (e) {
+          if (!draggedRow || draggedRow === row) return;
+          e.preventDefault();
+          row.classList.add('drag-over');
+        });
+        row.addEventListener('dragleave', function () { row.classList.remove('drag-over'); });
+        row.addEventListener('drop', function (e) {
+          if (!draggedRow || draggedRow === row) return;
+          e.preventDefault();
+          var rect = row.getBoundingClientRect();
+          var after = (e.clientY - rect.top) > rect.height / 2;
+          list.insertBefore(draggedRow, after ? row.nextElementSibling : row);
+          row.classList.remove('drag-over');
+          reindexOrderingList(list);
+        });
+      });
+      // Finger-drag (touch/pen only; mouse keeps the HTML5 path above).
+      enableTouchDrag(list, '.q-ordering-row', function (src, target, y) {
+        var rect = target.getBoundingClientRect();
+        var after = (y - rect.top) > rect.height / 2;
+        list.insertBefore(src, after ? target.nextElementSibling : target);
+        reindexOrderingList(list);
+      });
+    });
+  }
+
+  /* Matching: rows stay fixed (lefts), the right-side answers move.
+     Up/down buttons and drag-swap exchange two rows' select values, so
+     the deck-engine collector (reads .q-matching-select values) and
+     screen-reader semantics are unchanged. */
+  function swapMatchingRows(rowA, rowB) {
+    if (!rowA || !rowB || rowA === rowB) return;
+    var selA = rowA.querySelector('.q-matching-select');
+    var selB = rowB.querySelector('.q-matching-select');
+    if (!selA || !selB) return;
+    var tmp = selA.value;
+    selA.value = selB.value;
+    selB.value = tmp;
+    selA.classList.add('has-value');
+    selB.classList.add('has-value');
+  }
+
+  function initMatchingControls() {
+    var dragSrcRow = null;
+    document.querySelectorAll('.matching-list').forEach(function (list) {
+      list.addEventListener('click', function (e) {
+        var btn = e.target.closest('.q-move-btn');
+        if (!btn || btn.disabled) return;
+        var row = btn.closest('.q-matching-row');
+        if (!row) return;
+        var dir = parseInt(btn.dataset.move, 10) || 0;
+        var sibling = dir < 0 ? row.previousElementSibling : row.nextElementSibling;
+        while (sibling && !sibling.classList.contains('q-matching-row')) {
+          sibling = dir < 0 ? sibling.previousElementSibling : sibling.nextElementSibling;
+        }
+        if (!sibling) return;
+        swapMatchingRows(row, sibling);
+      });
+      list.querySelectorAll('.q-drag-handle').forEach(function (handle) {
+        handle.addEventListener('dragstart', function (e) {
+          dragSrcRow = handle.closest('.q-matching-row');
+          try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', ''); } catch (err) {}
+          requestAnimationFrame(function () { if (dragSrcRow) dragSrcRow.classList.add('dragging'); });
+        });
+        handle.addEventListener('dragend', function () {
+          if (dragSrcRow) dragSrcRow.classList.remove('dragging');
+          dragSrcRow = null;
+          list.querySelectorAll('.drag-over').forEach(function (el) { el.classList.remove('drag-over'); });
+        });
+      });
+      list.querySelectorAll('.q-matching-row').forEach(function (row) {
+        row.addEventListener('dragover', function (e) {
+          if (!dragSrcRow || dragSrcRow === row) return;
+          e.preventDefault();
+          row.classList.add('drag-over');
+        });
+        row.addEventListener('dragleave', function () { row.classList.remove('drag-over'); });
+        row.addEventListener('drop', function (e) {
+          if (!dragSrcRow || dragSrcRow === row) return;
+          e.preventDefault();
+          swapMatchingRows(dragSrcRow, row);
+          row.classList.remove('drag-over');
+        });
+      });
+      // Finger-drag swap (touch/pen only; mouse keeps the HTML5 path above).
+      enableTouchDrag(list, '.q-matching-row', function (src, target) {
+        swapMatchingRows(src, target);
       });
     });
   }
@@ -331,6 +623,8 @@
       window.initDeckPage();
       initSourceToggles();
       initClozeSelects();
+      initOrderingControls();
+      initMatchingControls();
     }
   });
 
@@ -351,11 +645,40 @@
     }
 
     function playSlide(deckIndex) {
+      // Suppressed once when a lesson_complete announcement replaces the
+      // generic results-slot narration (set by gradeQuiz before
+      // showResults triggers this via deckSlideChanged). Consumed even
+      // when muted so the flag never leaks into later navigation.
+      if (window.__ttsSuppressNext) {
+        window.__ttsSuppressNext = false;
+        return;
+      }
       if (muted || !player) return;
       player.src = audioUrl(deckIndex);
       player.load();
       player.play().catch(function() {});
     }
+
+    // Stage 2 hook: gradeQuiz plays announcement clips through the same
+    // player so mute + single-audio-element semantics hold.
+    window.__ttsSuppressNext = false;
+    window.__ttsPlayResultsFallback = function () {
+      var resultsEl = document.querySelector('.results-slide');
+      var di = resultsEl ? parseInt(resultsEl.dataset.deckIndex) : NaN;
+      if (isNaN(di)) {
+        var slides = document.querySelectorAll('.deck-container .slide');
+        di = slides.length ? slides.length - 1 : 0;
+      }
+      playSlide(di);
+    };
+    window.__ttsIsMuted = function () { return muted; };
+    window.__ttsPlayUrl = function (url) {
+      if (muted || !player || !url) return;
+      try { player.pause(); } catch (e) {}
+      player.src = url;
+      player.load();
+      player.play().catch(function() {});
+    };
 
     // Play the intro (slide_index -1) after a short delay so the deck's
     // goToSlide(0) doesn't preempt it with the first content slide's audio.

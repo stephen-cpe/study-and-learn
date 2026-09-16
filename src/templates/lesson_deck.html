@@ -178,30 +178,37 @@
                                 </select>
                             </div>
                             {% elif q.type == 'ordering' %}
-                            <div class="q-options ordering-list">
-                                {% for item in q['items'] %}
-                                <div class="q-ordering-row">
-                                    <select class="q-select q-order-select" name="{{ q.id }}--{{ loop.index0 }}" data-qid="{{ q.id }}" data-item="{{ loop.index0 }}">
-                                        <option value="" disabled selected>#</option>
-                                        {% for _rank in q['items'] %}
-                                        <option value="{{ loop.index }}">{{ loop.index }}</option>
-                                        {% endfor %}
-                                    </select>
-                                    <span class="q-ordering-item">{{ item }}</span>
+                            <div class="q-options ordering-list" data-qid="{{ q.id }}">
+                                <p class="quiz-instructions">Drag the handle or use ↑ ↓ to put the steps in the correct order (top = first). The starting order is never correct.</p>
+                                {% for item_idx in range(q['items']|length) %}
+                                <div class="q-ordering-row" data-item="{{ item_idx }}">
+                                    <span class="q-drag-handle" draggable="true" title="Drag to reorder" aria-hidden="true">⠿</span>
+                                    <span class="q-position-badge" aria-hidden="true">{{ item_idx + 1 }}</span>
+                                    <span class="q-ordering-item">{{ q['items'][item_idx] }}</span>
+                                    <span class="q-move-btns" role="group" aria-label="Move step">
+                                        <button type="button" class="q-move-btn q-move-up" data-move="-1" aria-label="Move {{ q['items'][item_idx] }} up">↑</button>
+                                        <button type="button" class="q-move-btn q-move-down" data-move="1" aria-label="Move {{ q['items'][item_idx] }} down">↓</button>
+                                    </span>
+                                    <input type="hidden" class="q-select q-order-select" name="{{ q.id }}--{{ item_idx }}" data-qid="{{ q.id }}" data-item="{{ item_idx }}" value="{{ item_idx + 1 }}">
                                 </div>
                                 {% endfor %}
                             </div>
                             {% elif q.type == 'matching' %}
-                            <div class="q-options matching-list">
-                                {% for left in q.lefts %}
-                                <div class="q-matching-row">
-                                    <span class="q-matching-left">{{ left }}</span>
-                                    <select class="q-select q-matching-select" name="{{ q.id }}--{{ loop.index0 }}" data-qid="{{ q.id }}" data-left="{{ loop.index0 }}">
-                                        <option value="" disabled selected>Select match...</option>
-                                        {% for r in q.rights %}
-                                        <option value="{{ loop.index0 }}">{{ r }}</option>
+                            <div class="q-options matching-list" data-qid="{{ q.id }}">
+                                <p class="quiz-instructions">Match each term to its definition (↑ ↓ or drag the handle to swap answers). The starting matches are never correct.</p>
+                                {% for left_idx in range(q.lefts|length) %}
+                                <div class="q-matching-row" data-left="{{ left_idx }}">
+                                    <span class="q-matching-left">{{ q.lefts[left_idx] }}</span>
+                                    <select class="q-select q-matching-select has-value" name="{{ q.id }}--{{ left_idx }}" data-qid="{{ q.id }}" data-left="{{ left_idx }}" aria-label="Match for {{ q.lefts[left_idx] }}">
+                                        {% for r_idx in range(q.rights|length) %}
+                                        <option value="{{ r_idx }}" {{ 'selected' if r_idx == (left_idx % (q.rights|length)) }}>{{ q.rights[r_idx] }}</option>
                                         {% endfor %}
                                     </select>
+                                    <span class="q-move-btns" role="group" aria-label="Swap match">
+                                        <button type="button" class="q-move-btn q-swap-up" data-move="-1" aria-label="Swap match with row above">↑</button>
+                                        <button type="button" class="q-move-btn q-swap-down" data-move="1" aria-label="Swap match with row below">↓</button>
+                                    </span>
+                                    <span class="q-drag-handle" draggable="true" title="Drag onto another row to swap answers" aria-hidden="true">⠿</span>
                                 </div>
                                 {% endfor %}
                             </div>
@@ -278,7 +285,11 @@
                 {% for src in sources %}
                 <div class="source-entry">
                     <div class="source-entry-header">
+                        {% if src.url %}
+                        <a href="{{ src.url }}" target="_blank" rel="noopener" class="source-filename">{{ src.filename }}</a>
+                        {% else %}
                         <span class="source-filename">{{ src.filename }}</span>
+                        {% endif %}
                     </div>
                     {% if src.figures %}
                     <div class="source-figures">

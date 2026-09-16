@@ -190,7 +190,10 @@
 }
 
 .quiz-question .q-option:has(input[type="checkbox"]:checked)::after {
-    content: "✓";
+    /* Filled square (matches the radio's filled circle above): the box
+       itself is the control, so a "✓" glyph breaks the retro immersion.
+       Inner fill in accent color with the same glow treatment. */
+    content: "";
     position: absolute;
     left: 0.55em;
     top: 50%;
@@ -198,11 +201,9 @@
     height: 1.05em;
     margin-top: -0.525em;
     box-sizing: border-box;
-    color: var(--deck-accent-light);
-    font-size: 0.95em;
-    line-height: 1.05em;
-    text-align: center;
-    text-shadow: 0 0 6px rgba(0, 180, 216, 0.8);
+    border-radius: 2px;
+    background: var(--deck-accent);
+    box-shadow: 0 0 8px rgba(0, 180, 216, 0.8), inset 0 0 3px rgba(5, 11, 20, 0.6);
     pointer-events: none;
 }
 
@@ -678,4 +679,109 @@
 
 .q-matching-row .q-select {
     flex: 1 1 55%;
+}
+
+/* ── Ordering / matching reorder controls ──────────────────────────
+   Position badge + move buttons + drag handle share the deck accent
+   language. Buttons are the touch/keyboard-safe path; the handle serves
+   mouse drag. Hidden rank inputs (.q-order-select[type=hidden]) carry
+   no visuals. */
+.q-position-badge {
+    flex: none;
+    min-width: 1.6em;
+    height: 1.6em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--deck-accent);
+    border-radius: 50%;
+    color: var(--deck-accent-light);
+    font-family: "BoldPixels", sans-serif;
+    font-size: 0.55em;
+    background: rgba(0, 180, 216, 0.08);
+    box-shadow: 0 0 6px rgba(0, 180, 216, 0.25);
+}
+
+.q-drag-handle {
+    flex: none;
+    cursor: grab;
+    color: var(--deck-accent);
+    font-size: 0.7em;
+    padding: 0.1em 0.25em;
+    border-radius: 4px;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+    opacity: 0.75;
+}
+
+.q-drag-handle:hover {
+    opacity: 1;
+    background: rgba(0, 180, 216, 0.12);
+}
+
+.q-drag-handle:active {
+    cursor: grabbing;
+}
+
+.q-move-btns {
+    flex: none;
+    display: inline-flex;
+    gap: 0.15em;
+}
+
+.q-move-btn {
+    background: rgba(0, 180, 216, 0.08);
+    border: 1px solid rgba(0, 180, 216, 0.35);
+    border-radius: 4px;
+    color: var(--deck-accent);
+    font-family: "BoldPixels", sans-serif;
+    font-size: 0.55em;
+    line-height: 1;
+    padding: 0.25em 0.4em;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.q-move-btn:hover:not(:disabled) {
+    background: rgba(0, 180, 216, 0.2);
+    border-color: var(--deck-accent-light);
+}
+
+.q-move-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.q-ordering-row.dragging,
+.q-matching-row.dragging {
+    opacity: 0.45;
+}
+
+.q-ordering-row.drag-over,
+.q-matching-row.drag-over {
+    outline: 2px dashed var(--deck-accent-light);
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+
+/* Finger-sized targets on touch devices only (pointer: coarse).
+   Laptop/desktop rendering is untouched — same sizes as before. */
+@media (pointer: coarse) {
+    .q-drag-handle {
+        font-size: 1.05em;
+        padding: 0.45em 0.6em;
+        opacity: 1;
+    }
+
+    .q-move-btn {
+        font-size: 0.8em;
+        padding: 0.5em 0.65em;
+    }
+
+    .q-position-badge {
+        min-width: 2em;
+        height: 2em;
+        font-size: 0.65em;
+    }
 }
