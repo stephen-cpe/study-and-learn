@@ -1214,6 +1214,7 @@ def accept_suggestion():
 
         def _web_retrieve(query: str, exclude_chunks: set = None):
             from urllib.parse import urlparse as _urlparse
+
             from src.services.web_search_service import web_fetch as _fetch
             parts, sources = [], []
             for u in (stored_urls or [])[:2]:

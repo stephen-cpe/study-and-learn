@@ -101,6 +101,7 @@ def test_matching_rows_have_swap_buttons_and_preselected(dnd_client):
 
 def test_shuffle_guarantees_nontrivial_order():
     import random
+
     from src.services.quiz_generator import _shuffle_sequence
     random.seed(20260916)
     for _ in range(100):
