@@ -22,6 +22,41 @@ logger = logging.getLogger(__name__)
 
 MAX_SUGGESTIONS = 3
 
+# Minimum normalized length for the substring half of the near-duplicate
+# check below. Short titles ("AI", "Safety") are substrings of many
+# unrelated topics, so containment only counts for longer titles where
+# it reliably signals a true duplicate (e.g. "Backend Engineering:
+# Flask APIs and Data Management" vs "... Data Management (SQL/NoSQL)").
+MIN_DUP_SUBSTRING_LEN = 20
+
+
+def _normalize_title(text: str) -> str:
+    """Normalize a module/suggestion title for duplicate comparison.
+
+    Lowercases, drops parenthetical qualifiers ("(SQL/NoSQL)"), strips
+    punctuation, and collapses whitespace so near-identical titles
+    compare equal even when the LLM rephrases slightly.
+    """
+    import re as _re
+    t = str(text or '').lower()
+    t = _re.sub(r'\([^)]*\)', ' ', t)
+    t = _re.sub(r'[^a-z0-9\s]', ' ', t)
+    return _re.sub(r'\s+', ' ', t).strip()
+
+
+def _is_duplicate_title(candidate: str, planned_norm: set) -> bool:
+    """Return True if *candidate* duplicates any planned-module title."""
+    norm = _normalize_title(candidate)
+    if not norm or norm in planned_norm:
+        return True
+    for p in planned_norm:
+        if not p:
+            continue
+        short, long = (norm, p) if len(norm) <= len(p) else (p, norm)
+        if len(short) >= MIN_DUP_SUBSTRING_LEN and short in long:
+            return True
+    return False
+
 
 def _truncate(text: str, limit: int) -> str:
     text = text or ""
@@ -91,9 +126,12 @@ def compute_suggestions(
             if not title or title.lower() in seen:
                 continue
             # Never suggest something already planned — the module list is
-            # the source of truth for "taught".
-            planned = {(m.get("title", "") or "").strip().lower() for m in (modules or [])}
-            if title.lower() in planned:
+            # the source of truth for "taught". Comparison is normalized
+            # (case/punctuation/parentheticals ignored) with substring
+            # matching so near-duplicates ("X (SQL/NoSQL)" vs "X") are
+            # also skipped.
+            planned = {_normalize_title(m.get('title', '')) for m in (modules or [])}
+            if _is_duplicate_title(title, planned):
                 continue
             seen.add(title.lower())
             suggestions.append({

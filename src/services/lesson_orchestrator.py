@@ -9,6 +9,7 @@ from src.services.lesson_generator import generate_lesson
 from src.services.quiz_generator import generate_inline_checkpoint, generate_quiz
 from src.services.rag_retriever import (
     build_rag_context,
+    build_rag_context_from_hashes,
     build_rag_context_from_hashes_with_sources,
 )
 from src.services.settings_service import DEFAULT_DIFFICULTY, DEFAULT_TTS_SPEAKER
@@ -112,7 +113,7 @@ def make_retriever(goal: str, extracted_texts: List[str]) -> Callable[[str], Dic
         mode has no ChromaDB source provenance).
     """
     def retrieve(query: str) -> Dict[str, Any]:
-        text = build_rag_context(goal, extracted_texts) if extracted_texts else ""
+        text = build_rag_context(query or goal, extracted_texts) if extracted_texts else ""
         return {"context_text": text, "sources": []}
     return retrieve
 
@@ -127,7 +128,7 @@ def make_retriever_from_hashes(goal: str, file_hashes: List[str]) -> Callable[[s
     """
     def retrieve(query: str) -> Dict[str, Any]:
         try:
-            result = build_rag_context_from_hashes_with_sources(goal, file_hashes)
+            result = build_rag_context_from_hashes(query or goal, file_hashes)
             return result
         except Exception:
             return {"context_text": "", "sources": []}
@@ -168,7 +169,7 @@ def make_retriever_from_hashes_with_names(
             from src.services.rag_budget import get_context_budget_chars
             module_budget = get_context_budget_chars(fraction=0.35)
             result = build_rag_context_from_hashes_with_sources(
-                goal, file_hashes, file_names,
+                query or goal, file_hashes, file_names,
                 top_k=None, exclude_chunks=exclude_chunks,
                 max_chars=module_budget,
             )

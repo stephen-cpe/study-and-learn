@@ -163,10 +163,119 @@ def sweep_orphaned_tasks() -> int:
 __all__ = [
     'TASK_KIND_GENERATE', 'TASK_KIND_PROCESS',
     'TASK_STATUS_FAILED', 'TASK_STATUS_READY', 'TASK_STATUS_RUNNING',
-    'clear_finished', 'create_task', 'dismiss_task', 'fail_task',
-    'finish_task', 'list_tasks', 'mark_read', 'sweep_orphaned_tasks',
-    'unread_count',
+    'claim_pipeline_task', 'clear_finished', 'create_task',
+    'discard_task', 'dismiss_task', 'fail_task',
+    'finish_task', 'get_running_task', 'list_tasks', 'mark_read',
+    'sweep_orphaned_tasks', 'unread_count',
 ]
+
+
+def get_running_task(user_id: str, kind: str, max_age_s: int = 7200):
+    """Return the user's freshest running task row of *kind*, or None.
+
+    Rows older than *max_age_s* (by ``created_at``) are treated as stale
+    and ignored — a crashed pipeline's row only blocks re-submits until
+    the boot sweep flips it to failed. Never raises.
+    """
+    try:
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc)
+        rows = (BackgroundTask.query
+                .filter_by(user_id=user_id, kind=kind, status=TASK_STATUS_RUNNING)
+                .order_by(BackgroundTask.created_at.asc()).all())
+        for row in rows:
+            created = row.created_at
+            if created is None:
+                return row
+            try:
+                if created.tzinfo is None:
+                    created = created.replace(tzinfo=timezone.utc)
+                if (now - created).total_seconds() <= max_age_s:
+                    return row
+            except Exception:
+                return row
+        return None
+    except Exception:
+        return None
+
+
+def claim_pipeline_task(task_id: str, user_id: str, kind: str = TASK_KIND_PROCESS,
+                        label: str = "", match_label: str = "") -> tuple:
+    """Insert-then-verify singleflight claim for long pipelines.
+
+    Registers our own running row, then looks for an older competing
+    running row for the same user+kind. The oldest pipeline wins;
+    newer duplicates back off so double-clicks/retries never run two
+    expensive pipelines (and never overshoot the 3-active-lesson cap).
+
+    Returns ``(winner: bool, existing_task_id: str | None,
+    same_goal: bool)``. ``same_goal`` compares *match_label* against the
+    winner's label so callers can follow an identical re-submit but warn
+    on a genuinely different concurrent job. Fail-open (``(True, None,
+    False)``) on any error to preserve historic behavior. Never raises.
+    """
+    try:
+        create_task(task_id, user_id, kind=kind, label=label)
+        rows = (BackgroundTask.query
+                .filter_by(user_id=user_id, kind=kind, status=TASK_STATUS_RUNNING)
+                .order_by(BackgroundTask.created_at.asc()).all())
+        mine = None
+        competitors = []
+        for row in rows:
+            if row.task_id == task_id:
+                mine = row
+            else:
+                competitors.append(row)
+        if not competitors:
+            return True, None, False
+        oldest = competitors[0]
+        try:
+            from datetime import timezone
+
+            def _aware(dt):
+                if dt is not None and dt.tzinfo is None:
+                    return dt.replace(tzinfo=timezone.utc)
+                return dt
+
+            own_ts = _aware(mine.created_at) if mine is not None else None
+            old_ts = _aware(oldest.created_at)
+            if own_ts is not None and old_ts is not None:
+                if (own_ts, task_id) < (old_ts, oldest.task_id):
+                    return True, None, False
+            elif mine is not None and oldest.created_at is None:
+                return True, None, False
+        except Exception:
+            pass
+        # We lost: mark our row failed so the bell stays honest, then
+        # report the winner for resume-or-warn handling upstream.
+        fail_task(task_id, error='Superseded — an identical job was already running.')
+        same_goal = bool(match_label) and (oldest.label or '') == match_label
+        return False, oldest.task_id, same_goal
+    except Exception as e:
+        logger.warning("claim_pipeline_task failed, failing open: %s", str(e))
+        return True, None, False
+
+
+def discard_task(task_id: str, user_id: str = "") -> bool:
+    """Delete a task row outright (owner-scoped when *user_id* given).
+
+    Used for non-AJAX form pipelines that need race-guard bookkeeping
+    without leaving bell spam behind. Never raises.
+    """
+    try:
+        query = BackgroundTask.query.filter_by(task_id=task_id)
+        if user_id:
+            query = query.filter_by(user_id=user_id)
+        row = query.first()
+        if row is None:
+            return False
+        db.session.delete(row)
+        db.session.commit()
+        return True
+    except Exception:
+        db.session.rollback()
+        return False
 
 
 def dismiss_task(task_id: str, user_id: str) -> bool:

@@ -224,13 +224,15 @@ def compute_external_suggestions(
         result = extract_json(response)
         raw = (result or {}).get('suggestions', []) if isinstance(result, dict) else []
 
-        planned = {(m.get('title', '') or '').strip().lower() for m in modules}
+        from src.services.suggest_next import _is_duplicate_title as _dup
+        from src.services.suggest_next import _normalize_title as _norm
+        planned = {_norm((m or {}).get('title', '')) for m in modules}
         suggestions, seen = [], set()
         for item in raw:
             if not isinstance(item, dict):
                 continue
             title = str(item.get('title', '')).strip()
-            if not title or title.lower() in seen or title.lower() in planned:
+            if not title or _norm(title) in seen or _dup(title, planned):
                 continue
             # Verbatim-URL enforcement: drop invented links.
             urls = item.get('source_urls', []) or []
@@ -238,7 +240,7 @@ def compute_external_suggestions(
                 urls = [urls]
             clean_urls = [u.strip() for u in urls
                           if isinstance(u, str) and u.strip() in allowed_urls][:3]
-            seen.add(title.lower())
+            seen.add(_norm(title))
             suggestions.append({
                 'title': title[:200],
                 'reason': str(item.get('reason', '')).strip()[:1000],

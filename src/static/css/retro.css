@@ -1522,6 +1522,51 @@ h2, .section-title {
     font-size: 1.05rem;
 }
 
+/* ===== WEAK SIGNALS (review strip) ===== */
+/* Same card language as .suggestion-card, with a warning-amber accent
+   bar so missed/partial items read as "attention" rather than a new
+   feature bolted on beside the Keep Learning card. */
+.weak-card {
+    border: 1px solid var(--az-border);
+    border-left: 4px solid var(--az-warning);
+}
+
+.weak-title {
+    color: var(--az-warning);
+    font-family: "BoldPixels", sans-serif;
+    font-size: 1.1rem;
+    margin-bottom: 0.25rem;
+}
+
+.weak-entry {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 0;
+    border-top: 1px solid rgba(255, 209, 102, 0.16);
+}
+
+.weak-badge {
+    background: rgba(255, 209, 102, 0.14);
+    color: var(--az-warning);
+    border-color: rgba(255, 209, 102, 0.45);
+    flex-shrink: 0;
+}
+
+.weak-prompt {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--az-silver);
+    font-size: 0.85em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.weak-review-btn {
+    flex-shrink: 0;
+}
+
 /* ===== RETRO DROPDOWN MENU ===== */
 .retro-dropdown-menu {
     background: var(--az-darker);

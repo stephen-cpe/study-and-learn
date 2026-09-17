@@ -272,6 +272,41 @@
     })
       .then(function (r) { return r.json().catch(function () { return {}; }); })
       .then(function (resp) {
+        if (resp.resumed && resp.task_id) {
+          // Singleflight: an identical generation is already running —
+          // follow it via the shared resume machinery instead of polling
+          // our own dead task id.
+          window.stopProgressPoll();
+          window.stopProcessProgressPoll();
+          window.saveBackgroundTask('generate', resp.task_id);
+          window.setBubblePersistent('A generation is already running — following it...');
+          window.resumeBackgroundTask();
+          return;
+        }
+        if (resp.error) {
+          window.clearBackgroundTask();
+          window.stopProgressPoll();
+          window.stopProcessProgressPoll();
+          window.setBubblePersistent(resp.error);
+          window.showBubbleBar(0);
+          window._progressActive = false;
+          var btn = document.getElementById('generate-lessons-btn');
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Generate Interactive Lessons';
+          }
+          return;
+        }
+        if (resp.accepted) {
+          // Full-async generation: the POST returned immediately and the
+          // worker thread owns the pipeline. path_id arrives up front so
+          // poll (B) below can start at once; the redirect fires when the
+          // worker (or the chained TTS worker) sets the completion flag.
+          // Empty string is allowed — the status endpoint falls back to
+          // the most recent active path.
+          resolvedPathId = resp.path_id || '';
+          return;
+        }
         if (resp.redirect) {
           window.clearBackgroundTask();
           resolvedRedirectUrl = resp.redirect;
@@ -420,11 +455,15 @@
         .catch(function () {});
 
       // ── Poll (B): redirect decision from /lessons/generation-status ─
-      // Only runs once resolvedPathId is set. The redirect is the
-      // ONLY signal we act on; cosmetic updates from this endpoint
-      // are ignored because poll (A) already provides them with
+      // Runs once the POST has answered (resolvedPathId set, possibly to
+      // '' meaning "server fallback to most recent active path"). The
+      // redirect is the ONLY signal we act on; cosmetic updates from this
+      // endpoint are ignored because poll (A) already provides them with
       // lower latency and finer granularity.
-      if (!resolvedPathId) return;
+      // A failed worker surfaces here via task_status.error — stop both
+      // polls, show the error, and re-arm the button instead of hanging
+      // until the hard timeout.
+      if (resolvedPathId === null || resolvedPathId === undefined) return;
 
       var statusUrl = '/lessons/generation-status?path_id='
         + encodeURIComponent(resolvedPathId)
@@ -434,6 +473,23 @@
         .then(function (r) { return r.json(); })
         .then(function (data) {
           if (!data) return;
+
+          if (data.task_status && data.task_status.error === true) {
+            window.stopProgressPoll();
+            window.clearBackgroundTask();
+            window.setBubblePersistent(
+              (data.task_status.mascot && data.task_status.mascot !== 'Working on your lesson...')
+                ? data.task_status.mascot
+                : 'Generation failed — please retry.');
+            window.showBubbleBar(0);
+            window._progressActive = false;
+            var genBtn = document.getElementById('generate-lessons-btn');
+            if (genBtn) {
+              genBtn.disabled = false;
+              genBtn.textContent = 'Generate Interactive Lessons';
+            }
+            return;
+          }
 
           // Redirect signal ONLY — ``generation_completed`` is
           // sourced from ``StudyPath.generation_completed_at`` (the
@@ -446,8 +502,11 @@
           // fire prematurely in some environments.
           if (data.generation_completed === true) {
             window.stopProgressPoll();
-            var finalUrl = resolvedRedirectUrl || window._generateRedirectUrl;
-            window.location.href = finalUrl;
+            var finalUrl = resolvedRedirectUrl;
+            if (!finalUrl && resolvedPathId) {
+              finalUrl = '/lessons?path_id=' + encodeURIComponent(resolvedPathId);
+            }
+            window.location.href = finalUrl || window._generateRedirectUrl;
           }
         })
         .catch(function () {});

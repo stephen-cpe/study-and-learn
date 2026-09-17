@@ -92,6 +92,13 @@
                 if (data.redirect) {
                   window.clearBackgroundTask();
                   window.location.href = data.redirect;
+                } else if (data.resumed && data.task_id) {
+                  // Singleflight: our double-click lost to an identical
+                  // in-flight pipeline — follow it instead of running two.
+                  window.stopProcessProgressPoll();
+                  window.saveBackgroundTask('process', data.task_id);
+                  window.setBubblePersistent('A job is already running — following it...');
+                  window.resumeBackgroundTask();
                 } else if (data.error) {
                   window.clearBackgroundTask();
                   window._mascotTalk(data.error);

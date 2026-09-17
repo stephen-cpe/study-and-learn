@@ -167,3 +167,16 @@ def settings():
         if current_user.lesson_difficulty in DIFFICULTY_LEVELS
         else DIFFICULTY_LEVELS.index(DEFAULT_DIFFICULTY),
     )
+
+
+@bp.route('/settings/forget-memories', methods=['POST'])
+@login_required
+def forget_memories():
+    """Delete all mascot memories for the learner (privacy control)."""
+    from src.services.mascot_memory import delete_all as _forget
+    count = _forget(current_user.id)
+    if count:
+        flash(f'Forgot {count} memorized detail(s) about you. Starting fresh!', 'success')
+    else:
+        flash('The mascot had nothing memorized about you.', 'info')
+    return redirect(url_for('main.settings'))

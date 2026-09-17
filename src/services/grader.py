@@ -71,6 +71,7 @@ def grade_single_question(question: dict, user_answer: Any) -> bool:
     elif qtype == "ordering":
         # Exact sequence match (all-or-nothing, like multi_select): the
         # learner's order of display indices must equal answer_order.
+        # (For proportional scoring see grade_partial_credit below.)
         if not isinstance(user_answer, list):
             return False
         correct = question.get("answer_order", [])
@@ -78,13 +79,45 @@ def grade_single_question(question: dict, user_answer: Any) -> bool:
         return len(user) == len(correct) == len(question.get("items", [])) and user == list(correct)
     elif qtype == "matching":
         # Exact pairs match (all-or-nothing): per-left chosen rights index
-        # must equal answer_indices.
+        # must equal answer_indices. (Proportional variant below.)
         if not isinstance(user_answer, list):
             return False
         correct = question.get("answer_indices", [])
         user = _safe_int_list(user_answer)
         return len(user) == len(correct) == len(question.get("lefts", [])) and user == list(correct)
     return False
+
+
+def grade_partial_credit(question: dict, user_answer: Any) -> float:
+    """Score a question proportionally in [0.0, 1.0].
+
+    Ordering scores the fraction of positions placed correctly;
+    matching scores the fraction of pairs matched correctly. All other
+    types delegate to :func:`grade_single_question` (1.0 or 0.0), so
+    checkpoints and quick-recall questions stay all-or-nothing while
+    final-quiz sequencing questions reward near-misses. Never raises.
+    """
+    try:
+        qtype = question.get("type", "")
+        if qtype == "ordering":
+            items = question.get("items", [])
+            correct = list(question.get("answer_order", []))
+            user = _safe_int_list(user_answer)
+            if not items or len(user) != len(correct) or len(correct) != len(items):
+                return 0.0
+            hits = sum(1 for u, c in zip(user, correct) if u == c)
+            return hits / len(correct)
+        if qtype == "matching":
+            lefts = question.get("lefts", [])
+            correct = list(question.get("answer_indices", []))
+            user = _safe_int_list(user_answer)
+            if not lefts or len(user) != len(correct) or len(correct) != len(lefts):
+                return 0.0
+            hits = sum(1 for u, c in zip(user, correct) if u == c)
+            return hits / len(correct)
+        return 1.0 if grade_single_question(question, user_answer) else 0.0
+    except Exception:
+        return 0.0
 
 
 def get_correct_answer(question: dict) -> Any:

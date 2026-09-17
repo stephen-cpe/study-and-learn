@@ -17,6 +17,7 @@ from flask_login import current_user, login_required
 
 from src.models import PATH_STATUS_ACTIVE
 from src.repositories.lesson_repo import (
+    create_study_path,
     get_active_path,
     get_lessons,
     get_most_recent_active_path,
@@ -37,7 +38,11 @@ from src.routes._helpers import (
     _resolve_texts,
 )
 from src.services import progress_tracker
-from src.services.grader import get_correct_answer, grade_single_question
+from src.services.grader import (
+    get_correct_answer,
+    grade_partial_credit,
+    grade_single_question,
+)
 from src.services.lesson_orchestrator import build_module_artifacts
 from src.services.mascot_memory import store_memory as _store_mascot_memory
 from src.services.settings_service import DEFAULT_DIFFICULTY, DEFAULT_TTS_SPEAKER
@@ -73,25 +78,37 @@ def generate_lessons():
     task_id = body.get('task_id', '') or session.sid
     progress_tracker.create_task(task_id=task_id,
                                  display_name=current_user.display_name)
-    # Durable bell record (Phase 1): other tabs poll /tasks for this.
+    # Singleflight + cap re-check under claim: the start-of-route check
+    # above can be raced by a concurrent submit, so the oldest pipeline
+    # wins here and duplicates follow it (resumed) instead of doubling
+    # AI spend or overshooting the 3-active-lesson cap.
     from src.services import background_tasks as _bt
-    _bt.create_task(task_id, current_user.id, kind='generate',
-                    label=f"Lessons: {(study_path.get('title') or learning_goal or '')[:80]}")
+    _gen_label = f"Lessons: {(study_path.get('title') or learning_goal or '')[:80]}"
+    _winner, _existing_tid, _same_goal = _bt.claim_pipeline_task(
+        task_id, current_user.id, kind='generate',
+        label=_gen_label, match_label=_gen_label)
+    if not _winner:
+        progress_tracker.cleanup_task(task_id)
+        if _same_goal and _existing_tid:
+            return jsonify({'resumed': True, 'task_id': _existing_tid})
+        return jsonify({'error': 'Another generation is already running — check the Tasks bell, then retry.'}), 429
+    if get_active_path(current_user) is None and current_user.active_lesson_count >= 3:
+        _bt.fail_task(task_id, error='At cap — see dashboard')
+        progress_tracker.cleanup_task(task_id)
+        flash('You already have 3 active lessons. Complete or abandon one before starting a new one.', 'error')
+        return redirect(url_for('main.dashboard'))
 
     modules = study_path['modules']
 
     most_recent = get_most_recent_active_path(current_user)
     path_id_val = most_recent.id if most_recent else None
-    lessons = get_lessons(current_user, path_id=path_id_val)
 
+    # Snapshot everything the background run needs — Flask session and
+    # current_user are unavailable off-request, so resolve them here.
     extracted_texts = _resolve_texts()
     file_hashes_data = _resolve_hashes()
     file_names_data = _resolve_filenames()
     content_digest = _resolve_content_digest(path_id=path_id_val)
-    retriever = _build_retriever(
-        learning_goal, extracted_texts, file_hashes_data, file_names_data,
-        content_digest=content_digest,
-    )
 
     tts_enabled = getattr(current_user, 'tts_enabled', False)
     tts_speaker = getattr(current_user, 'tts_speaker', DEFAULT_TTS_SPEAKER) or DEFAULT_TTS_SPEAKER
@@ -99,183 +116,69 @@ def generate_lessons():
     # display_name = nickname or full_name or username — the friendly name the
     # mascot and TTS narration use to address the learner.
     username = current_user.display_name
+    study_title = study_path.get('title', learning_goal[:50])
 
-    # Track chunk IDs used across modules to prevent content repetition.
-    # Each module's retrieval excludes chunks already used by earlier modules,
-    # forcing the LLM to cover different document content per module.
-    used_chunk_ids = set()
+    # Guarantee the shell StudyPath row synchronously so the client learns
+    # its path_id immediately (status poll needs it) and refreshes land on
+    # a real row while the worker fills in lessons.
+    if path_id_val is None:
+        shell = create_study_path(
+            current_user,
+            study_title,
+            learning_goal,
+            extracted_texts=extracted_texts or None,
+            file_hashes=file_hashes_data or None,
+            file_names=file_names_data or None,
+            content_digest=content_digest or None,
+            modules=modules,
+            summary=session.get('summary'),
+            relevance_result=session.get('relevance_result'),
+        )
+        if shell is not None:
+            path_id_val = shell.id
 
-    # TTS memory: learner facts for narration callbacks. Never raises —
-    # get_memories degrades to [] so generation never blocks on memory.
-    # Keep dicts (memory_type+content) so tts_persona can prioritize
-    # struggle/mastery signals and drop voice-pref echoes.
+    payload = {
+        'learning_goal': learning_goal,
+        'study_title': study_title,
+        'modules': modules,
+        'existing_lessons': get_lessons(current_user, path_id=path_id_val),
+        'extracted_texts': extracted_texts,
+        'file_hashes': file_hashes_data,
+        'file_names': file_names_data,
+        'content_digest': content_digest,
+        'tts_enabled': tts_enabled,
+        'tts_speaker': tts_speaker,
+        'difficulty': difficulty,
+        'display_name': username,
+    }
+
+    # Full async handoff (#5): the AI loop runs on a daemon thread
+    # (generation_worker) chained into the TTS worker. The POST returns
+    # immediately; the client polls /progress (cosmetic) and
+    # /lessons/generation-status (redirect decision) exactly as before.
+    from src.services.generation_worker import (
+        run_generation_for_path,
+        spawn_generation_background_task,
+    )
+    flask_app = current_app._get_current_object()
+    if current_app.config.get('TESTING'):
+        # Deterministic inline run for tests (no threads); preserves the
+        # historic synchronous response contract.
+        run_generation_for_path(flask_app, current_user.id, path_id_val, payload, task_id)
+        return jsonify({
+            'redirect': url_for('main.lessons', path_id=path_id_val),
+            'task_id': task_id,
+        })
     try:
-        from src.services.mascot_memory import get_memories as _get_memories
-        learner_memories = [
-            m for m in _get_memories(current_user.id, limit=10)
-            if isinstance(m, dict) and (m.get('content') or '').strip()
-        ]
-    except Exception:
-        learner_memories = []
-
-    progress_tracker.update_progress(task_id, 1)
-
-    try:
-        for i, module in enumerate(modules):
-            progress_tracker.update_progress(task_id, 2)
-            artifacts = build_module_artifacts(
-                module,
-                learning_goal,
-                retriever,
-                difficulty=difficulty,
-                tts_enabled=tts_enabled,
-                username=username,
-                tts_speaker=tts_speaker,
-                next_module_title=modules[i+1]['title'] if i+1 < len(modules) else None,
-                is_last_module=(i == len(modules) - 1),
-                path_id=path_id_val,
-                module_index=i,
-                used_chunk_ids=used_chunk_ids,
-                learner_memories=learner_memories,
-            )
-            progress_tracker.update_progress(task_id, 3)
-
-            lessons.append({
-                'index': i,
-                'module_title': module['title'],
-                'estimated_effort': module.get('estimated_effort', 'N/A'),
-                'lesson': artifacts['lesson'],
-                'quiz': artifacts['quiz'],
-                'checkpoints': artifacts['checkpoints'],
-                'sources': artifacts.get('sources', []),
-                'difficulty': difficulty,
-                'tts_enabled': tts_enabled,
-                'tts_speaker': tts_speaker if tts_enabled else None,
-                # tts_audio_status is the per-module generation state used by
-                # the lessons page UI to show "Generating narration..." badges
-                # and by the audio route to return 202 when pending. The
-                # background worker updates this field as it runs.
-                'tts_audio_status': 'pending' if tts_enabled else 'n/a',
-                'completed': False,
-                'score': None,
-                'passed': False
-            })
-
-        progress_tracker.update_progress(task_id, 4)
+        spawn_generation_background_task(
+            flask_app, current_user.id, path_id_val, payload, task_id)
     except Exception as e:
-        # Surface the failure to the user via mascot-error.gif so they
-        # see the robot in an error state instead of a frozen "busy".
-        # The JS sticky-error window keeps the error GIF visible for
-        # ~8s even if a later poll arrives. Do NOT swallow the error —
-        # re-raise after publishing the cosmetic so Flask's default 500
-        # handler still logs the traceback.
-        logger.error("Lesson generation failed: %s", str(e), exc_info=True)
+        logger.warning("Generation background thread failed to spawn: %s", str(e))
         progress_tracker.mark_error(task_id, mascot_msg='AI generation failed — retry')
         from src.services import background_tasks as _bt
         _bt.fail_task(task_id, error='AI generation failed — please retry')
-        raise
-
-    # Surface a warning if any module's quiz fell back to the
-    # topic-aware placeholder (AI generation or JSON parsing failed).
-    fallback_modules = [
-        lessons[i].get('module_title', f'Module {i + 1}')
-        for i, l in enumerate(lessons)
-        if l.get('quiz', {}).get('fallback')
-    ]
-    if fallback_modules:
-        flash(
-            f"AI quiz generation failed for: {', '.join(fallback_modules)}. "
-            f"Showing placeholder quizzes — try retaking for AI-generated questions.",
-            'warning'
-        )
-
-    save_lessons(lessons, current_user,
-                 title=study_path.get('title', learning_goal[:50]),
-                 learning_goal=learning_goal,
-                 extracted_texts=extracted_texts,
-                 file_hashes_val=file_hashes_data,
-                 file_names_val=file_names_data,
-                 path_id=path_id_val)
-
-    # Memory: record that the learner started a new study path
-    _store_mascot_memory(
-        current_user.id, 'episodic',
-        f"Started a new study path: {study_path.get('title', learning_goal[:50])}"
-    )
-
-    if path_id_val is None:
-        from src.models import StudyPath
-        refreshed = StudyPath.query.filter_by(
-            user_id=current_user.id, status=PATH_STATUS_ACTIVE
-        ).order_by(StudyPath.created_at.desc()).first()
-        if refreshed:
-            path_id_val = refreshed.id
-
-    # Task 5: TTS generation runs in a background thread so the request
-    # handler can return immediately. The lessons page polls
-    # /lessons/generation-status to display per-module audio status.
-    #
-    # The redirect signal is ``StudyPath.generation_completed_at``:
-    #   - tts_enabled=False  → this handler sets the column now, so
-    #     the JS poll-based redirect fires immediately.
-    #   - tts_enabled=True   → the TTS background worker sets the
-    #     column in its finally block once every module has finished
-    #     (success, skipped, or failed). The JS redirect fires when
-    #     the user sees the bubble say "All done!".
-    # The column is the canonical "navigate now" signal — atomic with
-    # the lesson-dict persistence, no shared cache state, no race
-    # conditions. The previous cache-based signal (``data.done``) had
-    # a race condition where the TTS worker overwrote the request
-    # handler's stage 4 (max GENERATE_STAGES) with its own max
-    # stage 3 (TTS_STAGES), causing the JS poll-based redirect
-    # (``data.stage >= 4``) to never fire.
-    from src import db
-    from src.models import StudyPath
-
-    if tts_enabled and path_id_val:
-        try:
-            from src.services.tts_worker import spawn_tts_background_task
-            spawn_tts_background_task(
-                flask_app=current_app._get_current_object(),
-                user_id=current_user.id,
-                path_id=path_id_val,
-                task_id=task_id,
-            )
-        except Exception as e:
-            # Defensive: if the background thread cannot even be
-            # started, set the completion column here so the user
-            # is not stuck on the results page forever.
-            logger.warning("TTS background thread failed to spawn: %s", str(e))
-            progress_tracker.mark_error(task_id, mascot_msg='Audio failed — lessons still work')
-            _set_generation_completed(path_id_val, current_user.id)
-    else:
-        # No TTS worker spawned — this handler is the only producer
-        # of the completion signal, so it must set the column before
-        # returning or the JS poll will hang at "Generating…".
-        _set_generation_completed(path_id_val, current_user.id)
-
-    path = StudyPath.query.filter_by(id=path_id_val, user_id=current_user.id).first() if path_id_val else None
-    if not path:
-        path = StudyPath.query.filter_by(user_id=current_user.id, status=PATH_STATUS_ACTIVE).order_by(StudyPath.created_at.desc()).first()
-    if path:
-        path.extracted_texts = None
-        path.content_digest = None
-        db.session.commit()
-
-    flash(f'Generated {len(modules)} lessons successfully!', 'success')
-    # Bell record flips to ready now (lessons are viewable; TTS audio may
-    # still generate in the background — the lessons page badges show that).
-    from src.services import background_tasks as _bt
-    _bt.finish_task(
-        task_id,
-        result_url=url_for('main.lessons', path_id=path_id_val),
-        label=f"Lessons ready: {(study_path.get('title') or learning_goal or '')[:80]}",
-        path_id=path_id_val or '',
-    )
-    return jsonify({
-        'redirect': url_for('main.lessons', path_id=path_id_val),
-        'task_id': task_id,
-    })
+        return jsonify({'error': 'Could not start generation — please retry.'}), 500
+    return jsonify({'accepted': True, 'task_id': task_id, 'path_id': path_id_val}), 202
 
 
 def _set_generation_completed(path_id: str, user_id: str) -> None:
@@ -316,6 +219,57 @@ def _set_generation_completed(path_id: str, user_id: str) -> None:
             db.session.rollback()
         except Exception:
             pass
+
+
+def _collect_weak_topics(lessons_data, limit: int = 5) -> list:
+    """Collect missed/partial items from persisted grade detail.
+
+    Reads each lesson's ``results_detail`` (written on final-quiz
+    submission) and returns the weakest entries first: ``{module_index,
+    module_title, qtype, prompt, credit}``. Never raises — the lessons
+    page must render even with malformed stored detail.
+    """
+    try:
+        items = []
+        for lesson in lessons_data or []:
+            if not isinstance(lesson, dict):
+                continue
+            detail = lesson.get('results_detail') or {}
+            if not isinstance(detail, dict):
+                continue
+            module_index = lesson.get('index', 0)
+            module_title = lesson.get('module_title', '')
+            for r in detail.get('quiz', []) or []:
+                if not isinstance(r, dict):
+                    continue
+                credit = r.get('credit', 1.0 if r.get('correct') else 0.0)
+                try:
+                    credit = float(credit)
+                except (TypeError, ValueError):
+                    credit = 0.0
+                if credit >= 1.0:
+                    continue
+                items.append({
+                    'module_index': module_index,
+                    'module_title': module_title,
+                    'qtype': str(r.get('type', '')) or 'quiz',
+                    'prompt': str(r.get('prompt', ''))[:120],
+                    'credit': credit,
+                })
+            for r in detail.get('checkpoints', []) or []:
+                if not isinstance(r, dict) or r.get('correct'):
+                    continue
+                items.append({
+                    'module_index': module_index,
+                    'module_title': module_title,
+                    'qtype': 'checkpoint',
+                    'prompt': str(r.get('prompt', ''))[:120],
+                    'credit': 0.0,
+                })
+        items.sort(key=lambda w: w['credit'])
+        return items[:max(0, limit)]
+    except Exception:
+        return []
 
 
 @bp.route('/lessons')
@@ -362,7 +316,8 @@ def lessons():
                            pass_threshold=PASS_THRESHOLD,
                            path_id=path_id,
                            path_status=path_status,
-                           all_passed=all_passed)
+                           all_passed=all_passed,
+                           weak_topics=_collect_weak_topics(lessons_data))
 
 
 @bp.route('/lessons/generation-status')
@@ -538,9 +493,12 @@ def grade_lesson(module_index):
             user_answer = fill_blank_answers.get(question['id'], answers[i] if i < len(answers) else None)
         else:
             user_answer = answers[i] if i < len(answers) else None
-        correct = grade_single_question(question, user_answer)
-        if correct:
-            earned_points += 1
+        # Sequencing questions (ordering/matching) earn proportional
+        # credit; everything else stays all-or-nothing. Checkpoints below
+        # always use the boolean grader (formative, not scored).
+        credit = grade_partial_credit(question, user_answer)
+        correct = credit >= 1.0
+        earned_points += credit
         quiz_results.append({
             'id': question['id'],
             'type': question['type'],
@@ -548,6 +506,7 @@ def grade_lesson(module_index):
             'user_answer': user_answer,
             'correct_answer': get_correct_answer(question),
             'correct': correct,
+            'credit': round(credit, 3),
             'explanation': question.get('explanation', '')
         })
 
@@ -575,6 +534,32 @@ def grade_lesson(module_index):
         lessons_data[module_index]['completed'] = True
         lessons_data[module_index]['score'] = score_pct
         lessons_data[module_index]['passed'] = passed
+        # Persist per-question detail (bounded) so the lessons page can
+        # surface weak topics. Only latest attempt is kept; prompts and
+        # explanations are trimmed to cap JSON growth.
+        try:
+            from datetime import datetime
+            from datetime import timezone as _tz
+
+            def _trim_result(r):
+                r = dict(r)
+                if isinstance(r.get('prompt'), str):
+                    r['prompt'] = r['prompt'][:300]
+                if isinstance(r.get('explanation'), str):
+                    r['explanation'] = r['explanation'][:500]
+                return r
+
+            lessons_data[module_index]['results_detail'] = {
+                'score': score_pct,
+                'passed': passed,
+                'earned': round(float(earned_points), 2),
+                'total': total_points,
+                'at': datetime.now(_tz.utc).isoformat(),
+                'quiz': [_trim_result(r) for r in quiz_results],
+                'checkpoints': [_trim_result(r) for r in checkpoint_results],
+            }
+        except Exception:
+            pass
         save_lessons(lessons_data, current_user, path_id=path_id)
 
         # Memory: record quiz outcome (fix: lessons store
@@ -741,6 +726,10 @@ def retake_lesson(module_index):
     lessons_data[module_index]['completed'] = False
     lessons_data[module_index]['score'] = None
     lessons_data[module_index]['passed'] = False
+    # Drop the previous attempt's persisted grade detail — the regenerated
+    # quiz/checkpoints below carry new prompts, so old per-question rows
+    # (and the weak-topics strip) must not reference them.
+    lessons_data[module_index].pop('results_detail', None)
     # Reset the user's saved deck position so they restart the lesson from
     # slide 0 instead of being dropped mid-deck with stale UI from the
     # previous (failed) attempt.
@@ -1061,11 +1050,11 @@ def list_suggestions():
         status='pending',
     ).order_by(Suggestion.created_at.asc()).all()
     if pending:
-        lessons_data = get_lessons(current_user, path_id=path.id)
-        all_passed = bool(lessons_data) and all(l.get('passed') for l in lessons_data)
         return jsonify({
             'suggestions': [_serialize(s) for s in pending],
-            'all_covered': all_passed,
+            'all_covered': False,
+            'source': 'cached',
+            'message': None,
         })
 
     lessons_data = get_lessons(current_user, path_id=path.id)
@@ -1114,13 +1103,16 @@ def list_suggestions():
             'suggestions': [_serialize(s) for s in rows],
             'all_covered': False,
             'source': 'internal',
+            'message': None,
         })
 
     # Internal exhausted → external web branch (opt-in, fail-closed).
     # Only when every planned module is passed; proprietary topics,
     # disabled flag, missing key, or any web failure return all_covered.
     if not all_passed:
-        return jsonify({'suggestions': [], 'all_covered': False, 'source': 'internal'})
+        return jsonify({'suggestions': [], 'all_covered': False, 'source': 'internal',
+                        'message': ('No follow-up topics identified yet — '
+                                    'complete more modules and try again.')})
     try:
         file_names = _json.loads(path.file_names) if path.file_names else []
     except (TypeError, ValueError):
@@ -1152,11 +1144,22 @@ def list_suggestions():
             'suggestions': [_serialize(s) for s in ext_rows],
             'all_covered': False,
             'source': 'web',
+            'message': None,
         })
+    _source = external.get('source', 'none')
+    if _source == 'proprietary':
+        _message = ('All document topics are covered. Web suggestions are '
+                    'skipped for proprietary materials.')
+    elif _source in ('web-disabled', 'web-disabled-mock'):
+        _message = ('All document topics are covered. Web suggestions are '
+                    'disabled.')
+    else:
+        _message = 'All materials covered — nicely done.'
     return jsonify({
         'suggestions': [],
         'all_covered': True,
-        'source': external.get('source', 'none'),
+        'source': _source,
+        'message': _message,
     })
 
 
@@ -1242,8 +1245,29 @@ def accept_suggestion():
 
         retriever = _web_retrieve
     else:
-        retriever = _build_retriever(goal, [], _resolve_hashes(), _resolve_filenames(),
-                                     content_digest='')
+        # Ground the new module in THIS path's documents (not the most
+        # recent active path, which may belong to different uploads), and
+        # exclude chunks already taught so the suggestion adds new
+        # material instead of re-teaching an existing module's content.
+        try:
+            _hashes = _json.loads(path.file_hashes) if path.file_hashes else []
+            if not isinstance(_hashes, list):
+                _hashes = []
+        except (TypeError, ValueError):
+            _hashes = []
+        try:
+            _names = _json.loads(path.file_names) if path.file_names else []
+            if not isinstance(_names, list):
+                _names = []
+        except (TypeError, ValueError):
+            _names = []
+        if not _hashes:
+            _hashes = _resolve_hashes()
+        if not _names:
+            _names = _resolve_filenames()
+        _digest = path.content_digest or _resolve_content_digest(path_id=path.id) or ''
+        retriever = _build_retriever(goal, [], _hashes, _names,
+                                     content_digest=_digest)
     difficulty = getattr(current_user, 'lesson_difficulty', DEFAULT_DIFFICULTY) or DEFAULT_DIFFICULTY
     tts_enabled = getattr(current_user, 'tts_enabled', False)
     tts_speaker = getattr(current_user, 'tts_speaker', DEFAULT_TTS_SPEAKER) or DEFAULT_TTS_SPEAKER
@@ -1257,6 +1281,15 @@ def accept_suggestion():
         learner_memories = []
 
     try:
+        # Seed cross-module dedup with chunks already taught in this
+        # path so the accepted topic pulls fresh document content.
+        _used_chunk_ids = set()
+        for _les in lessons_data:
+            for _src in (_les.get('sources') or []):
+                if isinstance(_src, dict):
+                    _cid = _src.get('chunk_id', '')
+                    if _cid:
+                        _used_chunk_ids.add(_cid)
         artifacts = build_module_artifacts(
             {'title': row.title},
             goal,
@@ -1269,7 +1302,7 @@ def accept_suggestion():
             is_last_module=True,
             path_id=path.id,
             module_index=new_index,
-            used_chunk_ids=set(),
+            used_chunk_ids=_used_chunk_ids,
             learner_memories=learner_memories,
         )
     except Exception as e:

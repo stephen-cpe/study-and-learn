@@ -229,10 +229,33 @@ def process():
             stages=progress_tracker.PROCESS_STAGES,
             display_name=current_user.display_name,
         )
-        # Durable bell record (Phase 1): other tabs poll /tasks for this.
+        # Singleflight: oldest pipeline wins. A double-click/retry carrying
+        # the same goal follows the in-flight task instead of starting a
+        # second expensive pipeline; a different goal colliding with a
+        # running job is asked to wait (429 → mascot error surface).
         from src.services import background_tasks as _bt
-        _bt.create_task(task_id, current_user.id, kind='process',
-                        label=f"Processing: {goal[:80]}")
+        _claim_label = f"Processing: {goal[:80]}"
+        _winner, _existing_tid, _same_goal = _bt.claim_pipeline_task(
+            task_id, current_user.id, kind='process',
+            label=_claim_label, match_label=_claim_label)
+        if not _winner:
+            progress_tracker.cleanup_task(task_id)
+            if _same_goal and _existing_tid:
+                return jsonify({'resumed': True, 'task_id': _existing_tid})
+            return jsonify({'error': 'Another job is already running — check the Tasks bell, then retry.'}), 429
+    else:
+        # Classic form post (no JS task id): same guard with a server-side
+        # id, discarded on success so the bell isn't spammed. Failures
+        # keep the row via the shared except paths below.
+        import uuid as _uuid
+        task_id = f"process-{_uuid.uuid4().hex}"
+        from src.services import background_tasks as _bt
+        _winner, _existing_tid, _same_goal = _bt.claim_pipeline_task(
+            task_id, current_user.id, kind='process',
+            label=f"Processing: {goal[:80]}")
+        if not _winner:
+            flash('A processing job is already running — please wait for it to finish.', 'info')
+            return redirect(url_for('main.dashboard'))
 
     upload_folder = current_app.config['UPLOAD_FOLDER']
     os.makedirs(upload_folder, exist_ok=True)
@@ -438,6 +461,8 @@ def process():
         session['coverage_ratio'] = coverage_ratio
 
         if current_user.is_authenticated:
+            # Cap re-check at write time (entry is singleflight-guarded
+            # above, so no concurrent pipeline can slip past together).
             if not current_user.can_start_new_lesson():
                 flash('You already have 3 active lessons. Complete or cancel one before starting a new one.', 'error')
                 if is_ajax:
@@ -446,6 +471,8 @@ def process():
                                     label='At cap — see dashboard')
                     progress_tracker.cleanup_task(task_id)
                     return jsonify({'redirect': url_for('main.dashboard')})
+                from src.services import background_tasks as _bt
+                _bt.discard_task(task_id, current_user.id)
                 return redirect(url_for('main.dashboard'))
             path_title = study_path.get('title', goal[:50])
             create_study_path(current_user, path_title, goal,
@@ -466,6 +493,9 @@ def process():
             return jsonify({'redirect': url_for('main.results')})
 
         flash(f'Processed {len(filenames)} file(s) successfully!', 'success')
+        if not is_ajax:
+            from src.services import background_tasks as _bt
+            _bt.discard_task(task_id, current_user.id)
         return redirect(url_for('main.results'))
 
     except StudyAndLearnError as e:
@@ -477,6 +507,12 @@ def process():
             _bt.fail_task(task_id, error=str(e))
             progress_tracker.cleanup_task(task_id)
             return jsonify({'error': str(e)}), 500
+        if task_id:
+            try:
+                from src.services import background_tasks as _bt2
+                _bt2.discard_task(task_id, current_user.id)
+            except Exception:
+                pass
         flash(str(e), 'error')
         return redirect(url_for('main.index'))
     except Exception:
@@ -488,5 +524,11 @@ def process():
             _bt.fail_task(task_id, error='An unexpected error occurred. Please try again.')
             progress_tracker.cleanup_task(task_id)
             return jsonify({'error': 'An unexpected error occurred. Please try again.'}), 500
+        if task_id:
+            try:
+                from src.services import background_tasks as _bt2
+                _bt2.discard_task(task_id, current_user.id)
+            except Exception:
+                pass
         flash('An unexpected error occurred. Please try again.', 'error')
         return redirect(url_for('main.index'))

@@ -25,6 +25,12 @@ logger = logging.getLogger(__name__)
 
 VALID_TYPES = MascotMemory.VALID_TYPES
 
+# Hygiene caps: memories are append-only, so without pruning the table
+# grows forever while reads only ever take the newest handful. Coalescing
+# also keeps repeats like "Prefers Hard difficulty" ×5 from stacking up.
+MAX_MEMORIES_PER_USER = 200
+COALESCE_WINDOW = 20
+
 
 def store_memory(user_id: str, memory_type: str, content: str) -> MascotMemory | None:
     """Store one memory for a learner.
@@ -39,12 +45,35 @@ def store_memory(user_id: str, memory_type: str, content: str) -> MascotMemory |
     if not content:
         return None
     try:
+        # Coalesce: an identical memory among the most recent rows adds
+        # no information — return the existing row instead of stacking.
+        recent = (db.session.query(MascotMemory)
+                  .filter_by(user_id=user_id)
+                  .order_by(MascotMemory.created_at.desc())
+                  .limit(COALESCE_WINDOW).all())
+        for row in recent:
+            if row.memory_type == memory_type and (row.content or '').strip() == content:
+                return row
         mem = MascotMemory(user_id=user_id, memory_type=memory_type,
                            content=content)
         db.session.add(mem)
         db.session.commit()
         logger.info("store_memory: %s → [%s] %s", user_id[:8],
                     memory_type, content[:80])
+        # Prune: keep only the newest MAX_MEMORIES_PER_USER rows so the
+        # table stays bounded while reads (newest-first) never notice.
+        try:
+            stale_ids = [r.id for r in (db.session.query(MascotMemory.id)
+                         .filter_by(user_id=user_id)
+                         .order_by(MascotMemory.created_at.desc())
+                         .offset(MAX_MEMORIES_PER_USER).all())]
+            if stale_ids:
+                (db.session.query(MascotMemory)
+                 .filter(MascotMemory.id.in_(stale_ids))
+                 .delete(synchronize_session=False))
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
         return mem
     except Exception:
         db.session.rollback()

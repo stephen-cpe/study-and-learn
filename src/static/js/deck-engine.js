@@ -473,9 +473,12 @@
             if (resultsDetail && data.quiz_results) {
                 let detailHtml = '';
                 data.quiz_results.forEach(r => {
-                    const icon = r.correct ? '✓' : '✗';
-                    const color = r.correct ? 'var(--deck-success)' : 'var(--deck-danger)';
-                    detailHtml += '<p style="color: ' + color + '; margin-bottom:0.5rem;">' + icon + ' ' + r.prompt + '<br><small>' + (r.explanation || '') + '</small></p>';
+                    var credit = (typeof r.credit === 'number') ? r.credit : (r.correct ? 1 : 0);
+                    var partial = credit > 0 && credit < 1;
+                    const icon = r.correct ? '✓' : (partial ? '◐' : '✗');
+                    const color = r.correct ? 'var(--deck-success)' : (partial ? 'var(--deck-warning)' : 'var(--deck-danger)');
+                    const suffix = partial ? ' <small>(partial credit ' + Math.round(credit * 100) + '%)</small>' : '';
+                    detailHtml += '<p style="color: ' + color + '; margin-bottom:0.5rem;">' + icon + ' ' + r.prompt + suffix + '<br><small>' + (r.explanation || '') + '</small></p>';
                 });
                 resultsDetail.innerHTML = (typeof DOMPurify !== 'undefined')
                     ? DOMPurify.sanitize(detailHtml)

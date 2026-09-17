@@ -168,9 +168,9 @@ def generate_lesson(
         ``sources`` (list of source provenance dicts).
     """
     if not learning_goal or not learning_goal.strip():
-        return _fallback_lesson(module_title)
+        return _fallback_lesson(module_title, degraded=True)
     if not module_title or not module_title.strip():
-        return _fallback_lesson("Untitled Module")
+        return _fallback_lesson("Untitled Module", degraded=True)
 
     rag_result = build_rag_context_for_module(module_title, learning_goal, retriever, exclude_chunks=exclude_chunks)
     rag_context = rag_result.get("context_text", "") if isinstance(rag_result, dict) else str(rag_result)
@@ -186,8 +186,13 @@ def generate_lesson(
     try:
         response = call_ollama(prompt)
     except AIServiceError as e:
-        logger.error("Lesson generation failed for module '%s': %s", module_title, str(e))
-        return _fallback_lesson(module_title)
+        logger.warning("Lesson generation attempt 1 failed for module '%s': %s — retrying once",
+                       module_title, str(e))
+        try:
+            response = call_ollama(prompt)
+        except AIServiceError as e2:
+            logger.error("Lesson generation failed for module '%s': %s", module_title, str(e2))
+            return _fallback_lesson(module_title, degraded=True)
 
     from src.services.llm_json import extract_json
     result = extract_json(response)
@@ -198,9 +203,15 @@ def generate_lesson(
                 'module_title': result.get('module_title', module_title),
                 'slides': validated_slides,
                 'sources': sources,
+                'fallback': False,
             }
 
-    return _fallback_lesson(module_title)
+    logger.warning(
+        "Lesson JSON parsing/validation failed for module '%s', using fallback. "
+        "Response (first 300 chars): %r",
+        module_title, response[:300] if response else '<empty>'
+    )
+    return _fallback_lesson(module_title, degraded=True)
 
 
 def _validate_slides(slides: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -220,11 +231,15 @@ def _validate_slides(slides: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return validated
 
 
-def _fallback_lesson(module_title: str) -> Dict[str, Any]:
+def _fallback_lesson(module_title: str, degraded: bool = False) -> Dict[str, Any]:
     """Return a generic placeholder lesson when AI generation fails.
 
     Args:
         module_title: The module title to use in the fallback slides.
+        degraded: When True, the returned dict carries ``'fallback': True``
+            so callers (generation worker, lessons page) can surface that
+            this module needs a retake instead of silently presenting
+            placeholder slides as real content.
 
     Returns:
         A dict with ``module_title`` and a minimal set of placeholder slides.
@@ -247,6 +262,7 @@ def _fallback_lesson(module_title: str) -> Dict[str, Any]:
             ]}
         ],
         'sources': [],
+        'fallback': degraded,
     }
 
 

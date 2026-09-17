@@ -105,6 +105,21 @@
             <button type="submit" class="retro-button retro-button-primary">Save Settings</button>
         </div>
     </form>
+
+    <!-- ── Mascot Memory ──────────────────────────────────────────── -->
+    <section class="settings-card">
+        <h2 class="settings-heading">Mascot Memory</h2>
+        <p class="settings-note">The study robot remembers your preferences and milestones to personalize its lines and narration. Forgetting wipes every memorized detail and starts fresh — your lessons and progress are untouched.</p>
+        <form method="POST" action="{{ url_for('main.forget_memories') }}"
+              data-confirm="true"
+              data-confirm-title="Forget everything memorized?"
+              data-confirm-body="The mascot will no longer remember your name preferences, difficulty, or milestones."
+              data-confirm-action="Forget Everything"
+              data-confirm-variant="danger">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-danger-cancel">Forget Everything Memorized</button>
+        </form>
+    </section>
 </div>
 
 <!-- ── Avatar Selection Modal ─────────────────────────────────────── -->

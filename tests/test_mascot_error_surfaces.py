@@ -203,13 +203,14 @@ def test_generate_lessons_failure_publishes_mascot_error(
         sess['study_path'] = {'modules': [{'title': 'M1', 'estimated_effort': '1h'}]}
         sess['extracted_texts'] = ['text']
 
-    # The route re-raises after mark_error, so the exception propagates
-    # to Flask's error handler. In TESTING mode, Flask re-raises by
-    # default, so we use pytest.raises to catch it.
-    with pytest.raises(RuntimeError, match='Unexpected DB failure'):
-        c.post('/generate-lessons',
-               data=json.dumps({'task_id': task_id}),
-               content_type='application/json')
+    # Failures are contained (never re-raised): the worker publishes the
+    # error state and fails the bell task so the client surfaces the
+    # failure via its task_status poll instead of landing on an empty
+    # lessons page. The completion flag must stay unset.
+    response = c.post('/generate-lessons',
+                      data=json.dumps({'task_id': task_id}),
+                      content_type='application/json')
+    assert response.status_code == 200
 
     progress = pt_get_progress(task_id)
     assert progress is not None, "mark_error was not called on generation failure"

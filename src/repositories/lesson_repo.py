@@ -142,14 +142,28 @@ def get_study_path_data(user=None) -> Optional[Dict[str, Any]]:
     if not user or not user.is_authenticated:
         return None
     path = StudyPath.query.filter_by(user_id=user.id, status=PATH_STATUS_ACTIVE).order_by(StudyPath.created_at.desc()).first()
-    if not path or not path.content_data:
+    if not path:
         return None
-    try:
-        data = json.loads(path.content_data)
-        if 'modules' in data:
-            return data
-    except (json.JSONDecodeError, TypeError):
-        pass
+    # Primary: pre-generation content_data holds {"modules": [...]}.
+    # (Post-generation it holds the lessons list, which has no 'modules' key.)
+    if path.content_data:
+        try:
+            data = json.loads(path.content_data)
+            if isinstance(data, dict) and 'modules' in data:
+                return data
+        except (json.JSONDecodeError, TypeError):
+            pass
+    # Fallback: durable plan snapshot in modules_json. create_study_path()
+    # persists the plan here but never writes content_data pre-generation,
+    # so without this a refresh / new tab / server restart loses the plan
+    # and /generate-lessons bounces to index with "No study path found".
+    if path.modules_json:
+        try:
+            modules = json.loads(path.modules_json)
+            if isinstance(modules, list) and modules:
+                return {'title': path.title, 'modules': modules}
+        except (json.JSONDecodeError, TypeError):
+            pass
     return None
 
 
