@@ -170,8 +170,15 @@ def compute_external_suggestions(
     file_names: List[str] | None = None,
     search_fn=None,
     fetch_fn=None,
+    excluded: List[str] | None = None,
 ) -> Dict[str, Any]:
-    """Compute web suggestions. Never raises; [] when blocked/failing."""
+    """Compute web suggestions. Never raises; [] when blocked/failing.
+
+    Args:
+        excluded: Titles the learner already dismissed — filtered with
+            the same normalized matching as internal suggestions so a
+            dismissed topic cannot return via the web branch.
+    """
     import os
 
     from config_defaults import env_default, env_int
@@ -227,12 +234,15 @@ def compute_external_suggestions(
         from src.services.suggest_next import _is_duplicate_title as _dup
         from src.services.suggest_next import _normalize_title as _norm
         planned = {_norm((m or {}).get('title', '')) for m in modules}
+        excluded_norm = {_norm(t) for t in (excluded or [])}
         suggestions, seen = [], set()
         for item in raw:
             if not isinstance(item, dict):
                 continue
             title = str(item.get('title', '')).strip()
             if not title or _norm(title) in seen or _dup(title, planned):
+                continue
+            if _dup(title, excluded_norm):
                 continue
             # Verbatim-URL enforcement: drop invented links.
             urls = item.get('source_urls', []) or []

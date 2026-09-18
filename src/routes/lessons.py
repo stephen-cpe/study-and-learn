@@ -1077,10 +1077,21 @@ def list_suggestions():
         relevance = {}
     missing = relevance.get('missing_material', '') if isinstance(relevance, dict) else ''
 
+    # Dismissed topics must stay dismissed: without this, the next
+    # compute re-proposes the same titles and dismissing is a no-op.
+    try:
+        dismissed = [r.title for r in Suggestion.query.filter_by(
+            study_path_id=path.id, user_id=current_user.id,
+            status='dismissed',
+        ).all() if r.title]
+    except Exception:
+        dismissed = []
+
     from src.services.suggest_next import compute_suggestions
     computed = compute_suggestions(
         path.learning_goal or '', modules,
         summary=path.summary_text or '', missing_material=missing or '',
+        excluded=dismissed,
     )
     from src import db as _db
     rows = []
@@ -1123,6 +1134,7 @@ def list_suggestions():
     external = compute_external_suggestions(
         path.learning_goal or '', modules,
         summary=path.summary_text or '', file_names=file_names,
+        excluded=dismissed,
     )
     ext_rows = []
     for item in (external.get('suggestions', []) or []):
@@ -1290,9 +1302,17 @@ def accept_suggestion():
                     _cid = _src.get('chunk_id', '')
                     if _cid:
                         _used_chunk_ids.add(_cid)
+        # Reframe the goal around the accepted topic itself. The
+        # generators' prompts lead with the learning goal, so passing
+        # the path's original goal here makes the LLM teach the OLD
+        # goal's content under the NEW title (verified live: a PQC
+        # suggestion taught from PQC chunks still came out as MFA
+        # slides). The retriever above stays path-scoped; only the
+        # prompt framing changes.
+        _module_goal = f"{row.title}. {row.reason or ''}".strip() or goal
         artifacts = build_module_artifacts(
             {'title': row.title},
-            goal,
+            _module_goal,
             retriever,
             difficulty=difficulty,
             tts_enabled=tts_enabled,
@@ -1304,6 +1324,7 @@ def accept_suggestion():
             module_index=new_index,
             used_chunk_ids=_used_chunk_ids,
             learner_memories=learner_memories,
+            title_only=True,
         )
     except Exception as e:
         logger.error("Suggested-module generation failed for '%s': %s", row.title, str(e))

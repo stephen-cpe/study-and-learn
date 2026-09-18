@@ -31,7 +31,7 @@ The application follows a service-oriented web architecture that separates HTTP 
 5. **AI Analysis:** The digest + a token-budget-sized retrieved context are combined into the prompt for the summary, relevance check, and curriculum. Weak matches gate further generation to save compute and prevent hallucinations — relevance gating blocks lesson generation for documents that do not match the learning goal.
 6. **Lesson Generation:** For valid matches, the route snapshots the plan and returns immediately (`accepted` + `task_id` + `path_id`); a background generation worker then sequentially builds slide decks, inline checkpoints, and six-type quizzes (mcq, true/false, multi-select, cloze dropdown, ordering, matching), each grounded in the cached digest plus per-module budgeted retrieval (cross-module chunk dedup still applies). Opt-in TTS narration chains onto the same worker. Partial credit applies to ordering/matching; per-question detail persists for weak-topic review.
 7. **Interactive Learning:** Learners navigate the custom slide deck. Progression is gated by an 80% pass threshold on final quizzes.
-8. **Continue Learning:** Completed paths offer follow-up topic suggestions — document-grounded first, then opt-in web suggestions once local material is exhausted — that generate full modules on accept. Passing a quiz also plays a short spoken results announcement (replacing the generic results narration, with graceful fallback). A notification bell reports finished background tasks with deep links so learners can multitask across tabs.
+8. **Continue Learning:** The lessons page offers follow-up topic suggestions — document-grounded first, then opt-in web suggestions once local material is exhausted — that generate full modules on accept. Passing a quiz also plays a short spoken results announcement (replacing the generic results narration, with graceful fallback). A notification bell reports finished background tasks with deep links so learners can multitask across tabs.
 
 ### Context-Window-Aware Retrieval Budget
 The number of chunks and the total context characters delivered to the LLM are derived from `OLLAMA_NUM_CTX` (the model's context window) minus a reserved prompt/output fraction (`rag_budget.py`). `RAG_MAX_CONTEXT_CHARS` (default ~120 000 chars) is a hard ceiling. Selecting a 256 K or 1 M context model automatically raises the retrieval budget roughly 2×/8× with no code change. The results page reports a *document coverage* percentage so users can verify how much of their material actually reached the model.
@@ -87,12 +87,15 @@ K -->|Yes| K2["Weak feedback card: gated"]
 K -->|No| L{"Generate Interactive Lessons?"}
 L --> GENW["Generation worker thread<br/>POST returns accepted immediately"]
 GENW --> M["Lesson Generator: slides + sources"]
+M --> MFB{"AI lesson parse OK?<br/>(1 retry)"}
+MFB -->|No| MFB2["Placeholder slides<br/>+ degraded flag + warning"]
+MFB -->|Yes| M2["Narration Script Generator"]
+MFB2 --> M2
 GENW --> N["Quiz Generator: questions + checkpoints"]
 N --> NFB{"AI quiz parse OK?"}
 NFB -->|No| NFB2["Topic-aware fallback quiz<br/>+ user flash warning"]
 NFB -->|Yes| O
 NFB2 --> O
-M --> M2["Narration Script Generator"]
 M2 --> M2b["Background TTS worker thread"]
 M2b -->|sets completion signal| O
 M2 -->|if TTS disabled| O
@@ -159,6 +162,8 @@ A common failure mode in RAG systems is "lost provenance," where retrieved text 
 
 To prevent content repetition across modules, a cross-module chunk dedup mechanism tracks which chunk IDs have been used by earlier modules. When generating lesson N+1, the retriever excludes chunks already consumed by modules 1..N, forcing each module to cover different document content. `chunk_id` is namespaced by collection (`<collection>:chunk_N`) at storage time so identical positions in different files never collide in the filter.
 
+Module retrieval is topic-scoped, not goal-scoped: similarity queries lead with the module title (the learning goal follows only for disambiguation), so each module pulls its own topic's chunks rather than repeating goal-level context. Accepted follow-up topics go further — they retrieve by title alone, and the lesson/quiz/checkpoint prompts are reframed around the suggested topic itself, so the new module teaches its own subject instead of the original goal.
+
 The RAG retrieval depth is context-window-aware: `rag_budget.get_top_k_for_budget()` and `get_context_budget_chars()` derive per-collection depth and the character ceiling from `OLLAMA_NUM_CTX` (default 131072 / 128K tokens) with a hard cap from `RAG_MAX_CONTEXT_CHARS` (default ~120K chars). The processing route additionally runs a **full-coverage map step** (`build_full_coverage_context`) that summarizes every extracted chunk into a `content_digest` (persisted on `StudyPath`, reused by lesson generation), combining it with budget-sized retrieval so the model grounds lessons in the entire document. The results page surfaces a *coverage ratio* badge showing how much extracted text was delivered to the model.
 
 Described figures also persist as thumbnails: the vision step saves a downscaled copy per described figure under content-addressed storage (`data/figures/<file_hash>/` with a manifest sidecar), the retriever attaches up to two figure references per source entry, and an auth-scoped route serves them as thumbnails in the deck's "View Sources" overlay. Like Chroma collections, figures are shared across users and paths and are never deleted by per-path lifecycle routes.
@@ -169,7 +174,7 @@ The local Ollama API context window is configurable via the `OLLAMA_NUM_CTX` env
 The Ollama API payload includes `format: "json"` (local) and `response_format: {"type": "json_object"}` (cloud) to constrain the model to valid JSON output. This eliminates the class of parsing failures caused by markdown fences, prose wrappers, or invalid syntax. A shared `extract_json` helper (`src/services/llm_json.py`) provides the safety net: it strips markdown fences, uses `raw_decode` to parse from the first `{`, and logs failures with the raw response rather than silently swallowing errors.
 ### 5.4 Asynchronous Generation & TTS
 
-Lesson generation never blocks its POST. The route validates, enforces the singleflight claim and lesson cap, guarantees the shell `StudyPath` row (so the client learns its `path_id` up front), snapshots everything the run needs into a plain payload (session and `current_user` are unavailable off-request), and returns `{accepted, task_id, path_id}` at once. A daemon generation worker (`generation_worker.py`, same spawn/app-context pattern as TTS) then runs the RAG + per-module LLM loop, saves lessons, records memory, chains the TTS worker, sets the completion flag, clears the digest, and flips the bell row — the client polls `/progress` and `/lessons/generation-status` exactly as before, including a failure branch that surfaces worker errors instead of hanging. Under `TESTING` the worker runs inline to keep the suite deterministic.
+Lesson generation never blocks its POST. The route validates, enforces the singleflight claim and lesson cap, guarantees the shell `StudyPath` row (so the client learns its `path_id` up front), snapshots everything the run needs into a plain payload (session and `current_user` are unavailable off-request), and returns `{accepted, task_id, path_id}` at once. A daemon generation worker (`generation_worker.py`, same spawn/app-context pattern as TTS) then runs the RAG + per-module LLM loop, saves lessons, records memory, chains the TTS worker, sets the completion flag, clears the digest, and flips the bell row — the client polls `/progress` and `/lessons/generation-status` exactly as before, including a failure branch that surfaces worker errors instead of hanging. Slide generation retries once on backend failure; if the response is still unusable, the module falls back to placeholder slides carrying a persisted degraded flag, and the worker warns visibly (flash + bell label) exactly like the quiz-fallback path, so degraded content is never presented silently. Under `TESTING` the worker runs inline to keep the suite deterministic.
 
 Generating neural audio for 5+ modules can take 45–90 minutes. Running this in the HTTP request thread causes timeouts; running it in a background thread requires a reliable completion signal so the frontend knows when to redirect.
 
@@ -208,7 +213,7 @@ After generation, the plan snapshot (`modules_json`, `summary_text`, `relevance_
 Two modes, in order:
 
 1. **Internal (document-grounded, default):** an LLM proposes up to three topics covered by the uploads but not yet taught or passed, skipping already-planned titles.
-2. **External (web, opt-in):** when internal topics are exhausted and every planned module is passed, a fail-closed classifier decides whether the web applies. Proprietary material (HR, company-internal, salaries, memos — blocklist wins, unsure means proprietary) never touches the web; public subjects (Physics, Engineering, Mathematics, CS) proceed to `web_search` → `web_fetch` → LLM synthesis. Only a sanitized topic query (goal + recent titles, org names stripped) ever leaves the server — never document text. Synthesized URLs must be copied verbatim from search results (invented links are stripped); external rows persist with `is_external` + `source_urls`, render with a Web badge, clickable sources, and a “verify links” disclaimer, and accept generates a web-grounded module. The whole phase is gated by `WEB_SEARCH_ENABLED=false` by default plus per-user rate limits, and every failure degrades to “all covered.”
+2. **External (web, opt-in):** when internal topics are exhausted and every planned module is passed, a fail-closed classifier decides whether the web applies. Proprietary material (HR, company-internal, salaries, memos — blocklist wins, unsure means proprietary) never touches the web; public subjects (Physics, Engineering, Mathematics, CS) proceed to `web_search` → `web_fetch` → LLM synthesis. Only a sanitized topic query (goal + recent titles, org names stripped) ever leaves the server — never document text. Synthesized URLs must be copied verbatim from search results (invented links are stripped); external rows persist with `is_external` + `source_urls`, render with a Web badge, clickable sources, and a “verify links” disclaimer, and accept generates a web-grounded module. The whole phase is gated by `WEB_SEARCH_ENABLED=false` by default plus a per-call result cap, and every failure degrades to “all covered.”
 
 ---
 
@@ -229,7 +234,7 @@ The test environment is fully isolated from production services. `AI_MOCK=true` 
 
 | Risk | Impact | Mitigation |
 | :--- | :--- | :--- |
-| **AI Output Inconsistency** | Poor pedagogical value | Strict RAG grounding; relevance gating; JSON mode at the API level; shared `extract_json` helper with failure logging; topic-aware fallback quizzes with user-visible flash warnings. |
+| **AI Output Inconsistency** | Poor pedagogical value | Strict RAG grounding; relevance gating; JSON mode at the API level; shared `extract_json` helper with failure logging; topic-aware fallback quizzes and lesson slides with user-visible flash warnings. |
 | **Resource Limits (RAM)** | App crashes during OCR | Smart-gated cloud vision (text PDFs skip rendering/LLM entirely); `OCR_FULL=false` opt-out for offline/zero-cost operation. |
 | **Session Leakage** | User A sees User B's data | Explicit session clearing on login; DB-backed multi-path isolation. |
 | **TTS Service Dependency** | Narration fails | Graceful degradation; lessons remain fully functional without audio. |
@@ -239,4 +244,4 @@ The test environment is fully isolated from production services. `AI_MOCK=true` 
 | **TTS Worker Write Race** | User progress lost during audio generation | Worker re-reads `content_data` before commit; applies only TTS field updates per module, preserving concurrent user writes. |
 | **Duplicate pipelines / cap race** | Double spend, overshot lesson cap | Oldest-wins singleflight claim per user+kind; re-submits resume or wait; cap re-checked at write time. |
 | **Background generation failure** | Stranded loading screen | Worker contains errors (progress + bell failure, no redirect flag); client surfaces the error and re-arms the generate button. |
-| **External Web Suggestions** | Proprietary leak / fake links / quota burn | Fail-closed classifier (unsure means proprietary); sanitized queries, never document text; verbatim URLs only with UI disclaimer; opt-in flag; cached rows and rate limits; graceful empty on any failure. |
+| **External Web Suggestions** | Proprietary leak / fake links / quota burn | Fail-closed classifier (unsure means proprietary); sanitized queries, never document text; verbatim URLs only with UI disclaimer; opt-in flag; cached rows and result-count caps; graceful empty on any failure. |

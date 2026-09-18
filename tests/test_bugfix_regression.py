@@ -143,9 +143,128 @@ def test_generate_lesson_marks_fallback(monkeypatch):
     monkeypatch.setattr(lg, 'call_ollama', boom)
     out = lg.generate_lesson('Mod', 'Goal', retriever=lambda q, **k: {'context_text': 'c', 'sources': []})
     assert out['fallback'] is True
+    assert out['fallback_reason'] == 'ai_error'
 
     monkeypatch.setattr(
         lg, 'call_ollama',
         lambda prompt, *a, **k: '{"module_title": "Mod", "slides": [{"type": "title", "title": "T", "subtitle": "S"}]}')
     out = lg.generate_lesson('Mod', 'Goal', retriever=lambda q, **k: {'context_text': 'c', 'sources': []})
     assert out['fallback'] is False
+
+
+def test_module_query_leads_with_title():
+    """Retrieval queries must lead with the module title (B1)."""
+    from src.services.lesson_generator import build_rag_context_for_module
+    seen = {}
+
+    def fake_retriever(query, **kw):
+        seen['query'] = query
+        return {'context_text': 'c', 'sources': []}
+
+    build_rag_context_for_module(
+        'Post-Quantum Cryptography (PQC) Key Management',
+        'MFA requirements and privileged account rules',
+        fake_retriever,
+    )
+    assert seen['query'].startswith('Post-Quantum Cryptography (PQC) Key Management')
+    assert 'MFA requirements' in seen['query']
+
+
+def test_module_query_title_only_for_accepted_followups():
+    """Accepted follow-ups must retrieve by title alone (B1 follow-up)."""
+    from src.services.lesson_generator import build_rag_context_for_module
+    seen = {}
+
+    def fake_retriever(query, **kw):
+        seen['query'] = query
+        return {'context_text': 'c', 'sources': []}
+
+    build_rag_context_for_module(
+        'Post-Quantum Cryptography (PQC) Key Management',
+        'MFA requirements and privileged account rules',
+        fake_retriever,
+        title_only=True,
+    )
+    assert seen['query'] == 'Post-Quantum Cryptography (PQC) Key Management'
+
+
+def test_accept_uses_title_only_retrieval(reg_app, monkeypatch):
+    """The accept flow must request title-only retrieval (B1 follow-up)."""
+    _seed_path_without_content_data(reg_app)
+    client = reg_app.test_client()
+    client.post('/login', data={'username': 'reggie', 'password': 'pass'})
+
+    import src.routes.lessons as lessons_mod
+    captured = {}
+
+    def fake_artifacts(*a, **k):
+        captured.update(k)
+        return {
+            'lesson': {'module_title': 'MFA Basics', 'slides': [], 'narration': []},
+            'quiz': {'questions': []}, 'checkpoints': {}, 'sources': [],
+        }
+
+    monkeypatch.setattr(lessons_mod, 'build_module_artifacts', fake_artifacts)
+    with reg_app.app_context():
+        user = User.query.filter_by(username='reggie').first()
+        path = StudyPath.query.filter_by(user_id=user.id).first()
+        row = Suggestion(user_id=user.id, study_path_id=path.id,
+                         title='Follow-up', reason='More',
+                         source_refs='doc', status='pending')
+        db.session.add(row)
+        db.session.commit()
+        sid = row.id
+    resp = client.post('/suggestions/accept', json={'suggestion_id': sid})
+    assert resp.status_code == 200
+    assert captured.get('title_only') is True
+
+
+def test_accept_reframes_goal_around_suggestion(reg_app, monkeypatch):
+    """The accept flow must prompt with the suggestion topic, not the path goal (B1)."""
+    _seed_path_without_content_data(reg_app)
+    client = reg_app.test_client()
+    client.post('/login', data={'username': 'reggie', 'password': 'pass'})
+
+    import src.routes.lessons as lessons_mod
+    captured = {}
+
+    def fake_artifacts(*a, **k):
+        captured['args'] = a
+        return {
+            'lesson': {'module_title': 'X', 'slides': [], 'narration': []},
+            'quiz': {'questions': []}, 'checkpoints': {}, 'sources': [],
+        }
+
+    monkeypatch.setattr(lessons_mod, 'build_module_artifacts', fake_artifacts)
+    with reg_app.app_context():
+        user = User.query.filter_by(username='reggie').first()
+        path = StudyPath.query.filter_by(user_id=user.id).first()
+        row = Suggestion(user_id=user.id, study_path_id=path.id,
+                         title='Post-Quantum Cryptography', reason='Keys matter',
+                         source_refs='doc', status='pending')
+        db.session.add(row)
+        db.session.commit()
+        sid = row.id
+    resp = client.post('/suggestions/accept', json={'suggestion_id': sid})
+    assert resp.status_code == 200
+    module, learning_goal = captured['args'][0], captured['args'][1]
+    assert module == {'title': 'Post-Quantum Cryptography'}
+    assert learning_goal.startswith('Post-Quantum Cryptography')
+    assert 'Learn MFA' not in learning_goal
+
+
+def test_compute_suggestions_skips_dismissed(monkeypatch):
+    """Dismissed titles must not be re-proposed, even reworded (N1)."""
+    from src.services import suggest_next as sn
+
+    def fake_call(prompt, **kw):
+        return json.dumps({"suggestions": [
+            {"title": 'Infrastructure as Code (IaC) and GitOps',
+             "reason": "again", "source_refs": "doc"},
+            {"title": 'CI/CD Pipelines', "reason": "next", "source_refs": "doc"},
+        ]})
+
+    monkeypatch.setattr(sn, 'call_ollama', fake_call)
+    out = sn.compute_suggestions(
+        'G', [], excluded=['Infrastructure as Code and GitOps'])
+    assert [s['title'] for s in out['suggestions']] == ['CI/CD Pipelines']

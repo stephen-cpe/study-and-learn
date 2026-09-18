@@ -41,8 +41,15 @@ def build_rag_context_for_module(
     learning_goal: str,
     retriever: Optional[Callable[[str], Dict[str, Any]]],
     exclude_chunks: set = None,
+    title_only: bool = False,
 ) -> Dict[str, Any]:
     """Query the retriever for context relevant to a module.
+
+    The query leads with the module title so similarity search favors
+    the module's own topic; the learning goal follows for disambiguation.
+    (Leading with the goal drowned the title and every module retrieved
+    goal-level context, so accepted follow-up topics were taught with
+    the original goal's content instead of their own.)
 
     Args:
         module_title: The module title to build a query around.
@@ -52,13 +59,16 @@ def build_rag_context_for_module(
         exclude_chunks: Optional set of chunk IDs to exclude from results
             (used by the cross-module dedup mechanism to prevent the same
             document content from appearing in multiple modules).
+        title_only: When True, query with the module title alone. Used
+            for accepted follow-up topics, which must be taught from
+            their own topic's content rather than the original goal's.
 
     Returns:
         Dict with ``context_text`` (str) and ``sources`` (list).
     """
     try:
         if retriever:
-            query = f"{learning_goal} {module_title}"
+            query = module_title if title_only else f"{module_title} {learning_goal}"
             kwargs = {}
             if exclude_chunks is not None:
                 kwargs['exclude_chunks'] = exclude_chunks
@@ -146,6 +156,7 @@ def generate_lesson(
     retriever: Optional[Callable[[str], Dict[str, Any]]],
     difficulty: str = 'Normal',
     exclude_chunks: set = None,
+    title_only: bool = False,
 ) -> Dict[str, Any]:
     """Generate an interactive slide-based lesson for a single module.
 
@@ -162,6 +173,8 @@ def generate_lesson(
             sentence complexity, and depth. Defaults to 'Normal'.
         exclude_chunks: Optional set of chunk IDs to exclude from retrieval
             (prevents the same document content from repeating across modules).
+        title_only: Forwarded to :func:`build_rag_context_for_module` —
+            retrieve with the module title alone (accepted follow-ups).
 
     Returns:
         A dict with keys ``module_title`` (str), ``slides`` (list), and
@@ -172,7 +185,8 @@ def generate_lesson(
     if not module_title or not module_title.strip():
         return _fallback_lesson("Untitled Module", degraded=True)
 
-    rag_result = build_rag_context_for_module(module_title, learning_goal, retriever, exclude_chunks=exclude_chunks)
+    rag_result = build_rag_context_for_module(module_title, learning_goal, retriever, exclude_chunks=exclude_chunks,
+                                              title_only=title_only)
     rag_context = rag_result.get("context_text", "") if isinstance(rag_result, dict) else str(rag_result)
     sources = rag_result.get("sources", []) if isinstance(rag_result, dict) else []
 
@@ -192,7 +206,7 @@ def generate_lesson(
             response = call_ollama(prompt)
         except AIServiceError as e2:
             logger.error("Lesson generation failed for module '%s': %s", module_title, str(e2))
-            return _fallback_lesson(module_title, degraded=True)
+            return _fallback_lesson(module_title, degraded=True, reason='ai_error')
 
     from src.services.llm_json import extract_json
     result = extract_json(response)
@@ -211,7 +225,7 @@ def generate_lesson(
         "Response (first 300 chars): %r",
         module_title, response[:300] if response else '<empty>'
     )
-    return _fallback_lesson(module_title, degraded=True)
+    return _fallback_lesson(module_title, degraded=True, reason='parse_error')
 
 
 def _validate_slides(slides: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -231,7 +245,7 @@ def _validate_slides(slides: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return validated
 
 
-def _fallback_lesson(module_title: str, degraded: bool = False) -> Dict[str, Any]:
+def _fallback_lesson(module_title: str, degraded: bool = False, reason: str = '') -> Dict[str, Any]:
     """Return a generic placeholder lesson when AI generation fails.
 
     Args:
@@ -240,6 +254,10 @@ def _fallback_lesson(module_title: str, degraded: bool = False) -> Dict[str, Any
             so callers (generation worker, lessons page) can surface that
             this module needs a retake instead of silently presenting
             placeholder slides as real content.
+        reason: Machine-readable cause (``'ai_error'`` when the backend
+            failed twice, ``'parse_error'`` when its response was not
+            usable lesson JSON). Persisted on the lesson dict for later
+            diagnosis; empty for direct-constructed fallbacks.
 
     Returns:
         A dict with ``module_title`` and a minimal set of placeholder slides.
@@ -263,6 +281,7 @@ def _fallback_lesson(module_title: str, degraded: bool = False) -> Dict[str, Any
         ],
         'sources': [],
         'fallback': degraded,
+        'fallback_reason': reason if degraded else '',
     }
 
 

@@ -96,10 +96,11 @@ def test_external_branch_persists_urls(monkeypatch, ext_client):
     # compute_external imports web fns lazily; patch via suggest_external search passthrough
     orig_compute = ext.compute_external_suggestions
 
-    def patched_compute(goal, modules=None, summary='', file_names=None, search_fn=None, fetch_fn=None):
+    def patched_compute(goal, modules=None, summary='', file_names=None, search_fn=None, fetch_fn=None,
+                         **kw):
         import src.services.web_search_service as w
         return orig_compute(goal, modules, summary, file_names,
-                            search_fn=w.web_search, fetch_fn=w.web_fetch)
+                            search_fn=w.web_search, fetch_fn=w.web_fetch, **kw)
 
     monkeypatch.setattr(ext, 'compute_external_suggestions', patched_compute)
     # internal must be empty: mock internal to [] via AI_MOCK? compute_suggestions uses call_ollama;

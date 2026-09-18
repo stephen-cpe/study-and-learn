@@ -110,9 +110,19 @@ def compute_suggestions(
     modules: List[Dict[str, Any]],
     summary: str = "",
     missing_material: str = "",
+    excluded: List[str] | None = None,
 ) -> Dict[str, Any]:
-    """Compute follow-up topic suggestions (never raises)."""
+    """Compute follow-up topic suggestions (never raises).
+
+    Args:
+        excluded: Titles the learner already dismissed (or otherwise
+            handled). Matching is normalized (see :func:`_normalize_title`)
+            so reworded resubmissions of a dismissed topic are also
+            skipped — without this, dismissing a card has no lasting
+            effect because the next compute re-proposes the same topic.
+    """
     try:
+        excluded_norm = {_normalize_title(t) for t in (excluded or [])}
         prompt = build_suggestion_prompt(learning_goal, modules, summary, missing_material)
         response = call_ollama(prompt)
         result = extract_json(response)
@@ -132,6 +142,8 @@ def compute_suggestions(
             # also skipped.
             planned = {_normalize_title(m.get('title', '')) for m in (modules or [])}
             if _is_duplicate_title(title, planned):
+                continue
+            if _is_duplicate_title(title, excluded_norm):
                 continue
             seen.add(title.lower())
             suggestions.append({

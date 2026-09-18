@@ -203,6 +203,7 @@ def build_module_artifacts(
     module_index: int = 0,
     used_chunk_ids: set = None,
     learner_memories: list = None,
+    title_only: bool = False,
 ) -> Dict[str, Any]:
     """
     Generate (or reuse) lesson slides, inline checkpoints, and a final quiz
@@ -233,6 +234,9 @@ def build_module_artifacts(
             about the learner (voice preference entries are filtered out
             by ``tts_persona``). Passed through to the narration
             generator for at-most-one natural callback.
+        title_only: Forwarded to lesson generation — retrieve with the
+            module title alone. Set for accepted follow-up topics so the
+            new module teaches its own topic, not the original goal.
 
     Returns:
         dict with keys: 'lesson', 'quiz', 'checkpoints', 'sources'.
@@ -246,6 +250,7 @@ def build_module_artifacts(
             module_title, learning_goal, retriever,
             difficulty=difficulty,
             exclude_chunks=used_chunk_ids,
+            title_only=title_only,
         )
 
     slides = lesson_data.get("slides", [])
