@@ -23,9 +23,17 @@ This fails on:
      rather than guessing the endpoint with ``rfind``.
   3. Logs a WARNING with the raw response on failure so the failure is
      never silent.
+
+``call_ollama_json`` wraps the full generate→parse→repair loop used by the
+lesson and quiz generators: on a parse/validation failure it re-prompts the
+model with a repair instruction before the caller degrades to a placeholder.
+This is the highest-impact reliability control for the class of defects the
+quality audit found (every degraded module carried ``parse_error`` and no
+retry was ever attempted).
 """
 import json
 import logging
+import os
 import re
 
 logger = logging.getLogger(__name__)
@@ -126,3 +134,124 @@ def extract_json_array(response: str):
             e, text[:300]
         )
         return None
+
+
+# ── Generate → parse → repair loop ──────────────────────────────────────
+#
+# The quality audit found that 100% of degraded modules (41.5% of all
+# generated modules across a 53-module sample) carried
+# ``fallback_reason='parse_error'`` and that no retry was ever attempted:
+# ``generate_lesson`` retried once on backend errors only, and a malformed
+# or truncated JSON response fell straight through to the placeholder.
+#
+# These helpers wrap the full loop so a parse failure gets one or more
+# repair attempts (re-prompting the model with the invalid output and a
+# strict "return ONLY valid JSON matching this schema" instruction) before
+# the caller degrades to a placeholder.
+
+
+def _repair_prompt(original_prompt: str, bad_response: str,
+                   schema_hint: str = "") -> str:
+    """Build the repair re-prompt sent after an unparseable response."""
+    tail = bad_response[-4000:] if bad_response else '<empty response>'
+    schema = f"\nRequired shape:\n{schema_hint}\n" if schema_hint else ""
+    return (
+        "Your previous output was not valid JSON and could not be parsed.\n"
+        f"{schema}\n"
+        "Rewrite the SAME content as a single valid JSON object. "
+        "Return ONLY the JSON object — no prose, no markdown fences, no "
+        "commentary. Ensure every string is quoted, every array/object is "
+        "closed, and no trailing commas are present.\n\n"
+        "Previous invalid output (tail):\n"
+        f"{tail}\n\n"
+        f"Original task:\n{original_prompt}"
+    )
+
+
+def generate_json(
+    prompt: str,
+    call_fn,
+    parse_fn=None,
+    schema_hint: str = "",
+    max_attempts: int = None,
+    label: str = "llm_json",
+):
+    """Call the model and parse JSON, retrying with a repair prompt.
+
+    Args:
+        prompt: The original generation prompt.
+        call_fn: Callable ``(prompt) -> str`` invoking the backend.
+        parse_fn: Callable ``(response) -> parsed | None``; defaults to
+            :func:`extract_json`.
+        schema_hint: Short schema description included in repair prompts.
+        max_attempts: Total attempts (initial + repairs). Defaults to
+            ``1 + LLM_JSON_REPAIR_ATTEMPTS`` (env-tunable).
+        label: Log prefix (e.g. the module title).
+
+    Returns:
+        The parsed JSON object, or ``None`` when every attempt failed.
+        Never raises for parse failures; backend exceptions propagate so
+        the caller keeps its existing error handling.
+    """
+    if parse_fn is None:
+        parse_fn = extract_json
+    if max_attempts is None:
+        from config_defaults import LLM_JSON_REPAIR_ATTEMPTS_DEFAULT
+        # Under AI_MOCK the backend is a deterministic stub: it returns the
+        # same non-JSON text every time, so retrying can never succeed and
+        # only wastes test time. One attempt in mock mode.
+        if os.environ.get('AI_MOCK', '').lower() == 'true':
+            max_attempts = 1
+        else:
+            try:
+                extra = int(os.environ.get(
+                    'LLM_JSON_REPAIR_ATTEMPTS',
+                    LLM_JSON_REPAIR_ATTEMPTS_DEFAULT,
+                ))
+            except (TypeError, ValueError):
+                extra = LLM_JSON_REPAIR_ATTEMPTS_DEFAULT
+            max_attempts = 1 + max(0, extra)
+
+    response = None
+    for attempt in range(max_attempts):
+        if attempt == 0:
+            response = call_fn(prompt)
+        else:
+            response = call_fn(_repair_prompt(prompt, response, schema_hint))
+        parsed = parse_fn(response)
+        if parsed is not None:
+            if attempt > 0:
+                logger.info(
+                    "%s: JSON repair attempt %d/%d succeeded",
+                    label, attempt, max_attempts - 1,
+                )
+            return parsed
+        logger.warning(
+            "%s: attempt %d/%d produced unparseable JSON "
+            "(response length=%d)",
+            label, attempt + 1, max_attempts,
+            len(response) if response else 0,
+        )
+    logger.error(
+        "%s: all %d JSON attempts failed; caller must degrade",
+        label, max_attempts,
+    )
+    return None
+
+
+def log_bad_response(response: str, reason: str = "", limit: int = 2000) -> None:
+    """Log head+tail of a failed response for post-mortem diagnosis.
+
+    Truncation is the most common parse-error cause; logging both ends lets
+    an operator distinguish it from malformed nesting or prose wrappers.
+    """
+    if not response:
+        logger.error("LLM response was empty (%s)", reason or 'unknown')
+        return
+    head = response[:limit]
+    tail = response[-limit:] if len(response) > limit else ''
+    logger.error(
+        "LLM response unusable (%s) length=%d. HEAD: %r%s",
+        reason or 'unknown', len(response), head,
+        f" TAIL: {tail!r}" if tail else '',
+    )

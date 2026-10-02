@@ -45,7 +45,9 @@
             <div class="lesson-card-header d-flex align-items-start justify-content-between">
                 <div class="lesson-module-number">{{ loop.index }}</div>
                 <div class="lesson-status-badges">
-                    {% if lesson.completed %}
+                    {% if lesson.get('content_degraded') %}
+                        <span class="badge badge-degraded">Content Failed — Regenerate</span>
+                    {% elif lesson.completed %}
                         {% if lesson.passed %}
                         <span class="badge badge-passed">Passed — {{ lesson.score }}%</span>
                         {% else %}
@@ -92,7 +94,15 @@
 
             <div class="lesson-actions">
                 {% if lesson.unlocked %}
-                {% if lesson.completed and not lesson.passed %}
+                {% if lesson.get('content_degraded') %}
+                {# Fail-closed: placeholder content is never presented as a
+                   gradable lesson. The learner must regenerate it first. #}
+                <button class="btn btn-primary btn-lg w-100 lesson-retake-btn"
+                        data-module-index="{{ lesson.index }}"
+                        data-path-id="{{ path_id }}">
+                    Regenerate Lesson
+                </button>
+                {% elif lesson.completed and not lesson.passed %}
                 {# Failed lesson: fire the /retake POST (regenerate + reset),
                    NOT a plain deck link. Mirrors the in-deck results-page
                    retake button so both entry points behave identically. #}

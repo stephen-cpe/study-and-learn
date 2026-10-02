@@ -19,6 +19,45 @@ from src.services.settings_service import DEFAULT_DIFFICULTY, DEFAULT_TTS_SPEAKE
 DeckLayoutEntry = Dict[str, Any]
 
 
+# ── Content-status helpers (fail-closed degradation) ─────────────────────
+#
+# A "degraded" module is one whose lesson and/or quiz fell back to a
+# placeholder. The quality audit found that quizzes are generated
+# independently from RAG, so a degraded module can present an
+# unanswerable quiz as graded material. These helpers let the routes,
+# worker, and templates treat such modules as needing regeneration
+# instead of silently counting them as taught-and-passable.
+
+CONTENT_STATUS_READY = 'ready'
+CONTENT_STATUS_DEGRADED = 'degraded'
+
+
+def lesson_content_status(lesson: Dict[str, Any]) -> str:
+    """Classify a persisted lesson dict as 'ready' or 'degraded'.
+
+    Explicit flags are authoritative (``lesson.fallback`` /
+    ``quiz.fallback``); the persisted ``content_status`` field wins when
+    present so future reasons can be recorded without re-deriving.
+    """
+    if not isinstance(lesson, dict):
+        return CONTENT_STATUS_DEGRADED
+    status = lesson.get('content_status')
+    if status == CONTENT_STATUS_DEGRADED:
+        return CONTENT_STATUS_DEGRADED
+    if status == CONTENT_STATUS_READY:
+        return CONTENT_STATUS_READY
+    if lesson.get('lesson', {}).get('fallback'):
+        return CONTENT_STATUS_DEGRADED
+    if lesson.get('quiz', {}).get('fallback'):
+        return CONTENT_STATUS_DEGRADED
+    return CONTENT_STATUS_READY
+
+
+def is_lesson_degraded(lesson: Dict[str, Any]) -> bool:
+    """True when a lesson dict's content failed to generate."""
+    return lesson_content_status(lesson) == CONTENT_STATUS_DEGRADED
+
+
 def build_deck_layout(
     slides: List[Dict[str, Any]],
     checkpoints: Dict[str, Any],
@@ -166,17 +205,39 @@ def make_retriever_from_hashes_with_names(
     """
     def retrieve(query: str, exclude_chunks: set = None) -> Dict[str, Any]:
         try:
+            from config_defaults import (
+                MODULE_CONTEXT_FRACTION_DEFAULT,
+                MODULE_DIGEST_CHARS_DEFAULT,
+                env_float,
+                env_int,
+            )
             from src.services.rag_budget import get_context_budget_chars
-            module_budget = get_context_budget_chars(fraction=0.35)
+            # Reduced per-module context fraction (down from 0.35): the
+            # audit tied the RMD parse failures to oversized module prompts,
+            # where dense tables + the full digest + a large retrieval budget
+            # pushed the model past reliable JSON emission. A smaller module
+            # context trades marginal recall for a much higher valid-JSON rate.
+            module_budget = get_context_budget_chars(fraction=env_float(
+                'MODULE_CONTEXT_FRACTION', MODULE_CONTEXT_FRACTION_DEFAULT))
             result = build_rag_context_from_hashes_with_sources(
                 query or goal, file_hashes, file_names,
                 top_k=None, exclude_chunks=exclude_chunks,
                 max_chars=module_budget,
             )
             if content_digest:
+                # Truncate the digest per module: the summary/relevance
+                # stages still receive the full digest from the route, but
+                # the per-module lesson prompt keeps only the head so the
+                # total prompt stays within a reliable JSON output budget.
+                digest_cap = env_int(
+                    'MODULE_DIGEST_CHARS', MODULE_DIGEST_CHARS_DEFAULT)
+                digest_text = content_digest
+                if digest_cap > 0 and len(digest_text) > digest_cap:
+                    marker = '\n[... digest truncated for this module ...]'
+                    digest_text = digest_text[:max(0, digest_cap - len(marker))] + marker
                 digest_block = (
                     "# Complete Document Digest (every section)\n\n"
-                    + content_digest
+                    + digest_text
                     + "\n\n"
                 )
                 result["context_text"] = digest_block + result.get(
@@ -204,6 +265,7 @@ def build_module_artifacts(
     used_chunk_ids: set = None,
     learner_memories: list = None,
     title_only: bool = False,
+    covered_concepts: list = None,
 ) -> Dict[str, Any]:
     """
     Generate (or reuse) lesson slides, inline checkpoints, and a final quiz
@@ -237,6 +299,9 @@ def build_module_artifacts(
         title_only: Forwarded to lesson generation — retrieve with the
             module title alone. Set for accepted follow-up topics so the
             new module teaches its own topic, not the original goal.
+        covered_concepts: Titles/objectives of already-generated modules,
+            forwarded to the lesson prompt as an explicit do-not-reteach
+            list (concept-level cross-module dedup).
 
     Returns:
         dict with keys: 'lesson', 'quiz', 'checkpoints', 'sources'.
@@ -251,6 +316,7 @@ def build_module_artifacts(
             difficulty=difficulty,
             exclude_chunks=used_chunk_ids,
             title_only=title_only,
+            covered_concepts=covered_concepts,
         )
 
     slides = lesson_data.get("slides", [])

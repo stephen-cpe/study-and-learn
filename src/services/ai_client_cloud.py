@@ -31,8 +31,11 @@ import requests
 from config_defaults import (
     OLLAMA_CLOUD_BASE_URL_DEFAULT,
     OLLAMA_MODEL_CLOUD_DEFAULT,
+    OLLAMA_NUM_PREDICT_DEFAULT,
+    OLLAMA_TEMPERATURE_DEFAULT,
     OLLAMA_TIMEOUT_DEFAULT,
     env_default,
+    env_float,
     env_int,
 )
 from src.services.exceptions import (
@@ -72,6 +75,18 @@ def call_ollama(prompt: str, model: str = None, images: list = None) -> str:
         "Content-Type": "application/json"
     }
 
+    # Deterministic decoding for structured JSON output. The OpenAI-compatible
+    # endpoint accepts temperature and max_tokens; max_tokens bounds runaway
+    # generations that otherwise truncate mid-JSON.
+    gen_options = {
+        "temperature": env_float(
+            'OLLAMA_TEMPERATURE', OLLAMA_TEMPERATURE_DEFAULT
+        ),
+        "max_tokens": env_int(
+            'OLLAMA_NUM_PREDICT', OLLAMA_NUM_PREDICT_DEFAULT
+        ),
+    }
+
     if images:
         user_content = [
             {"type": "text", "text": prompt},
@@ -85,23 +100,39 @@ def call_ollama(prompt: str, model: str = None, images: list = None) -> str:
             "model": model,
             "messages": [{"role": "user", "content": user_content}],
             "stream": False,
-            "response_format": {"type": "json_object"}
+            "response_format": {"type": "json_object"},
+            **gen_options,
         }
     else:
         payload = {
             "model": model,
             "messages": [{"role": "user", "content": prompt}],
             "stream": False,
-            "response_format": {"type": "json_object"}
+            "response_format": {"type": "json_object"},
+            **gen_options,
         }
 
-    logger.info(f"Calling Ollama Cloud model='{model}' timeout={timeout}s")
+    logger.info(
+        f"Calling Ollama Cloud model='{model}' timeout={timeout}s "
+        f"temperature={gen_options['temperature']} "
+        f"max_tokens={gen_options['max_tokens']}"
+    )
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=timeout)
         response.raise_for_status()
         result = response.json()
-        response_text = result.get('choices', [{}])[0].get('message', {}).get('content', '')
-        logger.info(f"Ollama Cloud success: received {len(response_text)} chars")
+        choice = result.get('choices', [{}])[0]
+        response_text = choice.get('message', {}).get('content', '')
+        finish_reason = choice.get('finish_reason') or 'unknown'
+        logger.info(
+            f"Ollama Cloud success: received {len(response_text)} chars "
+            f"(finish_reason={finish_reason})"
+        )
+        if finish_reason == 'length':
+            logger.warning(
+                "Ollama Cloud output was truncated at max_tokens "
+                "(finish_reason=length); JSON may be incomplete"
+            )
         return response_text
     except requests.exceptions.ConnectTimeout:
         logger.error(f"Ollama Cloud CONNECT TIMEOUT for model '{model}'")

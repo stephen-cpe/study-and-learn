@@ -83,11 +83,17 @@ def _build_lesson_prompt(
     learning_goal: str,
     rag_context: str,
     difficulty: str,
+    covered_concepts: list = None,
 ) -> str:
     """Assemble the lesson generation prompt.
 
     Pure string assembly — no I/O, no retrieval — so it can be unit
     tested and tuned independently of ``generate_lesson``'s control flow.
+
+    ``covered_concepts`` carries the titles/objectives of modules already
+    generated in this path. Passing them with an explicit "do not re-teach"
+    instruction addresses the cross-module repetition defect the audit
+    found (all four AZ modules taught the same goal-level triad).
     """
     context_instruction = ""
     if rag_context and rag_context.strip():
@@ -106,11 +112,37 @@ def _build_lesson_prompt(
 
     diff_instruction = DIFFICULTY_INSTRUCTIONS.get(difficulty, DEFAULT_DIFFICULTY_INSTRUCTION)
 
+    # Anti-fabrication: the audit found invented policy labels ("Rule of Two")
+    # presented as document terminology. Prohibit coining names entirely.
+    anti_fabrication = (
+        "TERMINOLOGY RULE: Use ONLY names, labels, and acronyms that appear "
+        "verbatim in the Context. Never invent or rename a rule, policy, "
+        "framework, or procedure (do not coin labels like \"Rule of Two\"). "
+        "If the Context does not name something, describe it without a "
+        "proper name.\n\n"
+    )
+
+    # Cross-module dedup: when the earlier modules are known, forbid
+    # re-teaching their concepts.
+    covered_block = ""
+    if covered_concepts:
+        covered_lines = "\n".join(
+            f"- {str(c).strip()[:120]}" for c in covered_concepts[:12]
+            if str(c).strip()
+        )
+        if covered_lines:
+            covered_block = (
+                "ALREADY TAUGHT IN THIS COURSE (do NOT re-teach these "
+                "topics — build on them instead):\n"
+                f"{covered_lines}\n\n"
+            )
+
     prompt = f"""You are an expert educator creating a structured, interactive lesson for high-school to early-college learners.
 
 {context_instruction}
 {diff_instruction}
-Learning Goal: {learning_goal}
+{anti_fabrication}
+{covered_block}Learning Goal: {learning_goal}
 Module Title: {module_title}
 Context: {rag_context if rag_context else 'No additional context available.'}
 
@@ -133,7 +165,8 @@ OUTPUT RULES:
 - Title slides MUST have "title" and "subtitle" (both strings).
 - Example slides MUST have "heading" and "body" (both strings).
 - Summary slides MUST have "bullets" (array of 2-5 strings).
-- Generate exactly 6-8 slides.
+- Generate exactly 6 slides. Keep the JSON compact: bullets are short
+  phrases, notes are optional and brief.
 
 JSON FORMAT:
 {{
@@ -157,12 +190,13 @@ def generate_lesson(
     difficulty: str = 'Normal',
     exclude_chunks: set = None,
     title_only: bool = False,
+    covered_concepts: list = None,
 ) -> Dict[str, Any]:
     """Generate an interactive slide-based lesson for a single module.
 
     Builds a prompt grounded in RAG context (when available), calls the AI
-    backend, and parses the JSON response. Falls back to a generic placeholder
-    lesson if generation fails, the response is unparseable, or inputs are empty.
+    backend, and parses the JSON response. Retries with a repair prompt on
+    a parse/validation failure before degrading to a placeholder.
 
     Args:
         module_title: The title of the module to generate a lesson for.
@@ -175,6 +209,9 @@ def generate_lesson(
             (prevents the same document content from repeating across modules).
         title_only: Forwarded to :func:`build_rag_context_for_module` —
             retrieve with the module title alone (accepted follow-ups).
+        covered_concepts: Titles/objectives of modules already generated in
+            this path; forwarded to the prompt as an explicit do-not-reteach
+            list (concept-level cross-module dedup).
 
     Returns:
         A dict with keys ``module_title`` (str), ``slides`` (list), and
@@ -195,53 +232,120 @@ def generate_lesson(
         learning_goal=learning_goal,
         rag_context=rag_context,
         difficulty=difficulty,
+        covered_concepts=covered_concepts,
     )
 
+    from src.services.llm_json import generate_json, log_bad_response
+
+    result = None
     try:
-        response = call_ollama(prompt)
+        result = generate_json(
+            prompt,
+            call_fn=call_ollama,
+            parse_fn=_parse_lesson_response,
+            schema_hint=_LESSON_SCHEMA_HINT,
+            label=f"lesson:{module_title[:40]}",
+        )
     except AIServiceError as e:
+        # Backend error (not a parse failure): keep the historical
+        # single retry, then degrade with the ai_error reason.
         logger.warning("Lesson generation attempt 1 failed for module '%s': %s — retrying once",
                        module_title, str(e))
         try:
-            response = call_ollama(prompt)
+            result = generate_json(
+                prompt,
+                call_fn=call_ollama,
+                parse_fn=_parse_lesson_response,
+                schema_hint=_LESSON_SCHEMA_HINT,
+                label=f"lesson:{module_title[:40]}",
+            )
         except AIServiceError as e2:
             logger.error("Lesson generation failed for module '%s': %s", module_title, str(e2))
             return _fallback_lesson(module_title, degraded=True, reason='ai_error')
 
-    from src.services.llm_json import extract_json
-    result = extract_json(response)
+    # ``generate_json`` returned a parsed object that still needs slide
+    # validation; the repair loop treats a validation-empty result as a
+    # parse failure only on the first pass, so re-check here.
     if result and 'slides' in result and isinstance(result['slides'], list):
         validated_slides = _validate_slides(result['slides'])
         if validated_slides:
             return {
-                'module_title': result.get('module_title', module_title),
+                'module_title': result.get('module_title') or module_title,
                 'slides': validated_slides,
                 'sources': sources,
                 'fallback': False,
             }
 
-    logger.warning(
-        "Lesson JSON parsing/validation failed for module '%s', using fallback. "
-        "Response (first 300 chars): %r",
-        module_title, response[:300] if response else '<empty>'
-    )
+    log_bad_response(str(result), reason='lesson parse/validation', limit=1000)
     return _fallback_lesson(module_title, degraded=True, reason='parse_error')
 
 
+# Schema description used by the repair prompt. Kept short — the repair
+# re-prompt should not itself become a large generation.
+_LESSON_SCHEMA_HINT = (
+    '{"module_title": "<string>", "slides": ['
+    '{"type": "title", "title": "...", "subtitle": "..."}, '
+    '{"type": "content", "heading": "...", "bullets": ["...", "..."]}, '
+    '{"type": "example", "heading": "...", "body": "..."}, '
+    '{"type": "summary", "bullets": ["...", "..."]}]}'
+)
+
+
+def _parse_lesson_response(response: str):
+    """Parse a lesson response and coerce it to a usable ``slides`` list.
+
+    Returns None when the response has no usable slide content so the
+    retry/repair loop treats it as a parse failure. Partial salvage: a
+    response whose JSON parses but contains some malformed slides keeps
+    the valid ones rather than discarding the whole module.
+    """
+    from src.services.llm_json import extract_json
+    result = extract_json(response)
+    if not isinstance(result, dict):
+        return None
+    slides = result.get('slides')
+    if not isinstance(slides, list):
+        return None
+    valid = _validate_slides(slides)
+    if not valid:
+        return None
+    return {'module_title': result.get('module_title', ''), 'slides': valid}
+
+
 def _validate_slides(slides: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Filter slides to only include those with valid types.
+    """Filter slides to only structurally usable ones.
+
+    Unlike a bare type check, this drops slides missing their core fields so
+    a single malformed slide cannot invalidate the whole module (partial
+    salvage). A slide that survives here still renders on the deck.
 
     Args:
         slides: A list of slide dicts from AI output.
 
     Returns:
-        Slides that have a valid ``type`` field (title/content/example/summary).
+        Slides that have a valid ``type`` and their minimal fields.
     """
     valid_types = {'title', 'content', 'example', 'summary'}
     validated = []
     for slide in slides:
-        if isinstance(slide, dict) and slide.get('type', '') in valid_types:
-            validated.append(slide)
+        if not isinstance(slide, dict):
+            continue
+        stype = slide.get('type', '')
+        if stype not in valid_types:
+            continue
+        # Minimal field presence per type.
+        if stype == 'title' and not (
+                slide.get('title') or slide.get('subtitle')):
+            continue
+        if stype == 'content' and not (
+                slide.get('heading') or slide.get('bullets')):
+            continue
+        if stype == 'example' and not (
+                slide.get('heading') or slide.get('body')):
+            continue
+        if stype == 'summary' and not slide.get('bullets'):
+            continue
+        validated.append(slide)
     return validated
 
 

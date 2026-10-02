@@ -64,6 +64,8 @@ def client(monkeypatch):
 
 def test_full_happy_path_mocked(client):
     """End-to-end smoke test using mocked AI responses."""
+    from unittest.mock import patch
+
     # 1) Landing page
     rv = client.get('/')
     assert rv.status_code == 200
@@ -85,8 +87,25 @@ def test_full_happy_path_mocked(client):
     assert rv.status_code == 200
     assert b'physics' in rv.data.lower() or b'Force' in rv.data
 
-    # 3) Trigger lesson generation
-    rv = client.post('/generate-lessons')
+    # 3) Trigger lesson generation. Mock the AI so the generated lesson is
+    #    substantive (not the AI_MOCK placeholder): fail-closed grading
+    #    rejects degraded modules, and this test covers the happy path.
+    with patch('src.services.lesson_generator.call_ollama') as mock_lesson, \
+         patch('src.services.quiz_generator.call_ollama') as mock_quiz:
+        mock_lesson.return_value = json.dumps({
+            'module_title': 'Physics Intro',
+            'slides': [
+                {'type': 'title', 'title': 'Physics Intro', 'subtitle': 'Forces'},
+                {'type': 'content', 'heading': 'Newton', 'bullets': ['F=ma', 'mass']},
+                {'type': 'summary', 'bullets': ['Forces accelerate mass']},
+            ],
+        })
+        mock_quiz.return_value = json.dumps({
+            'questions': [{'id': 'q1', 'type': 'mcq', 'prompt': 'F=ma?',
+                           'options': ['yes', 'no', 'maybe', 'never'],
+                           'answer_index': 0, 'explanation': 'E'}]
+        })
+        rv = client.post('/generate-lessons')
     assert rv.status_code == 200
     redirect_url = rv.get_json().get('redirect', '')
     assert redirect_url, 'Expected redirect URL in generate-lessons response'

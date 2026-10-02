@@ -18,6 +18,8 @@ from config_defaults import (
     OLLAMA_CLOUD_BASE_URL_DEFAULT,
     OLLAMA_MODEL_CLOUD_DEFAULT,
     OLLAMA_NUM_CTX_DEFAULT,
+    OLLAMA_NUM_PREDICT_DEFAULT,
+    OLLAMA_TEMPERATURE_DEFAULT,
     OLLAMA_TIMEOUT_DEFAULT,
     RAG_TOP_K_DEFAULT,
     VISION_MODEL_DEFAULT,
@@ -35,6 +37,14 @@ def _int(value: str, default: int) -> int:
     """Parse a string env var into an int, falling back on bad input."""
     try:
         return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _float(value: str, default: float) -> float:
+    """Parse a string env var into a float, falling back on bad input."""
+    try:
+        return float(value)
     except (TypeError, ValueError):
         return default
 
@@ -65,6 +75,15 @@ class Config:
     OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", OLLAMA_MODEL_CLOUD_DEFAULT)
     OLLAMA_TIMEOUT = _int(os.environ.get("OLLAMA_TIMEOUT"), OLLAMA_TIMEOUT_DEFAULT)
     OLLAMA_NUM_CTX = _int(os.environ.get("OLLAMA_NUM_CTX"), OLLAMA_NUM_CTX_DEFAULT)
+    # Deterministic decoding for JSON generation. The vision/mascot prompts
+    # read these at call time (ai_client / ai_client_cloud); lesson and quiz
+    # generation should stay conservative so structured output is stable.
+    OLLAMA_TEMPERATURE = _float(
+        os.environ.get("OLLAMA_TEMPERATURE"), OLLAMA_TEMPERATURE_DEFAULT
+    )
+    OLLAMA_NUM_PREDICT = _int(
+        os.environ.get("OLLAMA_NUM_PREDICT"), OLLAMA_NUM_PREDICT_DEFAULT
+    )
     # RAG coverage scales with OLLAMA_NUM_CTX: the retrieval character budget
     # is derived from the context window (minus a reserved prompt/output
     # fraction), so a 256K/1M model automatically retrieves more chunks.

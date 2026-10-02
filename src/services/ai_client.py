@@ -21,8 +21,11 @@ from config_defaults import (
     OLLAMA_BASE_URL_DEFAULT,
     OLLAMA_MODEL_LOCAL_DEFAULT,
     OLLAMA_NUM_CTX_DEFAULT,
+    OLLAMA_NUM_PREDICT_DEFAULT,
+    OLLAMA_TEMPERATURE_DEFAULT,
     OLLAMA_TIMEOUT_DEFAULT,
     env_default,
+    env_float,
     env_int,
 )
 from src.services.exceptions import (
@@ -59,18 +62,43 @@ def _call_ollama_local(prompt: str, model: str = None, images: list = None) -> s
         "prompt": prompt,
         "stream": False,
         "format": "json",
-        "options": {"num_ctx": env_int('OLLAMA_NUM_CTX', OLLAMA_NUM_CTX_DEFAULT)}
+        "options": {
+            "num_ctx": env_int('OLLAMA_NUM_CTX', OLLAMA_NUM_CTX_DEFAULT),
+            # Deterministic structured output: the backend default (~0.8)
+            # makes JSON drift/truncate; num_predict bounds runaway output.
+            "temperature": env_float(
+                'OLLAMA_TEMPERATURE', OLLAMA_TEMPERATURE_DEFAULT
+            ),
+            "num_predict": env_int(
+                'OLLAMA_NUM_PREDICT', OLLAMA_NUM_PREDICT_DEFAULT
+            ),
+        },
     }
     if images:
         payload["images"] = images
 
-    logger.info(f"Calling Ollama model='{model}' timeout={timeout}s")
+    logger.info(
+        f"Calling Ollama model='{model}' timeout={timeout}s "
+        f"temperature={payload['options']['temperature']} "
+        f"num_predict={payload['options']['num_predict']}"
+    )
     try:
         response = requests.post(url, json=payload, timeout=timeout)
         response.raise_for_status()
         result = response.json()
         response_text = result.get('response', '')
-        logger.info(f"Ollama success: received {len(response_text)} chars")
+        # ``done_reason == 'length'`` means num_predict/ctx cut the output
+        # off mid-generation — the exact failure mode behind parse errors.
+        done_reason = result.get('done_reason') or 'unknown'
+        logger.info(
+            f"Ollama success: received {len(response_text)} chars "
+            f"(done_reason={done_reason})"
+        )
+        if done_reason == 'length':
+            logger.warning(
+                "Ollama output was truncated at the token limit "
+                "(done_reason=length); JSON may be incomplete"
+            )
         return response_text
     except requests.exceptions.ConnectTimeout:
         logger.error(f"Ollama CONNECT TIMEOUT for model '{model}' — is Ollama running?")

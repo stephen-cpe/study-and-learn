@@ -412,30 +412,61 @@ def generate_quiz(
         difficulty=difficulty,
     )
 
+    # Retry with a repair prompt on unparseable/invalid output before
+    # degrading to the topic-aware fallback quiz. The audit found quiz
+    # parse failures were never retried either.
+    from src.services.llm_json import generate_json, log_bad_response
+
+    def _parse_questions(response):
+        result = extract_json(response)
+        if not isinstance(result, dict) or not isinstance(
+                result.get('questions'), list):
+            return None
+        validated = _validate_questions(result['questions'], n_questions)
+        if not validated:
+            return None
+        return {'questions': validated}
+
     try:
-        response = call_ollama(prompt)
+        result = generate_json(
+            prompt,
+            call_fn=call_ollama,
+            parse_fn=_parse_questions,
+            schema_hint=_QUIZ_SCHEMA_HINT,
+            label=f"quiz:{module_title[:40]}",
+        )
     except AIServiceError as e:
         logger.error("Quiz generation failed for module '%s': %s", module_title, str(e))
-        result = _fallback_quiz(n_questions, module_title=module_title, slides=slides)
-        result['fallback'] = True
-        return result
+        result = None
 
-    result = extract_json(response)
-    if result and 'questions' in result and isinstance(result['questions'], list):
-        validated = _validate_questions(result['questions'], n_questions)
-        if validated:
-            validated = _shuffle_questions(validated)
-            validated = _diversify_true_false(validated)
-            return {'questions': validated}
+    if result and result.get('questions'):
+        validated = result['questions']
+        validated = _shuffle_questions(validated)
+        validated = _diversify_true_false(validated)
+        return {'questions': validated}
 
-    logger.warning(
-        "Quiz JSON parsing/validation failed for module '%s', using fallback. "
-        "Response (first 300 chars): %r",
-        module_title, response[:300] if response else '<empty>'
-    )
+    log_bad_response(str(result), reason='quiz parse/validation', limit=1000)
     fallback = _fallback_quiz(n_questions, module_title=module_title, slides=slides)
     fallback['fallback'] = True
     return fallback
+
+
+# Schema description used by the quiz repair prompt.
+_QUIZ_SCHEMA_HINT = (
+    '{"questions": ['
+    '{"id": "q1", "type": "mcq", "prompt": "...", "options": ["...", "..."], '
+    '"answer_index": 0, "explanation": "..."}, '
+    '{"id": "q2", "type": "true_false", "prompt": "...", "answer": true, '
+    '"explanation": "..."}, '
+    '{"id": "q3", "type": "multi_select", "prompt": "...", '
+    '"options": ["..."], "answer_indices": [0], "explanation": "..."}, '
+    '{"id": "q4", "type": "cloze_dropdown", "prompt": "... ___ ...", '
+    '"options": ["..."], "answer_index": 0, "explanation": "..."}, '
+    '{"id": "q5", "type": "ordering", "prompt": "...", "items": ["..."], '
+    '"answer_order": [0, 1, 2, 3], "explanation": "..."}, '
+    '{"id": "q6", "type": "matching", "prompt": "...", "lefts": ["..."], '
+    '"rights": ["..."], "answer_indices": [0, 1, 2, 3], "explanation": "..."}]}'
+)
 
 
 def generate_inline_checkpoint(

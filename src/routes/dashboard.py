@@ -81,6 +81,28 @@ def complete_study_path(path_id):
         flash('Study path not found.', 'error')
         return redirect(url_for('main.dashboard'))
 
+    # Fail-closed: a path containing degraded (placeholder) modules must
+    # not be completable — the learner was never taught that material.
+    try:
+        import json as _json
+
+        from src.services.lesson_orchestrator import is_lesson_degraded
+        lessons = _json.loads(path.content_data) if path.content_data else []
+        degraded = [l for l in lessons if is_lesson_degraded(l)]
+    except Exception:
+        degraded = []
+    if degraded:
+        names = ', '.join(
+            l.get('module_title', f"Module {i + 1}")
+            for i, l in enumerate(degraded[:3])
+        )
+        flash(
+            f"Cannot complete: {len(degraded)} module(s) failed to generate "
+            f"({names}). Retake them first.",
+            'error',
+        )
+        return redirect(url_for('main.lessons', path_id=path_id))
+
     progress_rows = LessonProgress.query.filter_by(study_path_id=path.id).all()
     if not progress_rows or not all(r.passed for r in progress_rows):
         flash('All modules must be passed before marking as complete.', 'error')

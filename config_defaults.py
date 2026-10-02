@@ -39,6 +39,22 @@ def env_float(name: str, fallback: float) -> float:
         return fallback
 
 
+# ── Lesson/quiz JSON resilience ──────────────────────────────────────────
+# On a parse/validation failure the generators retry with a repair prompt
+# before falling back to placeholders. This is the single highest-impact
+# reliability control: the audit found 100% of degradations were
+# ``parse_error`` with no retry ever attempted.
+LLM_JSON_REPAIR_ATTEMPTS_DEFAULT = 2
+# Per-module retrieval fraction of the context budget (reduced from the
+# historical 0.35 hard-code). A smaller module prompt is materially more
+# reliable at emitting valid 6-slide JSON; the full-coverage digest is
+# separately truncated per module.
+MODULE_CONTEXT_FRACTION_DEFAULT = 0.25
+# Max characters of the document digest prepended to a module's context.
+# The full digest is retained for the summary/relevance stages.
+MODULE_DIGEST_CHARS_DEFAULT = 24000
+
+
 # ── Named call-time defaults ────────────────────────────────────────────
 # The local and cloud chat-model defaults are intentionally different: a
 # small CPU model for local dev, a cloud-served model when OLLAMA_MODEL
@@ -50,6 +66,13 @@ OLLAMA_CLOUD_BASE_URL_DEFAULT = "https://ollama.com"
 OLLAMA_TIMEOUT_DEFAULT = 300
 OLLAMA_NUM_CTX_DEFAULT = 131072
 RAG_TOP_K_DEFAULT = 20
+# Deterministic decoding for structured JSON output. Without an explicit
+# temperature the backend default (~0.8) makes lesson/quiz JSON drift and
+# truncate; a low temperature materially improves schema adherence.
+# ``OLLAMA_NUM_PREDICT`` bounds output length so a runaway generation can
+# not silently consume the whole context window.
+OLLAMA_TEMPERATURE_DEFAULT = 0.25
+OLLAMA_NUM_PREDICT_DEFAULT = 8192
 EMBEDDING_MODEL_DEFAULT = "qwen3-embedding:0.6b"
 # OCR and vision are consolidated onto a single natively multimodal model.
 # ``glm-ocr`` (local-only) has been removed — all image OCR, table

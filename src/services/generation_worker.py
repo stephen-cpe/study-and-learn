@@ -106,6 +106,11 @@ def run_generation_for_path(
 
     lessons: List[Dict[str, Any]] = list(payload.get('existing_lessons') or [])
     used_chunk_ids = set()
+    # Concept-level dedup: titles + objective bullets of already-generated
+    # modules are passed to each subsequent module's prompt so the model
+    # does not re-teach the same goal-level content (the audit found all
+    # four AZ modules repeated the same triad).
+    covered_concepts = []
     progress_tracker.update_progress(task_id, 1)
 
     try:
@@ -125,10 +130,11 @@ def run_generation_for_path(
                 module_index=i,
                 used_chunk_ids=used_chunk_ids,
                 learner_memories=learner_memories,
+                covered_concepts=covered_concepts,
             )
             progress_tracker.update_progress(task_id, 3)
 
-            lessons.append({
+            lesson_entry = {
                 'index': i,
                 'module_title': module['title'],
                 'estimated_effort': module.get('estimated_effort', 'N/A'),
@@ -143,7 +149,30 @@ def run_generation_for_path(
                 'completed': False,
                 'score': None,
                 'passed': False
-            })
+            }
+            # Persist the fail-closed content status so the grade route,
+            # lessons page, and completion gate can treat a placeholder
+            # module as needing regeneration instead of graded content.
+            from src.services.lesson_orchestrator import (
+                CONTENT_STATUS_DEGRADED,
+                CONTENT_STATUS_READY,
+            )
+            lesson_entry['content_status'] = (
+                CONTENT_STATUS_DEGRADED
+                if (artifacts['lesson'].get('fallback')
+                    or artifacts['quiz'].get('fallback'))
+                else CONTENT_STATUS_READY
+            )
+            lessons.append(lesson_entry)
+
+            # Record this module's concept for the next prompt's
+            # do-not-reteach block.
+            if lesson_entry['content_status'] == CONTENT_STATUS_READY:
+                covered_concepts.append(module.get('title', ''))
+                for slide in artifacts['lesson'].get('slides', [])[:2]:
+                    heading = slide.get('heading') or slide.get('title')
+                    if heading:
+                        covered_concepts.append(str(heading))
 
         progress_tracker.update_progress(task_id, 4)
     except Exception as e:
@@ -166,15 +195,19 @@ def run_generation_for_path(
     if fallback_modules:
         fallback_note = (
             f"AI quiz generation failed for: {', '.join(fallback_modules)}. "
-            f"Showing placeholder quizzes — try retaking for AI-generated questions."
+            f"Showing placeholder quizzes — retake those modules for AI-generated questions."
         )
     if slide_fallback_modules:
         slide_note = (
             f"AI lesson generation failed for: {', '.join(slide_fallback_modules)}. "
-            f"Showing placeholder slides — please retake those modules."
+            f"Showing placeholder slides — retake those modules."
         )
         fallback_note = f"{fallback_note} {slide_note}".strip()
-        # No request context off-thread, so flash only when inline.
+    # Degraded content must be surfaced even when no request context exists
+    # (off-thread) — the bell label below carries it, and the flash runs
+    # inline under TESTING. This is the fail-closed surface: the learner is
+    # told the module failed rather than being graded on untaught material.
+    if fallback_note:
         try:
             from flask import flash
             if has_request_context():

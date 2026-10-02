@@ -752,6 +752,11 @@ h2, .section-title {
     color: var(--az-cyan);
     border: 1px solid var(--az-cyan);
 }
+.badge-degraded {
+    background: rgba(239, 71, 111, 0.18);
+    color: var(--az-danger, #ef476f);
+    border: 1px solid var(--az-danger, #ef476f);
+}
 .badge-difficulty {
     display: inline-block;
     font-size: 0.7em;

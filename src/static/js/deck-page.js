@@ -171,6 +171,13 @@
       })
         .then(function (r) { return r.json(); })
         .then(function (data) {
+          // Fail-closed: a degraded (placeholder) module refuses final
+          // grading. Surface the regenerate prompt instead of rendering a
+          // broken results slide.
+          if (data && data.needs_regeneration) {
+            alert(data.error || 'This module needs to be regenerated before it can be graded.');
+            return;
+          }
           // Stage 2 spoken results: the announcement replaces the generic
           // results-slot narration (same voice, no overlap). Suppress the
           // results audio that showResults() would otherwise trigger via

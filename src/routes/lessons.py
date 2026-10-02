@@ -43,7 +43,12 @@ from src.services.grader import (
     grade_partial_credit,
     grade_single_question,
 )
-from src.services.lesson_orchestrator import build_module_artifacts
+from src.services.lesson_orchestrator import (
+    CONTENT_STATUS_DEGRADED,
+    CONTENT_STATUS_READY,
+    build_module_artifacts,
+    is_lesson_degraded,
+)
 from src.services.mascot_memory import store_memory as _store_mascot_memory
 from src.services.settings_service import DEFAULT_DIFFICULTY, DEFAULT_TTS_SPEAKER
 
@@ -290,6 +295,7 @@ def lessons():
 
     for i, lesson in enumerate(lessons_data):
         lesson['unlocked'] = True
+        lesson['content_degraded'] = is_lesson_degraded(lesson)
         if i > 0:
             prev = lessons_data[i - 1]
             if not prev.get('passed', False):
@@ -301,8 +307,11 @@ def lessons():
     # pair that bounced users through an empty session to /index.
     from src.models import StudyPath
     path_status = PATH_STATUS_ACTIVE
+    # Fail-closed: a degraded module blocks path completion even if its
+    # LessonProgress row says passed — the learner was never taught it.
     all_passed = bool(lessons_data) and all(
-        l.get('passed', False) for l in lessons_data
+        l.get('passed', False) and not l.get('content_degraded', False)
+        for l in lessons_data
     )
     if path_id:
         sp = StudyPath.query.filter_by(
@@ -437,6 +446,22 @@ def grade_lesson(module_index):
     quiz_questions = lesson.get('quiz', {}).get('questions', [])
     checkpoints = lesson.get('checkpoints', {})
     checkpoint_answers = data.get('checkpoint_answers', {}) or {}
+
+    # ── Fail-closed: degraded modules cannot be graded as taught content ──
+    # When lesson and/or quiz generation fell back to a placeholder, the
+    # assessment tests material the learner was never shown. Reject the
+    # final-quiz submission so the learner is asked to regenerate instead
+    # of being failed on untaught content. Checkpoint-only POSTs are still
+    # allowed through (they never mark the lesson complete) so the deck's
+    # existing formative flow is untouched.
+    is_final_grade_attempt = bool(answers) or len(quiz_questions) == 0
+    if is_final_grade_attempt and is_lesson_degraded(lesson):
+        return jsonify({
+            'error': 'This module did not generate properly and needs to be '
+                     'regenerated before it can be graded.',
+            'degraded': True,
+            'needs_regeneration': True,
+        }), 409
 
     # ── Persisted checkpoint answers across sessions ─────────────────────
     # Checkpoint answers are graded formative-style as the user advances
@@ -686,6 +711,12 @@ def retake_lesson(module_index):
     lesson = lessons_data[module_index]
     module_title = lesson.get('module_title', '')
     slides = lesson.get('lesson', {}).get('slides', [])
+    # Fail-closed retake: if the lesson body is a placeholder (degraded),
+    # regenerate the slides too — reusing them would keep the learner stuck
+    # on the placeholder forever. A healthy lesson keeps its slides (retake
+    # is quiz/checkpoint regeneration by existing design).
+    degraded = is_lesson_degraded(lesson)
+    existing_slides = None if degraded else slides
     goal = _resolve_goal()
     texts = _resolve_texts()
     hashes_data = _resolve_hashes()
@@ -712,7 +743,7 @@ def retake_lesson(module_index):
         {'title': module_title},
         goal,
         retriever,
-        existing_slides=slides,
+        existing_slides=existing_slides,
         difficulty=difficulty,
         tts_enabled=tts_enabled,
         username=username,
@@ -723,6 +754,18 @@ def retake_lesson(module_index):
     lessons_data[module_index]['quiz'] = artifacts['quiz']
     lessons_data[module_index]['checkpoints'] = artifacts['checkpoints']
     lessons_data[module_index]['lesson'] = artifacts['lesson']
+    # Refresh the fail-closed content status — a successful regeneration
+    # clears the degraded flag so the module can be graded/completed again.
+    from src.services.lesson_orchestrator import (
+        CONTENT_STATUS_DEGRADED,
+        CONTENT_STATUS_READY,
+    )
+    lessons_data[module_index]['content_status'] = (
+        CONTENT_STATUS_DEGRADED
+        if (artifacts['lesson'].get('fallback')
+            or artifacts['quiz'].get('fallback'))
+        else CONTENT_STATUS_READY
+    )
     lessons_data[module_index]['completed'] = False
     lessons_data[module_index]['score'] = None
     lessons_data[module_index]['passed'] = False
@@ -1345,6 +1388,12 @@ def accept_suggestion():
         'completed': False,
         'score': None,
         'passed': False,
+        'content_status': (
+            CONTENT_STATUS_DEGRADED
+            if (artifacts['lesson'].get('fallback')
+                or artifacts['quiz'].get('fallback'))
+            else CONTENT_STATUS_READY
+        ),
     })
     save_lessons(lessons_data, current_user, path_id=path.id)
 
