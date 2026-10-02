@@ -41,6 +41,123 @@ logger = logging.getLogger(__name__)
 # Matches ```json ... ``` or ``` ... ``` fences.
 _FENCE_RE = re.compile(r'^```(?:json)?\s*\n?(.*?)\n?```\s*$', re.DOTALL)
 
+# Valid single-character JSON escapes: \" \\ \/ \b \f \n \r \t, plus
+# \uXXXX. Anything else after a backslash inside a JSON string is invalid.
+_VALID_JSON_ESCAPE = re.compile(r'["\\/bfnrt]')
+_UNICODE_ESCAPE = re.compile(r'[0-9a-fA-F]{4}')
+_LOWER_WORD = re.compile(r'[a-z]+')
+
+# LaTeX commands whose leading backslash is *silently* absorbed by JSON
+# because the first letter is a valid escape (b/f/n/r/t). E.g. ``\text``
+# decodes as TAB + "ext" — valid JSON, corrupt content. These must be
+# escaped before parsing. Commands starting with any other letter
+# (``\mu``, ``\alpha``, ``\Delta``) already fail the invalid-escape rule
+# and are handled by the generic path. Maximal-munch means only the exact
+# command name matches, so a genuine ``\n`` followed by more letters is
+# preserved unless it spells one of these names exactly.
+_LATEX_COMMANDS = {
+    # b*
+    'bar', 'because', 'begin', 'beta', 'bf', 'big', 'bigl', 'bigr',
+    'binom', 'bmod', 'boldsymbol', 'bot', 'brace', 'brack', 'bullet',
+    # f*
+    'fbox', 'flat', 'forall', 'frac', 'frown',
+    # n*
+    'nabla', 'natural', 'nearrow', 'neg', 'neq', 'nequiv', 'ni',
+    'ngeq', 'nleq', 'nmid', 'not', 'notin', 'nu', 'nwarrow',
+    'nleftarrow', 'nrightarrow', 'nolinebreak', 'nonumber', 'nsub', 'nsup',
+    # r*
+    'rangle', 'rceil', 'reals', 'rfloor', 'rho', 'right', 'rightarrow',
+    'rightharpoondown', 'rightharpoonup', 'rightleftharpoons',
+    'risingdotseq', 'rlap', 'rm', 'root', 'rule', 'rvert', 'rVert',
+    # t*
+    'tan', 'tau', 'text', 'textbf', 'textit', 'textrm', 'textsf',
+    'texttt', 'therefore', 'theta', 'thickapprox', 'thicksim',
+    'thinspace', 'thickspace', 'tilde', 'times', 'to', 'top',
+    'triangle', 'triangleq', 'tfrac',
+}
+
+
+def _latex_after_valid_escape(letter: str, word: str) -> bool:
+    """True when *letter* + *word* spells a LaTeX command after a backslash."""
+    return (letter + word) in _LATEX_COMMANDS
+
+
+def sanitize_json_escapes(text: str) -> str:
+    """Escape invalid backslash sequences inside JSON string literals.
+
+    LLMs frequently emit LaTeX (``$98.5\\%$``, ``$\\mu$``) or Windows paths
+    inside JSON strings using a single backslash, which is not a legal JSON
+    escape and makes ``json.loads`` fail with "Invalid \\escape". The audit
+    traced the entire RMD document-set failure mode (80–100 % of modules)
+    to exactly this: threshold-dense documents produce percentage/units
+    LaTeX, the response is otherwise perfect JSON, and the parse dies.
+
+    Two classes are repaired:
+
+    1. **Invalid escapes** (``\\%``, ``\\mu``): doubled so the characters
+       pass through verbatim.
+    2. **LaTeX absorbed by a valid escape** (``\\text`` → TAB + "ext",
+       ``\\times``, ``\\frac``): these parse *successfully* but corrupt the
+       content, so the ambiguous command names are detected and escaped.
+       Ordinary escapes (``\\n``, ``\\t``, ``\\uXXXX``) are preserved.
+
+    This is a pure string transform with no I/O; safe to apply to any
+    candidate JSON substring before parsing. If the input is not JSON-like
+    it returns it unchanged (best-effort).
+    """
+    if not text or '\\' not in text:
+        return text
+
+    out = []
+    in_string = False
+    i = 0
+    n = len(text)
+    while i < n:
+        ch = text[i]
+        if not in_string:
+            out.append(ch)
+            if ch == '"':
+                in_string = True
+            i += 1
+            continue
+        # Inside a JSON string.
+        if ch == '"':
+            out.append(ch)
+            in_string = False
+            i += 1
+            continue
+        if ch == '\\':
+            nxt = text[i + 1] if i + 1 < n else ''
+            if nxt == 'u' and _UNICODE_ESCAPE.match(text[i + 2:i + 6] or ''):
+                # Valid \uXXXX — keep as-is.
+                out.append(text[i:i + 6])
+                i += 6
+                continue
+            if nxt in 'bfnrt':
+                # Ambiguous: might be a genuine escape (\n, \t) or the
+                # start of a LaTeX command (\text, \times). Only the exact
+                # command names are treated as LaTeX.
+                m = _LOWER_WORD.match(text, i + 2)
+                if m and _latex_after_valid_escape(nxt, m.group(0)):
+                    out.append('\\\\')
+                    i += 1
+                    continue
+                out.append(text[i:i + 2])
+                i += 2
+                continue
+            if nxt in '"\\/':
+                out.append(text[i:i + 2])
+                i += 2
+                continue
+            # Invalid escape (e.g. \% \m): escape the backslash so the
+            # LaTeX/path chars pass through verbatim.
+            out.append('\\\\')
+            i += 1
+            continue
+        out.append(ch)
+        i += 1
+    return ''.join(out)
+
 
 def extract_json(response: str):
     """Extract and parse the first JSON object from an LLM response.
@@ -78,17 +195,27 @@ def extract_json(response: str):
     # JSON value and ignores trailing content (prose, fences, etc.).
     # This is more robust than rfind('}') which can grab braces from
     # trailing remarks or miss nested-object endpoints.
-    try:
-        decoder = json.JSONDecoder()
-        result, _end = decoder.raw_decode(text[start:])
-        return result
-    except json.JSONDecodeError as e:
-        logger.warning(
-            "Failed to extract JSON from LLM response: %s. "
-            "Response (first 300 chars): %r",
-            e, text[:300]
-        )
-        return None
+    #
+    # Sanitization runs FIRST: ``\text`` is technically valid JSON
+    # (``\t`` + "ext"), so a raw parse would "succeed" with a control
+    # character injected into the content. The sanitizer is written to
+    # leave already-valid JSON byte-identical, so applying it
+    # unconditionally is safe and prevents that silent corruption.
+    candidate = text[start:]
+    last_err = None
+    for attempt_text in (sanitize_json_escapes(candidate), candidate):
+        try:
+            decoder = json.JSONDecoder()
+            result, _end = decoder.raw_decode(attempt_text)
+            return result
+        except json.JSONDecodeError as e:
+            last_err = e
+    logger.warning(
+        "Failed to extract JSON from LLM response: %s. "
+        "Response (first 300 chars): %r",
+        last_err, text[:300]
+    )
+    return None
 
 
 def extract_json_array(response: str):
@@ -121,19 +248,23 @@ def extract_json_array(response: str):
                        text[:200])
         return None
 
-    try:
-        decoder = json.JSONDecoder()
-        result, _end = decoder.raw_decode(text[start:])
-        if isinstance(result, list):
-            return result
-        return None
-    except json.JSONDecodeError as e:
-        logger.warning(
-            "Failed to extract JSON array from LLM response: %s. "
-            "Response (first 300 chars): %r",
-            e, text[:300]
-        )
-        return None
+    candidate = text[start:]
+    last_err = None
+    for attempt_text in (sanitize_json_escapes(candidate), candidate):
+        try:
+            decoder = json.JSONDecoder()
+            result, _end = decoder.raw_decode(attempt_text)
+            if isinstance(result, list):
+                return result
+            return None
+        except json.JSONDecodeError as e:
+            last_err = e
+    logger.warning(
+        "Failed to extract JSON array from LLM response: %s. "
+        "Response (first 300 chars): %r",
+        last_err, text[:300]
+    )
+    return None
 
 
 # ── Generate → parse → repair loop ──────────────────────────────────────

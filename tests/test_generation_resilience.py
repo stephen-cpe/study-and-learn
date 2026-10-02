@@ -100,6 +100,88 @@ class TestGenerateJsonRepair:
         assert any('empty' in r.message for r in caplog.records)
 
 
+class TestJsonEscapeSanitizer:
+    """The audit's RMD failure mode: valid JSON structurally, but LaTeX
+    single-backslash escapes (\\%) make json.loads fail. extract_json must
+    recover these without altering already-valid JSON."""
+
+    def test_invalid_latex_escape_is_recovered(self):
+        bad = '{"bullets": ["MCF must stay above $98.5\\%$ for nominal"]}'
+        import json as _json
+        # Sanity: the raw text is genuinely invalid JSON.
+        with pytest.raises(_json.JSONDecodeError):
+            _json.loads(bad)
+        result = llm_json.extract_json(bad)
+        assert result is not None
+        assert '98.5\\%' in result['bullets'][0]
+
+    def test_valid_escapes_are_preserved(self):
+        import json as _json
+        good = r'{"a": "line1\nline2", "u": "\u00e9", "b": "\\ok"}'
+        assert llm_json.sanitize_json_escapes(good) == good
+        assert _json.loads(llm_json.sanitize_json_escapes(good)) == _json.loads(good)
+
+    def test_fenced_latex_response_is_recovered(self):
+        bad = ('```json\n'
+               '{"slides": [{"type": "content", "heading": "H", '
+               '"bullets": ["$94\\%$ threshold"]}]}\n```')
+        result = llm_json.extract_json(bad)
+        assert result is not None
+        assert result['slides'][0]['bullets'] == ['$94\\%$ threshold']
+
+    def test_backslash_outside_string_untouched(self):
+        # No strings -> no escaping should occur.
+        assert llm_json.sanitize_json_escapes('123 \\ 456') == '123 \\ 456'
+
+    def test_array_extraction_recovers_latex(self):
+        bad = ('[{"slide_index": 0, "text": "Above $98.5\\%$ is nominal."}]')
+        result = llm_json.extract_json_array(bad)
+        assert result is not None
+        assert '98.5\\%' in result[0]['text']
+
+
+class TestLatexEscapeAbsorption:
+    """LaTeX commands starting with a valid JSON escape letter (\\text,
+    \\times, \\frac, \\tan) parse silently as control chars unless
+    detected. extract_json must preserve the LaTeX and inject no control
+    characters, while leaving genuine escapes untouched."""
+
+    @pytest.mark.parametrize('raw,expected', [
+        (r'{"b": ["at $T+0.0\text{s}$"]}', r'$T+0.0\text{s}$'),
+        (r'{"b": ["$847\text{ TB/s}$"]}', r'$847\text{ TB/s}$'),
+        (r'{"b": ["$\frac{1}{2}$"]}', r'$\frac{1}{2}$'),
+        (r'{"b": ["$\times$ and $\tan\theta$"]}', r'$\times$'),
+        (r'{"b": ["$5.0\ \mu\text{Sv}$"]}', r'$5.0\ \mu\text{Sv}$'),
+        (r'{"b": ["$94.0\% \text{--} 98.5\%$"]}',
+         r'$94.0\% \text{--} 98.5\%$'),
+    ])
+    def test_latex_command_not_absorbed(self, raw, expected):
+        result = llm_json.extract_json(raw)
+        assert result is not None
+        got = result['b'][0]
+        assert expected in got, f"expected {expected!r} in {got!r}"
+        for ctrl in ('\t', '\b', '\f', '\r'):
+            assert ctrl not in got, f"control char {ctrl!r} leaked into {got!r}"
+
+    def test_valid_escapes_still_work_when_mixed_with_latex(self):
+        raw = r'{"a": "line1\nline2", "b": ["$x\text{y}$"]}'
+        result = llm_json.extract_json(raw)
+        assert result is not None
+        assert result['a'] == 'line1\nline2'
+        assert result['b'][0] == r'$x\text{y}$'
+
+    def test_genuine_tab_and_newline_preserved(self):
+        raw = '{"a": "col1\\tcol2", "b": "row1\\nrow2"}'
+        result = llm_json.extract_json(raw)
+        assert result == {'a': 'col1\tcol2', 'b': 'row1\nrow2'}
+
+    def test_standalone_short_escape_not_false_positived(self):
+        # "a\tb" where b is not a known command must stay a tab.
+        raw = r'{"a": "x\ty"}'
+        result = llm_json.extract_json(raw)
+        assert result == {'a': 'x\ty'}
+
+
 # ═══════════════════════════════════════════════════════════════════════
 # 2. Generator prompts + repair integration
 # ═══════════════════════════════════════════════════════════════════════
@@ -426,6 +508,57 @@ class TestFailClosedGrade:
             _login(c)
             c.post(f'/lessons/0/retake?path_id={path_id}', json={})
         assert seen['existing_slides'] is not None
+
+
+class TestFallbackRateObservability:
+    def test_generation_summary_logs_degraded_count(
+            self, resilience_client, caplog, monkeypatch):
+        """The worker must emit one structured generation_summary line with
+        the fallback rate so degraded content is trackable/alertable."""
+        import logging
+        app, user = resilience_client
+
+        def fake_build(module, goal, retriever, **kwargs):
+            return {
+                'lesson': {'module_title': module['title'],
+                           'slides': [{'type': 'title', 'title': 'T'}],
+                           'fallback': True, 'fallback_reason': 'parse_error',
+                           'narration': []},
+                'quiz': {'questions': [], 'fallback': False},
+                'checkpoints': {}, 'sources': [],
+            }
+
+        monkeypatch.setattr(
+            'src.services.lesson_orchestrator.build_module_artifacts',
+            fake_build)
+        with app.app_context():
+            from src.repositories.lesson_repo import create_study_path
+            path = create_study_path(user, 'T', 'G',
+                                     modules=[{'title': 'M1'}, {'title': 'M2'}],
+                                     summary='S', relevance_result={})
+            from src.services import background_tasks as _bt
+            from src.services import progress_tracker
+            from src.services.generation_worker import run_generation_for_path
+            progress_tracker.create_task(task_id='obs-task', display_name='u')
+            _bt.create_task('obs-task', user.id, kind='generate', label='t')
+            with caplog.at_level(logging.INFO):
+                run_generation_for_path(
+                    app, user.id, path.id,
+                    {'learning_goal': 'G', 'study_title': 'T',
+                     'modules': [{'title': 'M1'}, {'title': 'M2'}],
+                     'existing_lessons': [], 'extracted_texts': [],
+                     'file_hashes': [], 'file_names': [],
+                     'content_digest': '', 'tts_enabled': False,
+                     'tts_speaker': 'Ava', 'difficulty': 'Normal',
+                     'display_name': 'u'},
+                    'obs-task')
+        summary = [r for r in caplog.records
+                   if 'generation_summary' in r.getMessage()]
+        assert summary, "worker must log a generation_summary line"
+        msg = summary[0].getMessage()
+        assert 'degraded=2' in msg
+        assert 'fallback_rate=1.00' in msg
+        assert 'parse_error' in msg
 
 
 # ═══════════════════════════════════════════════════════════════════════

@@ -181,6 +181,27 @@ def run_generation_for_path(
         _bt.fail_task(task_id, error='AI generation failed — please retry')
         return {'ok': False, 'path_id': path_id, 'modules': 0, 'fallback': []}
 
+    # ── Fallback-rate observability ──────────────────────────────────────
+    # Emit one structured line per generation so degraded-content rates can
+    # be tracked/alerted without re-reading every lesson JSON. ``reason``
+    # distinguishes the parse/validation class from backend errors.
+    _fallback_reasons = {}
+    for _l in lessons:
+        if _l.get('lesson', {}).get('fallback'):
+            _reason = _l.get('lesson', {}).get('fallback_reason') or 'unknown'
+            _fallback_reasons[_reason] = _fallback_reasons.get(_reason, 0) + 1
+        if _l.get('quiz', {}).get('fallback'):
+            _fallback_reasons['quiz'] = _fallback_reasons.get('quiz', 0) + 1
+    _degraded_count = sum(
+        1 for _l in lessons if _l.get('content_status') == 'degraded')
+    logger.info(
+        "generation_summary path_id=%s modules=%d degraded=%d "
+        "fallback_rate=%.2f reasons=%s",
+        path_id, len(lessons), _degraded_count,
+        (_degraded_count / len(lessons)) if lessons else 0.0,
+        _fallback_reasons or {},
+    )
+
     fallback_modules = [
         lessons[i].get('module_title', f'Module {i + 1}')
         for i, lesson in enumerate(lessons)
