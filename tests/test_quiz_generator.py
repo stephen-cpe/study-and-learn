@@ -608,6 +608,7 @@ def test_five_distinct_questions_accepted_for_six_requested(monkeypatch):
     """Quality over quantity: 5 distinct high-quality questions ship
     instead of forcing a 6th that repeats a skill."""
     import json as _json
+
     import src.services.quiz_generator as qg_module
 
     def mock_call(prompt, model=None):
@@ -625,6 +626,7 @@ def test_duplicate_type_keeps_first_and_stays_distinct(monkeypatch):
     """6 returned with a repeated type collapse to 5 distinct (first
     per type wins) instead of shipping a duplicate-skill quiz."""
     import json as _json
+
     import src.services.quiz_generator as qg_module
 
     questions = _five_distinct_questions() + [
