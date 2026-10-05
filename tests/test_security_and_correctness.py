@@ -257,10 +257,27 @@ def _generate_single_lesson(client):
             '{"module_title": "Intro", "slides": '
             '[{"type": "title", "title": "Hello", "subtitle": "World"}]}'
         )
+        # Six distinct questions (the quiz contract is 5-6 distinct
+        # types; single-question stubs are rejected as too thin to grade).
         mock_quiz.return_value = (
-            '{"questions": [{"id": "q1", "type": "mcq", "prompt": "Q?", '
+            '{"questions": ['
+            '{"id": "q1", "type": "mcq", "prompt": "Q?", '
             '"options": ["A","B","C","D"], "answer_index": 0, '
-            '"explanation": "E"}]}'
+            '"explanation": "E"}, '
+            '{"id": "q2", "type": "true_false", "prompt": "T?", '
+            '"answer": true, "explanation": "E"}, '
+            '{"id": "q3", "type": "multi_select", "prompt": "M?", '
+            '"options": ["A","B","C","D"], "answer_indices": [0, 1], '
+            '"explanation": "E"}, '
+            '{"id": "q4", "type": "cloze_dropdown", "prompt": "C ___?", '
+            '"options": ["A","B","C"], "answer_index": 0, '
+            '"explanation": "E"}, '
+            '{"id": "q5", "type": "ordering", "prompt": "O?", '
+            '"items": ["A","B","C","D"], "answer_order": [1, 0, 3, 2], '
+            '"explanation": "E"}, '
+            '{"id": "q6", "type": "matching", "prompt": "Mt?", '
+            '"lefts": ["a","b","c","d"], "rights": ["1","2","3","4"], '
+            '"answer_indices": [1, 0, 3, 2], "explanation": "E"}]}'
         )
         with client.session_transaction() as sess:
             sess['learning_goal'] = 'Learn stuff'

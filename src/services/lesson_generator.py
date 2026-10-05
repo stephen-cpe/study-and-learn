@@ -267,7 +267,10 @@ def generate_lesson(
     # validation; the repair loop treats a validation-empty result as a
     # parse failure only on the first pass, so re-check here.
     if result and 'slides' in result and isinstance(result['slides'], list):
-        validated_slides = _validate_slides(result['slides'])
+        validated_slides = _fit_slide_count(
+            _validate_slides(result['slides']),
+            label=f"lesson:{module_title[:40]}",
+        )
         if validated_slides:
             return {
                 'module_title': result.get('module_title') or module_title,
@@ -306,7 +309,10 @@ def _parse_lesson_response(response: str):
     slides = result.get('slides')
     if not isinstance(slides, list):
         return None
-    valid = _validate_slides(slides)
+    valid = _fit_slide_count(
+        _validate_slides(slides),
+        label=f"lesson:{result.get('module_title', '')[:40]}",
+    )
     if not valid:
         return None
     return {'module_title': result.get('module_title', ''), 'slides': valid}
@@ -347,6 +353,65 @@ def _validate_slides(slides: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             continue
         validated.append(slide)
     return validated
+
+
+#: Locked lesson length: the prompt asks for exactly 6 slides, and one
+#: extra complete slide is tolerated when the topic needs the room (live
+#: verification caught a 7-slide module with a complete arc). Anything
+#: beyond that is trimmed, never silently dropped teaching content
+#: without a log line.
+MAX_SLIDES = 7
+
+
+def _fit_slide_count(
+    slides: List[Dict[str, Any]],
+    label: str = "lesson",
+    limit: int = MAX_SLIDES,
+) -> List[Dict[str, Any]]:
+    """Fit a validated slide list to the locked lesson length.
+
+    Six or fewer slides pass through untouched (short-but-complete
+    lessons are kept — the floor is enforced by the prompt, not by
+    cutting). A 7th complete slide is accepted as-is. Beyond ``limit``,
+    surplus middle slides are dropped so the lesson keeps its opening
+    title and closing summary; the trim is logged.
+
+    Args:
+        slides: Validated slide dicts in deck order.
+        label: Log prefix (usually the module title).
+        limit: Maximum slides to keep.
+
+    Returns:
+        At most ``limit`` slides with the lesson arc preserved.
+    """
+    if len(slides) <= limit:
+        return slides
+    logger.warning(
+        "%s: trimming %d slides to locked maximum %d",
+        label, len(slides), limit,
+    )
+    head = slides[:1]
+    tail: List[Dict[str, Any]] = []
+    body = slides[1:]
+    if body and body[-1].get('type') == 'summary':
+        tail = body[-1:]
+        body = body[:-1]
+    # Preserve the arc: the worked example(s) survive; surplus middle
+    # content slides are the ones dropped.
+    keep_middle = limit - len(head) - len(tail)
+    non_content = [s for s in body if s.get('type') != 'content']
+    content_budget = max(0, keep_middle - len(non_content))
+    middle: List[Dict[str, Any]] = []
+    for s in body:
+        if len(middle) >= keep_middle:
+            break
+        if s.get('type') == 'content':
+            if content_budget > 0:
+                middle.append(s)
+                content_budget -= 1
+        else:
+            middle.append(s)
+    return head + middle + tail
 
 
 def _fallback_lesson(module_title: str, degraded: bool = False, reason: str = '') -> Dict[str, Any]:

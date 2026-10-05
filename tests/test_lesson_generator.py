@@ -5,6 +5,7 @@ import json
 
 from src.services.lesson_generator import (
     _fallback_lesson,
+    _fit_slide_count,
     _validate_slides,
     generate_lesson,
     generate_narration_script,
@@ -181,6 +182,52 @@ def test_fallback_lesson():
     types = [s['type'] for s in result['slides']]
     assert 'title' in types
     assert 'content' in types
+
+
+def _arc_slides(n_content=3, extra_content=0):
+    slides = [{"type": "title", "title": "T", "subtitle": "S"}]
+    slides += [
+        {"type": "content", "heading": f"H{i}", "bullets": ["a"]}
+        for i in range(n_content + extra_content)
+    ]
+    slides.append({"type": "example", "heading": "E", "body": "B"})
+    slides.append({"type": "summary", "bullets": ["done"]})
+    return slides
+
+
+def test_fit_slide_count_keeps_six_untouched():
+    slides = _arc_slides()
+    assert len(slides) == 6
+    assert _fit_slide_count(slides) == slides
+
+
+def test_fit_slide_count_tolerates_seventh_complete_slide():
+    # Live verification caught a 7-slide module with a complete arc
+    # (title + 4 content + example + summary): it must ship as-is.
+    slides = _arc_slides(extra_content=1)
+    assert len(slides) == 7
+    fitted = _fit_slide_count(slides)
+    assert len(fitted) == 7
+    assert fitted[0]['type'] == 'title'
+    assert fitted[-1]['type'] == 'summary'
+
+
+def test_fit_slide_count_trims_beyond_cap_preserving_arc():
+    slides = _arc_slides(extra_content=3)
+    assert len(slides) == 9
+    fitted = _fit_slide_count(slides)
+    assert len(fitted) == 7
+    assert fitted[0]['type'] == 'title'
+    assert fitted[-1]['type'] == 'summary'
+    types = [s['type'] for s in fitted]
+    assert types.count('example') == 1
+    assert types.count('content') == 4
+
+
+def test_fit_slide_count_leaves_short_lessons_alone():
+    slides = _arc_slides(n_content=1)
+    assert len(slides) == 4
+    assert _fit_slide_count(slides) == slides
 
 
 def test_lesson_prompt_contains_humor_note(monkeypatch):

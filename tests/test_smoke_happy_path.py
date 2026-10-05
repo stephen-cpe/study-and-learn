@@ -100,10 +100,33 @@ def test_full_happy_path_mocked(client):
                 {'type': 'summary', 'bullets': ['Forces accelerate mass']},
             ],
         })
+        # Six distinct questions (the quiz contract is 5-6 distinct
+        # types; single-question stubs are rejected as too thin to grade).
         mock_quiz.return_value = json.dumps({
-            'questions': [{'id': 'q1', 'type': 'mcq', 'prompt': 'F=ma?',
-                           'options': ['yes', 'no', 'maybe', 'never'],
-                           'answer_index': 0, 'explanation': 'E'}]
+            'questions': [
+                {'id': 'q1', 'type': 'mcq', 'prompt': 'F=ma?',
+                 'options': ['yes', 'no', 'maybe', 'never'],
+                 'answer_index': 0, 'explanation': 'E'},
+                {'id': 'q2', 'type': 'true_false', 'prompt': 'F=ma is true.',
+                 'answer': True, 'explanation': 'E'},
+                {'id': 'q3', 'type': 'multi_select',
+                 'prompt': 'Which relate to force?',
+                 'options': ['mass', 'accel', 'color', 'taste'],
+                 'answer_indices': [0, 1], 'explanation': 'E'},
+                {'id': 'q4', 'type': 'cloze_dropdown',
+                 'prompt': 'Force equals ___ times acceleration.',
+                 'options': ['mass', 'volume', 'charge'], 'answer_index': 0,
+                 'explanation': 'E'},
+                {'id': 'q5', 'type': 'ordering',
+                 'prompt': 'Order the steps.',
+                 'items': ['A', 'B', 'C', 'D'],
+                 'answer_order': [1, 0, 3, 2], 'explanation': 'E'},
+                {'id': 'q6', 'type': 'matching',
+                 'prompt': 'Match terms.',
+                 'lefts': ['a', 'b', 'c', 'd'],
+                 'rights': ['1', '2', '3', '4'],
+                 'answer_indices': [1, 0, 3, 2], 'explanation': 'E'},
+            ]
         })
         rv = client.post('/generate-lessons')
     assert rv.status_code == 200

@@ -584,3 +584,97 @@ def test_build_type_mix_six_types():
                               'cloze_dropdown', 'ordering', 'matching'])
     assert sum(mix.values()) == 6
     assert all(v == 1 for v in mix.values())
+
+
+def _five_distinct_questions():
+    return [
+        {"id": "q1", "type": "mcq", "prompt": "What is MFA?",
+         "options": ["A", "B", "C", "D"], "answer_index": 0, "explanation": "E"},
+        {"id": "q2", "type": "true_false", "prompt": "MFA needs two factors.",
+         "answer": True, "explanation": "E"},
+        {"id": "q3", "type": "multi_select", "prompt": "Which are MFA methods?",
+         "options": ["A", "B", "C", "D"], "answer_indices": [0, 1],
+         "explanation": "E"},
+        {"id": "q4", "type": "cloze_dropdown", "prompt": "SMS ___ is banned.",
+         "options": ["OTP", "XYZ", "PDQ"], "answer_index": 0,
+         "explanation": "E"},
+        {"id": "q5", "type": "ordering", "prompt": "Order the steps.",
+         "items": ["A", "B", "C", "D"], "answer_order": [0, 1, 2, 3],
+         "explanation": "E"},
+    ]
+
+
+def test_five_distinct_questions_accepted_for_six_requested(monkeypatch):
+    """Quality over quantity: 5 distinct high-quality questions ship
+    instead of forcing a 6th that repeats a skill."""
+    import json as _json
+    import src.services.quiz_generator as qg_module
+
+    def mock_call(prompt, model=None):
+        return _json.dumps({"questions": _five_distinct_questions()})
+
+    monkeypatch.setattr(qg_module, 'call_ollama', mock_call)
+    result = generate_quiz("MFA Module", [], None, n_questions=6)
+    assert result.get('fallback') is not True
+    assert len(result['questions']) == 5
+    types = [q['type'] for q in result['questions']]
+    assert len(set(types)) == 5
+
+
+def test_duplicate_type_keeps_first_and_stays_distinct(monkeypatch):
+    """6 returned with a repeated type collapse to 5 distinct (first
+    per type wins) instead of shipping a duplicate-skill quiz."""
+    import json as _json
+    import src.services.quiz_generator as qg_module
+
+    questions = _five_distinct_questions() + [
+        {"id": "q6", "type": "mcq", "prompt": "What else is MFA?",
+         "options": ["A", "B", "C", "D"], "answer_index": 1, "explanation": "E"},
+    ]
+
+    def mock_call(prompt, model=None):
+        return _json.dumps({"questions": questions})
+
+    monkeypatch.setattr(qg_module, 'call_ollama', mock_call)
+    result = generate_quiz("MFA Module", [], None, n_questions=6)
+    assert result.get('fallback') is not True
+    assert len(result['questions']) == 5
+    types = [q['type'] for q in result['questions']]
+    assert len(set(types)) == len(types)
+    assert result['questions'][0]['prompt'] == "What is MFA?"
+
+
+def test_normalize_question_prompt_ignores_case_and_punctuation():
+    from src.services.quiz_generator import _normalize_question_prompt
+    a = _normalize_question_prompt("What is MFA?")
+    b = _normalize_question_prompt("  what IS mfa ")
+    assert a == b and a
+
+
+def test_drop_repeated_questions_filters_path_repeats():
+    from src.services.quiz_generator import (
+        _drop_repeated_questions,
+        _normalize_question_prompt,
+    )
+    used = {_normalize_question_prompt("What is MFA?")}
+    questions = [
+        {"type": "mcq", "prompt": "What is MFA?"},
+        {"type": "true_false", "prompt": "MFA needs two factors."},
+    ]
+    kept = _drop_repeated_questions(questions, used)
+    assert [q['type'] for q in kept] == ['true_false']
+    assert _normalize_question_prompt("MFA needs two factors.") in used
+
+
+def test_avoid_prompts_rendered_into_quiz_prompt():
+    from src.services.quiz_generator import _build_quiz_prompt
+    prompt = _build_quiz_prompt(
+        "MFA Module", "slides", "ctx",
+        {"mcq": 1, "true_false": 1, "multi_select": 1,
+         "cloze_dropdown": 1, "ordering": 1, "matching": 1},
+        6, "Normal",
+        avoid_prompts=["What is MFA?", "Explain COLD IRON"],
+    )
+    assert "do NOT repeat" in prompt
+    assert "What is MFA?" in prompt
+    assert "COLD IRON" in prompt

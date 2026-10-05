@@ -230,6 +230,7 @@ def _build_quiz_prompt(
     type_mix: Dict[str, int],
     n_questions: int,
     difficulty: str,
+    avoid_prompts: list = None,
 ) -> str:
     """Assemble the final-quiz generation prompt.
 
@@ -251,6 +252,19 @@ def _build_quiz_prompt(
         )
 
     diff_instruction = DIFFICULTY_INSTRUCTIONS.get(difficulty, DEFAULT_DIFFICULTY_INSTRUCTION)
+
+    avoid_block = ""
+    if avoid_prompts:
+        seen_prompts = [str(p).strip()[:160] for p in avoid_prompts if str(p).strip()]
+        seen_prompts = seen_prompts[:20]
+        if seen_prompts:
+            avoid_block = (
+                "Already-asked questions in this study path (do NOT repeat or "
+                "closely rephrase any of these — test a different concept or "
+                "detail):\n"
+                + "\n".join(f"- {p}" for p in seen_prompts)
+                + "\n\n"
+            )
 
     prompt = f"""You are an expert educator creating a quiz for high-school to early-college learners.
 
@@ -277,7 +291,7 @@ PEDAGOGICAL REQUIREMENTS:
    questions from other modules. If this module covers the same topic as a previous module, test a
    DIFFERENT aspect or detail — never the same question with slightly different wording.
 
-{HUMOR_INSTRUCTIONS}
+{avoid_block}{HUMOR_INSTRUCTIONS}
 Create exactly {n_questions} questions with the following type distribution:
 {json.dumps(type_mix)}
 
@@ -362,6 +376,7 @@ def generate_quiz(
     retriever: Optional[Callable[[str], Dict[str, Any]]],
     n_questions: int = 6,
     difficulty: str = 'Normal',
+    avoid_prompts: list = None,
 ) -> Dict[str, Any]:
     """Generate a mixed-type quiz for a module grounded in RAG context.
 
@@ -370,11 +385,16 @@ def generate_quiz(
         slides: The lesson slides to base quiz questions on.
         retriever: A callable that returns RAG context for a query string,
             or None if unavailable.
-        n_questions: Number of questions to generate (default 6 — one per
+        n_questions: Number of questions to request (default 6 — one per
             type: mcq, true_false, multi_select, cloze_dropdown, ordering,
-            matching).
+            matching). Quality over quantity: 5 distinct high-quality
+            questions are accepted when the model cannot produce a 6th
+            distinct type without repeating a skill.
         difficulty: One of 'Easy', 'Normal', 'Hard'. Controls vocabulary
             and question complexity. Defaults to 'Normal'.
+        avoid_prompts: Optional list of question prompts already asked in
+            this study path. Rendered into the prompt as a do-not-repeat
+            block (cross-module question dedup).
 
     Returns:
         A dict with key ``questions`` containing a list of validated,
@@ -410,6 +430,7 @@ def generate_quiz(
         type_mix=type_mix,
         n_questions=n_questions,
         difficulty=difficulty,
+        avoid_prompts=avoid_prompts,
     )
 
     # Retry with a repair prompt on unparseable/invalid output before
@@ -422,10 +443,20 @@ def generate_quiz(
         if not isinstance(result, dict) or not isinstance(
                 result.get('questions'), list):
             return None
-        validated = _validate_questions(result['questions'], n_questions)
+        # Validate everything the model returned, then keep the first
+        # question of each type: 5–6 distinct high-quality questions are
+        # accepted, but a repeated type is not. A short distinct set
+        # triggers the repair loop (or the placeholder) rather than
+        # shipping a duplicate-skill quiz.
+        validated = _validate_questions(
+            result['questions'], len(result['questions']))
         if not validated:
             return None
-        return {'questions': validated}
+        distinct = _dedupe_distinct_types(validated)
+        minimum = min(n_questions, 5)
+        if len(distinct) < minimum:
+            return None
+        return {'questions': distinct[:n_questions]}
 
     try:
         result = generate_json(
@@ -793,6 +824,64 @@ def _validate_questions(
         if len(valid) >= expected_count:
             break
     return valid
+
+
+def _normalize_question_prompt(text: Any) -> str:
+    """Normalize a question prompt for duplicate comparison.
+
+    Lowercases, strips punctuation, and collapses whitespace so
+    rephrased repeats compare equal even when the LLM tweaks
+    punctuation or casing.
+    """
+    import re as _re
+    t = str(text or '').lower()
+    t = _re.sub(r'[^a-z0-9\s]', ' ', t)
+    return _re.sub(r'\s+', ' ', t).strip()
+
+
+def _dedupe_distinct_types(
+    questions: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Keep the first question of each type, preserving order.
+
+    Quality over quantity: a quiz with 5 distinct high-quality
+    questions (5 different skills) is accepted over 6 where one
+    type is repeated. Callers decide the minimum count.
+    """
+    seen: set = set()
+    distinct: List[Dict[str, Any]] = []
+    for q in questions:
+        qtype = q.get('type', '') if isinstance(q, dict) else ''
+        if qtype in seen:
+            continue
+        seen.add(qtype)
+        distinct.append(q)
+    return distinct
+
+
+def _drop_repeated_questions(
+    questions: List[Dict[str, Any]],
+    used_prompts: set,
+) -> List[Dict[str, Any]]:
+    """Drop questions already asked in this study path.
+
+    Compares normalized prompts against ``used_prompts`` (mutated
+    in-place: surviving prompts are added so subsequent modules see
+    them). Returns the surviving list, preserving order.
+    """
+    kept: List[Dict[str, Any]] = []
+    for q in questions:
+        norm = _normalize_question_prompt((q or {}).get('prompt', ''))
+        if norm and norm in used_prompts:
+            logger.info(
+                "Dropping cross-module duplicate quiz question: %r",
+                str((q or {}).get('prompt', ''))[:120],
+            )
+            continue
+        kept.append(q)
+        if norm:
+            used_prompts.add(norm)
+    return kept
 
 
 def _fallback_quiz(n_questions: int = 6, module_title: str = '',

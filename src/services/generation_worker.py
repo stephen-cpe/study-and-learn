@@ -111,6 +111,16 @@ def run_generation_for_path(
     # does not re-teach the same goal-level content (the audit found all
     # four AZ modules repeated the same triad).
     covered_concepts = []
+    # Question-level dedup: normalized prompts already asked in this path
+    # are passed to each subsequent quiz prompt and post-filtered, so no
+    # two modules ship the same question.
+    from src.services.quiz_generator import _normalize_question_prompt
+    used_question_prompts = set()
+    for _les in lessons:
+        for _q in ((_les.get('quiz') or {}).get('questions') or []):
+            _norm = _normalize_question_prompt((_q or {}).get('prompt', ''))
+            if _norm:
+                used_question_prompts.add(_norm)
     progress_tracker.update_progress(task_id, 1)
 
     try:
@@ -131,6 +141,7 @@ def run_generation_for_path(
                 used_chunk_ids=used_chunk_ids,
                 learner_memories=learner_memories,
                 covered_concepts=covered_concepts,
+                used_question_prompts=used_question_prompts,
             )
             progress_tracker.update_progress(task_id, 3)
 

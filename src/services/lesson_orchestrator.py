@@ -3,7 +3,10 @@ Lesson orchestration service — generates lesson slides, inline checkpoints,
 and final quizzes for a single module.  Extracted from routes.py to keep
 route handlers thin and testable.
 """
+import logging
 from typing import Any, Callable, Dict, List
+
+logger = logging.getLogger(__name__)
 
 from src.services.lesson_generator import generate_lesson
 from src.services.quiz_generator import generate_inline_checkpoint, generate_quiz
@@ -266,6 +269,7 @@ def build_module_artifacts(
     learner_memories: list = None,
     title_only: bool = False,
     covered_concepts: list = None,
+    used_question_prompts: set = None,
 ) -> Dict[str, Any]:
     """
     Generate (or reuse) lesson slides, inline checkpoints, and a final quiz
@@ -302,6 +306,11 @@ def build_module_artifacts(
         covered_concepts: Titles/objectives of already-generated modules,
             forwarded to the lesson prompt as an explicit do-not-reteach
             list (concept-level cross-module dedup).
+        used_question_prompts: Set of normalized quiz prompts already asked
+            in this path. Forwarded to the quiz prompt as a do-not-repeat
+            block; surviving prompts are added in-place so subsequent
+            modules test fresh concepts (question-level cross-module
+            dedup).
 
     Returns:
         dict with keys: 'lesson', 'quiz', 'checkpoints', 'sources'.
@@ -356,7 +365,36 @@ def build_module_artifacts(
     else:
         lesson_data['narration'] = []
 
-    quiz_data = generate_quiz(module_title, slides, retriever, n_questions=6, difficulty=difficulty)
+    from src.services.quiz_generator import _drop_repeated_questions
+    avoid = sorted(used_question_prompts) if used_question_prompts else None
+    quiz_data = generate_quiz(
+        module_title, slides, retriever, n_questions=6,
+        difficulty=difficulty, avoid_prompts=avoid,
+    )
+    if used_question_prompts is not None:
+        # Post-filter: drop anything the prompt-level block missed, so a
+        # repeated question can never ship. Quality over quantity: the
+        # surviving distinct questions stand even if fewer than 6.
+        kept = _drop_repeated_questions(
+            quiz_data.get('questions', []), used_question_prompts)
+        if kept:
+            if len(kept) < len(quiz_data.get('questions', [])):
+                logger.warning(
+                    "Dropped %d cross-module duplicate quiz question(s) "
+                    "for module '%s'",
+                    len(quiz_data.get('questions', [])) - len(kept),
+                    module_title,
+                )
+            quiz_data['questions'] = kept
+        else:
+            # Everything was a repeat (essentially impossible with the
+            # prompt block active): keep the generated set so the module
+            # still has a gradeable quiz, and record it.
+            from src.services.quiz_generator import _normalize_question_prompt
+            for q in quiz_data.get('questions', []):
+                norm = _normalize_question_prompt((q or {}).get('prompt', ''))
+                if norm:
+                    used_question_prompts.add(norm)
     lesson_data['deck_layout'] = deck_layout
 
     return {

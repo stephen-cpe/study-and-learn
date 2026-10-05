@@ -1,4 +1,5 @@
 import io
+import json
 import tempfile
 from unittest.mock import patch
 
@@ -312,19 +313,35 @@ def test_retake_regenerates_quiz_and_resets_state(mock_quiz_ollama, mock_lesson_
         '{"module_title": "Intro", '
         '"slides": [{"type": "title", "title": "Hello", "subtitle": "World"}]}'
     )
+    # Six distinct questions per set (the quiz contract is 5-6 distinct
+    # types; single-question stubs are rejected as too thin to grade).
+    def _six_questions(tag, first_id):
+        return json.dumps({"questions": [
+            {"id": first_id, "type": "true_false",
+             "prompt": f"{tag}? (T/F)", "answer": True,
+             "explanation": "E"},
+            {"id": "q2", "type": "mcq", "prompt": f"{tag}? (MCQ)",
+             "options": ["X", "Y", "Z", "W"], "answer_index": 0,
+             "explanation": "E"},
+            {"id": "q3", "type": "multi_select", "prompt": f"{tag}? (MS)",
+             "options": ["X", "Y", "Z", "W"], "answer_indices": [0, 1],
+             "explanation": "E"},
+            {"id": "q4", "type": "cloze_dropdown",
+             "prompt": f"{tag}? Fill ___ Blank.",
+             "options": ["X", "Y", "Z"], "answer_index": 0,
+             "explanation": "E"},
+            {"id": "q5", "type": "ordering", "prompt": f"{tag}? (order)",
+             "items": ["A", "B", "C", "D"], "answer_order": [1, 0, 3, 2],
+             "explanation": "E"},
+            {"id": "q6", "type": "matching", "prompt": f"{tag}? (match)",
+             "lefts": ["a", "b", "c", "d"],
+             "rights": ["1", "2", "3", "4"],
+             "answer_indices": [1, 0, 3, 2], "explanation": "E"},
+        ]})
     # First call to quiz_generator returns question set A
-    quiz_response_a = (
-        '{"questions": ['
-        '{"id": "q_a", "type": "true_false", "prompt": "Set A?", '
-        '"answer": true, "explanation": "Original quiz"}]}'
-    )
+    quiz_response_a = _six_questions("Set A?", "q_a")
     # Second call (during retake) returns question set B
-    quiz_response_b = (
-        '{"questions": ['
-        '{"id": "q_b", "type": "mcq", "prompt": "Set B?", '
-        '"options": ["X","Y","Z","W"], "answer_index": 0, '
-        '"explanation": "Regenerated quiz"}]}'
-    )
+    quiz_response_b = _six_questions("Set B?", "q_b")
     mock_quiz_ollama.side_effect = [quiz_response_a, quiz_response_b]
 
     with client.session_transaction() as sess:

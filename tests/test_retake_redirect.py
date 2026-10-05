@@ -215,10 +215,28 @@ def test_retake_persists_fresh_quiz(mock_lesson, mock_quiz, mock_tts, retake_cli
             {'type': 'title', 'title': 'T', 'subtitle': ''},
         ]
     })
+    # Six distinct questions (the quiz contract is 5-6 distinct types;
+    # single-question stubs are rejected as too thin to grade).
     mock_quiz.return_value = json.dumps({
-        'questions': [{'id': 'q_NEW', 'type': 'mcq', 'prompt': 'NEW?',
-                       'options': ['W', 'X', 'Y', 'Z'], 'answer_index': 2,
-                       'explanation': 'Because'}]
+        'questions': [
+            {'id': 'q_NEW', 'type': 'mcq', 'prompt': 'NEW?',
+             'options': ['W', 'X', 'Y', 'Z'], 'answer_index': 2,
+             'explanation': 'Because'},
+            {'id': 'q2', 'type': 'true_false', 'prompt': 'NEW T/F?',
+             'answer': True, 'explanation': 'E'},
+            {'id': 'q3', 'type': 'multi_select', 'prompt': 'NEW MS?',
+             'options': ['W', 'X', 'Y', 'Z'], 'answer_indices': [0, 1],
+             'explanation': 'E'},
+            {'id': 'q4', 'type': 'cloze_dropdown', 'prompt': 'NEW ___?',
+             'options': ['W', 'X', 'Y'], 'answer_index': 0,
+             'explanation': 'E'},
+            {'id': 'q5', 'type': 'ordering', 'prompt': 'NEW order?',
+             'items': ['A', 'B', 'C', 'D'], 'answer_order': [1, 0, 3, 2],
+             'explanation': 'E'},
+            {'id': 'q6', 'type': 'matching', 'prompt': 'NEW match?',
+             'lefts': ['a', 'b', 'c', 'd'], 'rights': ['1', '2', '3', '4'],
+             'answer_indices': [1, 0, 3, 2], 'explanation': 'E'},
+        ]
     })
     mock_tts.return_value = {}
 
