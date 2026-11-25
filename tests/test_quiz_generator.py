@@ -680,3 +680,59 @@ def test_avoid_prompts_rendered_into_quiz_prompt():
     assert "do NOT repeat" in prompt
     assert "What is MFA?" in prompt
     assert "COLD IRON" in prompt
+
+
+def test_quiz_prompt_grounds_questions_in_slides_not_context():
+    from src.services.quiz_generator import _build_quiz_prompt
+    prompt = _build_quiz_prompt(
+        "MFA Module", "MFA requires two factors.", "SPIDR is a story-splitting technique.",
+        {"mcq": 1, "true_false": 1, "multi_select": 1,
+         "cloze_dropdown": 1, "ordering": 1, "matching": 1},
+        6, "Normal",
+    )
+    assert "The Lesson Content is the ONLY source of facts" in prompt
+    assert "answerable from the Lesson Content alone" in prompt
+    assert "Context (for verification only" in prompt
+    assert "GROUNDING SELF-CHECK" in prompt
+    assert "for true_false, the fact needed to judge the statement is stated there" in prompt
+    assert "every correct option is named in the Lesson Content" in prompt
+    assert "do NOT import a standard process" in prompt
+    assert "do NOT import techniques or categories from general knowledge" in prompt
+    assert "base every question on facts from the provided Context" not in prompt
+    assert "lesson content or Context" not in prompt
+
+
+def test_checkpoint_prompt_grounds_question_in_segment_not_context(monkeypatch):
+    import json
+
+    import src.services.quiz_generator as qg_module
+
+    captured = {}
+
+    def mock_call(prompt, model=None):
+        captured["prompt"] = prompt
+        return json.dumps({
+            "id": "checkpoint",
+            "type": "mcq",
+            "prompt": "How many factors does MFA require?",
+            "options": ["One", "Two", "Three", "Four"],
+            "answer_index": 1,
+            "explanation": "MFA requires two factors.",
+        })
+
+    monkeypatch.setattr(qg_module, "call_ollama", mock_call)
+    slides = [{"type": "content", "heading": "MFA",
+               "bullets": ["MFA requires two factors."]}]
+
+    qg_module.generate_inline_checkpoint(
+        "MFA Module", slides,
+        lambda _query: {"context_text": "SPIDR is a story-splitting technique."},
+        cp_type="mcq",
+    )
+
+    prompt = captured["prompt"]
+    assert "Segment Content below is the ONLY source of facts" in prompt
+    assert "answerable from the Segment Content alone" in prompt
+    assert "Context (for verification only" in prompt
+    assert "must never supply a new fact" in prompt
+    assert "For true_false, the fact needed to judge the statement" in prompt

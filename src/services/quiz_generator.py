@@ -2,9 +2,11 @@
 Quiz generation service for the Study-and-Learn MVP.
 
 Generates mixed-type quizzes (mcq, true_false, multi_select, cloze_dropdown,
-ordering, matching) and inline comprehension checkpoints grounded in RAG context. Applies
-pedagogical safeguards: plausible distractors, diversified true/false
-answers, shuffled option ordering, and cloze dropdown with plausible choices.
+ordering, matching) and inline comprehension checkpoints grounded in the lesson
+slides. Retrieval context is used only to verify answers, never as a source of
+new facts. Applies pedagogical safeguards: plausible distractors, diversified
+true/false answers, shuffled option ordering, and cloze dropdown with plausible
+choices.
 """
 import json
 import logging
@@ -237,18 +239,29 @@ def _build_quiz_prompt(
     Pure string assembly — no I/O, no retrieval — so it can be unit
     tested and tuned independently of ``generate_quiz``'s control flow.
     """
-    context_instruction = ""
     if rag_context and rag_context.strip():
         context_instruction = (
-            "You MUST base every question on facts from the provided Context. "
-            "Do NOT ask about information not present in the Context or lesson content. "
-            "If the Context lacks sufficient detail for a question, write a question "
-            "about a concept from the lesson content instead — never fabricate details.\n\n"
+            "GROUNDING RULE: You MUST base every question on facts stated in the Lesson "
+            "Content below. The Lesson Content is the ONLY source of facts for every "
+            "question and answer. Every question MUST be answerable from the Lesson "
+            "Content alone, and the correct answer MUST be stated or directly supported "
+            "there. Do NOT test any fact, term, example, or number that is not present in "
+            "the Lesson Content, even if it appears in the Context. The Context is provided "
+            "only to verify that an answer is accurate; it must never supply a new fact. "
+            "If the Lesson Content lacks enough detail for a question, write a simpler "
+            "question about a concept that is on the slides — never pull in outside "
+            "material.\n\n"
         )
     else:
         context_instruction = (
-            "No additional context is available. Base questions only on the lesson content provided. "
-            "Use widely known facts only — do NOT invent specific data.\n\n"
+            "GROUNDING RULE: You MUST base every question on facts stated in the Lesson "
+            "Content below. The Lesson Content is the ONLY source of facts for every "
+            "question and answer. Every question MUST be answerable from the Lesson "
+            "Content alone, and the correct answer MUST be stated or directly supported "
+            "there. Do NOT test any fact, term, example, or number that is not present in "
+            "the Lesson Content. If the Lesson Content lacks enough detail for a question, "
+            "write a simpler question about a concept that is on the slides — do NOT "
+            "invent specific data.\n\n"
         )
 
     diff_instruction = DIFFICULTY_INSTRUCTIONS.get(difficulty, DEFAULT_DIFFICULTY_INSTRUCTION)
@@ -272,12 +285,13 @@ def _build_quiz_prompt(
 {diff_instruction}
 Module: {module_title}
 Lesson Content: {slide_summary}
-Context: {rag_context if rag_context else 'None'}
+Context (for verification only — NOT a source of questions or facts): {rag_context if rag_context else 'None'}
 
 PEDAGOGICAL REQUIREMENTS:
 1. Every distractor (wrong answer) MUST be plausible — a confident but mistaken learner could choose it.
    Avoid absurd, obviously wrong, or silly distractors.
-2. Every correct answer MUST be unambiguously correct based on the lesson content or Context.
+2. Every correct answer MUST be unambiguously correct based on the Lesson Content alone.
+   The Context may only confirm an answer; it must not introduce facts that are absent from the slides.
 3. For cloze_dropdown: the blank MUST replace a key term directly stated in the preceding lesson content.
     Provide 3-4 short, plausible options. One must be the correct answer at 'answer_index'.
     The wrong options must be plausible enough that a learner who hasn't read carefully might choose them.
@@ -290,6 +304,14 @@ PEDAGOGICAL REQUIREMENTS:
 7. CRITICAL: Each question MUST test a UNIQUE concept from this module. Do NOT repeat or rephrase
    questions from other modules. If this module covers the same topic as a previous module, test a
    DIFFERENT aspect or detail — never the same question with slightly different wording.
+8. GROUNDING SELF-CHECK: Before returning, verify every question against the Lesson Content:
+   - the fact needed to answer it is stated there;
+   - for true_false, the fact needed to judge the statement is stated there;
+   - any ordering sequence is explicitly supported by the Lesson Content;
+   - for multi_select, every correct option is named in the Lesson Content;
+   - matching terms and definitions both appear in the Lesson Content.
+   Replace any question that fails with a different, grounded question of the same type.
+   Never fill a gap with general knowledge or Context facts.
 
 {avoid_block}{HUMOR_INSTRUCTIONS}
 Create exactly {n_questions} questions with the following type distribution:
@@ -297,11 +319,11 @@ Create exactly {n_questions} questions with the following type distribution:
 
 For each question type:
 - mcq: 4 options, exactly 1 correct. Include prompt, options array, answer_index (0-based), explanation.
-- true_false: A clear factual statement. Include prompt, answer (boolean), explanation.
-- multi_select: 4 options, 2-3 correct. Include prompt, options array, answer_indices array (0-based), explanation.
+- true_false: A clear factual statement. The fact needed to judge it MUST be stated in the Lesson Content; do NOT test general knowledge or a fact that appears only in the Context. Include prompt, answer (boolean), explanation.
+- multi_select: 4 options, 2-3 correct. Every correct option and every plausible real-world distractor MUST be explicitly named in the Lesson Content; do NOT import techniques or categories from general knowledge. Include prompt, options array, answer_indices array (0-based), explanation.
 - cloze_dropdown: A sentence with a key concept replaced by '___'. Provide 3-4 short, plausible options in an 'options' array. One must be the correct answer at 'answer_index'. The wrong options must be plausible enough that a learner who hasn't read carefully might choose them. Do NOT use obviously wrong options. The correct answer should not always be at the same index — vary the position. Include prompt (with ___), options array, answer_index (0-based), explanation.
-- ordering: A process, sequence, or timeline with 4 steps in SCRAMBLED display order. Include prompt (e.g. "Put these steps in the correct order, 1 = first"), items array (4 distinct steps, scrambled — never already sorted), answer_order array (the display indices in correct sequence: e.g. items ["Boil","Chop","Serve","Cook"] are correctly ordered Chop, Boil, Cook, Serve, so answer_order is [1,0,3,2]), explanation.
-- matching: 4 term/definition pairs. Include prompt (e.g. "Match each term to its definition"), lefts array (4 terms, fixed), rights array (4 definitions, SCRAMBLED — never in matching order), answer_indices array (for each left, the 0-based index into rights of its correct match), explanation.
+- ordering: A process, sequence, or timeline with 4 steps in SCRAMBLED display order. The sequence MUST be explicitly supported by the Lesson Content; do NOT import a standard process from outside it. Include prompt (e.g. "Put these steps in the correct order, 1 = first"), items array (4 distinct steps, scrambled — never already sorted), answer_order array (the display indices in correct sequence: e.g. items ["Boil","Chop","Serve","Cook"] are correctly ordered Chop, Boil, Cook, Serve, so answer_order is [1,0,3,2]), explanation.
+- matching: 4 term/definition pairs. Both the terms and their definitions MUST appear in the Lesson Content. Include prompt (e.g. "Match each term to its definition"), lefts array (4 terms, fixed), rights array (4 definitions, SCRAMBLED — never in matching order), answer_indices array (for each left, the 0-based index into rights of its correct match), explanation.
 
 Respond with ONLY a JSON object — no prose, no markdown, no commentary.
 
@@ -378,7 +400,7 @@ def generate_quiz(
     difficulty: str = 'Normal',
     avoid_prompts: list = None,
 ) -> Dict[str, Any]:
-    """Generate a mixed-type quiz for a module grounded in RAG context.
+    """Generate a mixed-type quiz for a module grounded in its lesson slides.
 
     Args:
         module_title: The module title.
@@ -594,18 +616,25 @@ def generate_inline_checkpoint(
 
 {diff_instruction}
 {type_instruction}
-The question must be answerable using only the information provided below.
+GROUNDING RULE: The Segment Content below is the ONLY source of facts for this checkpoint.
+The question and its correct answer MUST be answerable from the Segment Content alone.
+Do NOT test any fact, term, example, or number that is not present in the Segment Content,
+even if it appears in the Context. The Context is provided only to verify accuracy; it
+must never supply a new fact.
 
 Module: {module_title}
 Segment Content: {slide_summary}
-Context: {rag_context if rag_context else 'None'}
+Context (for verification only — NOT a source of questions or facts): {rag_context if rag_context else 'None'}
 
 CHECKPOINT RULES:
 1. The question MUST test a core concept directly stated in the segment content — NOT obscure trivia.
-2. For mcq and cloze_dropdown: all options must be plausible — avoid absurd or obviously wrong distractors.
-3. The correct answer must be unambiguously correct based on the segment content.
-4. The explanation must briefly justify why the answer is correct.
-5. Vary the position of the correct answer. Do NOT always place it at index 0.
+   If the segment content lacks enough detail, write a simpler question about a concept that is on the slides.
+2. For true_false, the fact needed to judge the statement MUST be stated in the segment content;
+   do NOT test general knowledge or a fact that appears only in the Context.
+3. For mcq and cloze_dropdown: all options must be plausible — avoid absurd or obviously wrong distractors.
+4. The correct answer must be unambiguously correct based on the segment content alone.
+5. The explanation must briefly justify why the answer is correct.
+6. Vary the position of the correct answer. Do NOT always place it at index 0.
 
 Respond with ONLY a JSON object — no prose, no markdown.
 
