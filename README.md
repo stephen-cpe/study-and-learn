@@ -96,7 +96,7 @@ The default models are working placeholders — override `OLLAMA_MODEL` with any
 
 Note: `config_defaults.py` ships `gemma4:31b-cloud` as the cloud-mode default for `OLLAMA_MODEL`. To run locally, set `AI_BACKEND=local` and `OLLAMA_MODEL=qwen3:0.6b` in your `.env` (see `.env.example`). Any chat model can be substituted via `OLLAMA_MODEL`.
 
-**For cloud deployment (`AI_BACKEND=cloud`):** You only need to pull `qwen3-embedding:0.6b` locally — the embedding model runs on the server for ChromaDB RAG retrieval (Ollama Cloud does not expose the `/api/embed` endpoint). The chat model runs on Ollama Cloud and does NOT need to be pulled locally. The default cloud chat model is `gemma4:31b-cloud`; override `OLLAMA_MODEL` to use any other cloud chat model. See `digitalocean-deployment-guide.md` for full deployment instructions.
+**For cloud deployment (`AI_BACKEND=cloud`):** You only need to pull `qwen3-embedding:0.6b` locally — the embedding model runs on the server for ChromaDB RAG retrieval (Ollama Cloud does not expose the `/api/embed` endpoint). The chat model runs on Ollama Cloud and does NOT need to be pulled locally. The default cloud chat model is `gemma4:31b-cloud`; override `OLLAMA_MODEL` to use any other cloud chat model. See `docs/digitalocean-deployment-guide.md` for full deployment instructions.
 
 OCR and vision are consolidated onto `OLLAMA_VISION_MODEL` (default `glm-5.3-flash:cloud`, natively multimodal Text+Image, 1M context). Vision OCR is ON by default (`OCR_FULL=true`) but smart-gated per file: text-layer PDFs skip rendering + LLM calls entirely — vision runs only on scanned/image-heavy PDFs, plus direct image uploads. Set `OCR_FULL=false` to force text-layer-only extraction everywhere. Figure descriptions use the same vision model and require `AI_BACKEND=cloud` with valid `OLLAMA_CLOUD_API_KEY`.
 
@@ -147,7 +147,7 @@ Set `AI_MOCK=true` in your `.env` file to use mock responses. This is useful for
 ## Documentation
 
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) — system architecture and engineering overview
-- [DigitalOcean Deployment Guide](digitalocean-deployment-guide.md) — production deployment reference
+- [DigitalOcean Deployment Guide](docs/digitalocean-deployment-guide.md) — production deployment reference
 
 ## License
 

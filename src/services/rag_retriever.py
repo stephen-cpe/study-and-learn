@@ -332,6 +332,7 @@ def _map_summaries(
     max_sections = rag_budget.map_max_sections()
     section_budget = rag_budget.map_max_section_chars()
 
+    prepared: List[tuple[str, List[str]]] = []
     for file_idx, file_hash in enumerate(file_hashes):
         if not file_hash:
             continue
@@ -345,15 +346,21 @@ def _map_summaries(
             else (file_hash[:12] + '...')
         )
         sections = _split_into_sections(entry.extracted_text, section_budget)
-        if not sections:
-            continue
+        if sections:
+            prepared.append((file_name, sections))
 
+    # Report the real number of sections the map step will visit, capped at
+    # the configured maximum — not the cap itself.
+    total_to_process = min(
+        sum(len(sections) for _name, sections in prepared), max_sections)
+
+    for file_name, sections in prepared:
         for sec_idx, section in enumerate(sections):
             if total_sections >= max_sections:
                 break
             total_sections += 1
             if progress_callback:
-                progress_callback(total_sections, max_sections)
+                progress_callback(total_sections, total_to_process)
 
             prompt = (
                 "You are preparing a reading digest so another AI can answer questions "

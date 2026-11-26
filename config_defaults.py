@@ -73,6 +73,11 @@ RAG_TOP_K_DEFAULT = 20
 # not silently consume the whole context window.
 OLLAMA_TEMPERATURE_DEFAULT = 0.25
 OLLAMA_NUM_PREDICT_DEFAULT = 8192
+# Optional reasoning-effort fields. Empty means "omit the field" so existing
+# models (notably gemma4:31b-cloud) keep their current non-thinking behaviour.
+# Setting any value can turn thinking on and consume the max_tokens budget.
+OLLAMA_CHAT_REASONING_EFFORT_DEFAULT = ""
+OLLAMA_VISION_REASONING_EFFORT_DEFAULT = ""
 EMBEDDING_MODEL_DEFAULT = "qwen3-embedding:0.6b"
 # OCR and vision are consolidated onto a single natively multimodal model.
 # ``glm-ocr`` (local-only) has been removed — all image OCR, table

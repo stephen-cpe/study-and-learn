@@ -11,8 +11,8 @@ False), it lazy-imports this module and delegates::
     return cloud_call(prompt, model)
 
 There is no "uncomment an import" step — backend selection is exclusively
-env-var-driven. See ADR-007 (SRS.md §4.4) and AI_AGENT_PROTOCOL.md for the
-``AI_BACKEND`` / ``AI_MOCK`` / ``force_local`` rules.
+env-var-driven. See ``ai_client.py`` for the ``AI_BACKEND`` / ``AI_MOCK`` /
+``force_local`` rules.
 
 Environment variables
 ---------------------
@@ -29,11 +29,13 @@ import os
 import requests
 
 from config_defaults import (
+    OLLAMA_CHAT_REASONING_EFFORT_DEFAULT,
     OLLAMA_CLOUD_BASE_URL_DEFAULT,
     OLLAMA_MODEL_CLOUD_DEFAULT,
     OLLAMA_NUM_PREDICT_DEFAULT,
     OLLAMA_TEMPERATURE_DEFAULT,
     OLLAMA_TIMEOUT_DEFAULT,
+    OLLAMA_VISION_REASONING_EFFORT_DEFAULT,
     env_default,
     env_float,
     env_int,
@@ -45,6 +47,19 @@ from src.services.exceptions import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _reasoning_effort(images: list = None) -> str:
+    """Return the configured effort, or '' to omit the field entirely."""
+    if images:
+        return env_default(
+            'OLLAMA_VISION_REASONING_EFFORT',
+            OLLAMA_VISION_REASONING_EFFORT_DEFAULT,
+        )
+    return env_default(
+        'OLLAMA_CHAT_REASONING_EFFORT',
+        OLLAMA_CHAT_REASONING_EFFORT_DEFAULT,
+    )
 
 
 def call_ollama(prompt: str, model: str = None, images: list = None) -> str:
@@ -112,26 +127,56 @@ def call_ollama(prompt: str, model: str = None, images: list = None) -> str:
             **gen_options,
         }
 
+    reasoning_effort = _reasoning_effort(images)
+    if reasoning_effort:
+        payload["reasoning_effort"] = reasoning_effort
+
+    effort_log = (
+        f" reasoning_effort={reasoning_effort}" if reasoning_effort else ""
+    )
     logger.info(
         f"Calling Ollama Cloud model='{model}' timeout={timeout}s "
         f"temperature={gen_options['temperature']} "
-        f"max_tokens={gen_options['max_tokens']}"
+        f"max_tokens={gen_options['max_tokens']}{effort_log}"
     )
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=timeout)
         response.raise_for_status()
         result = response.json()
         choice = result.get('choices', [{}])[0]
-        response_text = choice.get('message', {}).get('content', '')
+        message = choice.get('message', {}) or {}
+        response_text = message.get('content', '') or ''
+        reasoning_text = message.get('reasoning') or message.get('reasoning_content') or ''
         finish_reason = choice.get('finish_reason') or 'unknown'
         logger.info(
             f"Ollama Cloud success: received {len(response_text)} chars "
             f"(finish_reason={finish_reason})"
         )
+        if reasoning_text:
+            logger.info(
+                "Ollama Cloud reasoning: %d chars", len(reasoning_text)
+            )
         if finish_reason == 'length':
+            if not response_text.strip():
+                logger.error(
+                    "Ollama Cloud returned empty content at max_tokens=%d "
+                    "(finish_reason=length, reasoning=%d chars) for model '%s'",
+                    gen_options['max_tokens'], len(reasoning_text), model,
+                )
+                raise AICloudAPIError(
+                    f"Cloud model '{model}' exhausted max_tokens="
+                    f"{gen_options['max_tokens']} on reasoning and returned no "
+                    "content. Increase OLLAMA_NUM_PREDICT or lower the "
+                    "configured reasoning effort."
+                )
             logger.warning(
                 "Ollama Cloud output was truncated at max_tokens "
                 "(finish_reason=length); JSON may be incomplete"
+            )
+        elif not response_text.strip():
+            logger.warning(
+                "Ollama Cloud returned empty content (finish_reason=%s) for model '%s'",
+                finish_reason, model,
             )
         return response_text
     except requests.exceptions.ConnectTimeout:
@@ -159,8 +204,9 @@ def call_ollama(prompt: str, model: str = None, images: list = None) -> str:
             )
         elif status == 404:
             raise AICloudAPIError(
-                f"Cloud model '{model}' not found. "
-                f"Verify the model name includes the '-cloud' suffix."
+                f"Cloud model '{model}' not found. Verify the model name uses "
+                f"the current ':cloud' suffix (for example "
+                f"'glm-5.3-flash:cloud'); older tags use '-cloud'."
             )
         elif status >= 500:
             raise AICloudAPIError(

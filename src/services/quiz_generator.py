@@ -1004,23 +1004,48 @@ def _fallback_quiz(n_questions: int = 6, module_title: str = '',
             'explanation': f'This question tests your understanding of {title}.'
         })
 
-    # 3. A true/false about a slide detail.
-    if unique_terms and len(unique_terms) >= 2:
-        questions.append({
-            'id': 'q3',
-            'type': 'true_false',
-            'prompt': f'{unique_terms[1]} is related to {title}.',
-            'answer': True,
-            'explanation': f'{unique_terms[1]} is discussed in this module.'
-        })
-    else:
-        questions.append({
-            'id': 'q3',
-            'type': 'true_false',
-            'prompt': f'Reviewing the material from {title} is important.',
-            'answer': True,
-            'explanation': f'Reviewing {title} helps reinforce learning.'
-        })
+    # 3. A matching question using slide headings/definitions where possible.
+    matching_pairs = []
+    seen_lefts = set()
+    seen_rights = set()
+    for slide in (slides or []):
+        if slide.get('type') != 'content':
+            continue
+        heading = str(slide.get('heading', '')).strip()
+        bullets = [str(b).strip() for b in (slide.get('bullets') or []) if str(b).strip()]
+        if not heading or not bullets:
+            continue
+        right = bullets[0]
+        if heading.lower() in seen_lefts or right.lower() in seen_rights:
+            continue
+        seen_lefts.add(heading.lower())
+        seen_rights.add(right.lower())
+        matching_pairs.append((heading, right))
+        if len(matching_pairs) == 4:
+            break
+    generic_pairs = [
+        ('Review the key terms', 'Start by learning the vocabulary'),
+        ('Understand the core principles', 'Connect the ideas together'),
+        ('Practice with examples', 'Apply what you have learned'),
+        ('Check your answers', 'Verify your work'),
+    ]
+    for left, right in generic_pairs:
+        if len(matching_pairs) == 4:
+            break
+        if left.lower() in seen_lefts or right.lower() in seen_rights:
+            continue
+        seen_lefts.add(left.lower())
+        seen_rights.add(right.lower())
+        matching_pairs.append((left, right))
+    questions.append({
+        'id': 'q3',
+        'type': 'matching',
+        'prompt': f'Match each term or study step for {title} to its match.',
+        'lefts': [left for left, _right in matching_pairs],
+        'rights': [right for _left, right in matching_pairs],
+        'answer_indices': list(range(len(matching_pairs))),
+        'explanation': f'Each item is paired with its match from {title}.'
+    })
 
     # 4. A cloze_dropdown with a key term.
     if unique_terms:

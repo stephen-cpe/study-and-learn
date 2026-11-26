@@ -161,13 +161,23 @@ class TestLineGenerator:
         assert len(line) > 0
         assert len(line) <= 70
 
-    def test_cache_returns_same_line(self, app, make_user):
-        """Two consecutive calls with the same user+event should return
-        the cached line (no second LLM call)."""
+    def test_consecutive_calls_do_not_repeat_line(self, app, make_user):
+        """The cache may be reused, but the same line must not be sent twice."""
         uid = make_user()
         line1 = generate_line(uid, 'Bobby', 'idle')
         line2 = generate_line(uid, 'Bobby', 'idle')
-        assert line1 == line2
+        assert line1 != line2
+
+    def test_no_repeat_across_events(self, app, make_user, monkeypatch):
+        """idle → lessons must not return the same sentence twice in a row."""
+        import src.services.mascot_lines as ml
+
+        uid = make_user()
+        monkeypatch.setattr(ml, 'call_ollama', lambda prompt: 'The same line')
+        line1 = generate_line(uid, 'Bobby', 'idle')
+        line2 = generate_line(uid, 'Bobby', 'lessons')
+        assert line1 == 'The same line'
+        assert line2 != line1
 
     def test_never_raises_on_error(self, app, make_user):
         """generate_line must never raise — it always returns a string."""

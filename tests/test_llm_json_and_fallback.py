@@ -149,8 +149,8 @@ class TestTopicAwareFallback:
              'bullets': ['Mitochondria produce ATP', 'ATP is energy']}
         ]
         result = _fallback_quiz(5, module_title='Cell Biology', slides=slides)
-        prompts = ' '.join(q['prompt'] for q in result['questions'])
-        assert 'mitochondria' in prompts.lower() or 'atp' in prompts.lower(), (
+        content = json.dumps(result['questions'])
+        assert 'mitochondria' in content.lower() or 'atp' in content.lower(), (
             "fallback quiz should reference slide content, not generic "
             "study-skills content"
         )

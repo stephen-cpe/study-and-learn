@@ -572,11 +572,13 @@ def test_quiz_prompt_contains_ordering_matching_specs(monkeypatch):
     assert 'answer_indices' in p
 
 
-def test_fallback_quiz_has_six_with_ordering():
+def test_fallback_quiz_has_six_distinct_types():
     fb = _fallback_quiz(6, module_title='Cells', slides=[])
     assert len(fb['questions']) == 6
     types = [q['type'] for q in fb['questions']]
     assert 'ordering' in types
+    assert 'matching' in types
+    assert len(set(types)) == 6
 
 
 def test_build_type_mix_six_types():

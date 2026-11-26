@@ -55,6 +55,10 @@ class Config:
     # ── Flask core ──────────────────────────────────────────────────────
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-key-for-testing-only")
     UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", "uploads")
+    # Lesson decks and TTS generations routinely stay open for more than an
+    # hour. CSRF tokens are bound to the login session, so let them live as
+    # long as that session instead of expiring after Flask-WTF's 3600s default.
+    WTF_CSRF_TIME_LIMIT = None
 
     # ── Database ────────────────────────────────────────────────────────
     # Required: postgresql+psycopg2://user:pass@host:5432/dbname

@@ -65,7 +65,7 @@ def create_app():
     # CSRF is enforced in production; disabled under CI / AI_MOCK / TESTING
     # so the test suite (which uses raw POSTs) keeps passing without tokens.
     # Tests that want to exercise CSRF enforcement set WTF_CSRF_ENABLED=True
-    # explicitly (see tests/test_security_task1.py).
+    # explicitly (see tests/test_security_and_correctness.py).
     if 'WTF_CSRF_ENABLED' not in app.config:
         app.config['WTF_CSRF_ENABLED'] = not (
             _is_debug or _is_mock or _is_ci

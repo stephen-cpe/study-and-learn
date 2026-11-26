@@ -181,7 +181,11 @@ def compute_external_suggestions(
     """
     import os
 
-    from config_defaults import env_default, env_int
+    from config_defaults import (
+        WEB_SEARCH_SYNTH_MODEL_DEFAULT,
+        env_default,
+        env_int,
+    )
 
     modules = modules or []
     if os.environ.get('AI_MOCK', '').lower() == 'true':
@@ -223,7 +227,8 @@ def compute_external_suggestions(
             })
 
         prompt = build_external_synthesis_prompt(learning_goal, modules, enriched)
-        model = env_default('WEB_SEARCH_SYNTH_MODEL', 'gpt-oss:20b-cloud')
+        model = env_default(
+            'WEB_SEARCH_SYNTH_MODEL', WEB_SEARCH_SYNTH_MODEL_DEFAULT)
         try:
             response = call_ollama(prompt, model=model)
         except TypeError:

@@ -10,7 +10,7 @@ Covers:
 """
 import json
 import tempfile
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from cachelib import FileSystemCache
@@ -599,3 +599,24 @@ class TestDecodingParameters:
         payload = mock_post.call_args[1]['json']
         assert 'temperature' in payload
         assert 'max_tokens' in payload
+
+    @patch('src.services.ai_client_cloud.requests.post')
+    def test_cloud_404_message_mentions_both_suffix_forms(
+            self, mock_post, monkeypatch):
+        from requests.exceptions import HTTPError
+
+        from src.services.exceptions import AICloudAPIError
+
+        monkeypatch.delenv('AI_MOCK', raising=False)
+        monkeypatch.setenv('OLLAMA_CLOUD_API_KEY', 'fake')
+        response = MagicMock(status_code=404, text='missing')
+        response.raise_for_status.side_effect = HTTPError()
+        mock_post.return_value = response
+
+        from src.services.ai_client_cloud import call_ollama as cloud_call
+
+        with pytest.raises(AICloudAPIError) as exc:
+            cloud_call('test prompt')
+        message = str(exc.value)
+        assert ':cloud' in message
+        assert '-cloud' in message

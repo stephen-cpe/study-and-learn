@@ -49,6 +49,7 @@ import io
 import json
 import re
 import tempfile
+import time
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -372,6 +373,29 @@ class TestCSRFEnforcement:
             'avatar': 'avatar-0.png', 'csrf_token': token,
         }, follow_redirects=False)
         assert rv.status_code in (200, 302)
+
+    def test_token_older_than_one_hour_still_valid(self, csrf_client):
+        _login_with_csrf(csrf_client)
+        rv = csrf_client.get('/settings')
+        token = _extract_csrf_token(rv.data)
+        future = time.time() + 3661
+        with patch('itsdangerous.timed.time.time', return_value=future):
+            rv = csrf_client.post('/settings', data={
+                'avatar': 'avatar-0.png', 'csrf_token': token,
+            }, follow_redirects=False)
+        assert rv.status_code in (200, 302), (
+            "A session-bound CSRF token must remain valid while the login "
+            "session is still alive."
+        )
+
+    def test_settings_with_wrong_token_rejected(self, csrf_client):
+        _login_with_csrf(csrf_client)
+        rv = csrf_client.get('/settings')
+        token = _extract_csrf_token(rv.data)
+        rv = csrf_client.post('/settings', data={
+            'avatar': 'avatar-0.png', 'csrf_token': token + 'tampered',
+        }, follow_redirects=False)
+        assert rv.status_code == 400
 
     def test_ajax_without_csrf_header_rejected(self, csrf_client):
         _login_with_csrf(csrf_client)

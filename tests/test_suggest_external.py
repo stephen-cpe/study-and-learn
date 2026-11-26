@@ -55,20 +55,30 @@ def test_external_proprietary_never_calls_search(monkeypatch):
 def test_external_verbatim_urls_only(monkeypatch):
     monkeypatch.setenv('WEB_SEARCH_ENABLED', 'true')
     monkeypatch.setenv('AI_MOCK', 'false')
+    monkeypatch.delenv('WEB_SEARCH_SYNTH_MODEL', raising=False)
     import src.services.suggest_external as ext
-    monkeypatch.setattr(ext, 'call_ollama', lambda prompt, model=None: json.dumps({
-        "suggestions": [
-            {"title": "Quantum Decoherence", "reason": "Next step.",
-             "source_refs": "web", "source_urls": ["https://invented.example/bad"]},
-            {"title": "Quantum Entanglement", "reason": "Follows.",
-             "source_refs": "web", "source_urls": ["https://real.example/a"]},
-        ]}))
+    models = []
+
+    def fake_call(prompt, model=None):
+        models.append(model)
+        return json.dumps({
+            "suggestions": [
+                {"title": "Quantum Decoherence", "reason": "Next step.",
+                 "source_refs": "web",
+                 "source_urls": ["https://invented.example/bad"]},
+                {"title": "Quantum Entanglement", "reason": "Follows.",
+                 "source_refs": "web",
+                 "source_urls": ["https://real.example/a"]},
+            ]})
+
+    monkeypatch.setattr(ext, 'call_ollama', fake_call)
     fake_results = [{'title': 'A', 'url': 'https://real.example/a', 'content': 'snip'}]
     out = ext.compute_external_suggestions(
         'Learn quantum physics', [{'title': 'Qubits'}], summary='Physics textbook',
         file_names=['physics.pdf'],
         search_fn=lambda q, max_results=5: fake_results,
         fetch_fn=lambda u: 'fetched body about entanglement')
+    assert models == ['gpt-oss:20b-cloud']
     titles = [s['title'] for s in out['suggestions']]
     assert 'Quantum Entanglement' in titles
     # Invented URL is stripped to [] per strict JSON rule (never invent),

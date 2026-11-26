@@ -223,6 +223,25 @@ class TestOcrPageFailureHandling:
             result = vp.ocr_page(test_png_path, mode="text")
         assert result == ""
 
+    def test_truncated_vision_response_warns(self, test_png_path, monkeypatch):
+        """A reasoning-truncated response must be visible in the OCR log."""
+        from src.services import vision_parser as vp
+        from src.services.exceptions import AICloudAPIError
+
+        monkeypatch.setenv("AI_MOCK", "false")
+        with patch.object(
+            vp, "call_ollama",
+            side_effect=AICloudAPIError(
+                "exhausted max_tokens=8192 on reasoning and returned no content"
+            ),
+        ), patch.object(vp.logger, "warning") as mock_warn:
+            result = vp.ocr_page(test_png_path, mode="text")
+        assert result == ""
+        args = mock_warn.call_args.args
+        assert args[0] == "OCR %s mode failed for %s: %s"
+        assert args[1] == "text"
+        assert "exhausted max_tokens" in str(args[3])
+
 
 class TestVisionModelProbe:
     def test_skipped_under_ai_mock(self, monkeypatch):

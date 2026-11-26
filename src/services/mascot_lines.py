@@ -60,6 +60,10 @@ FALLBACK_LINES = {
 _line_cache: dict[tuple[str, str], tuple[str, float]] = {}
 _CACHE_TTL_S = 30.0
 
+# Last line returned to each user, regardless of event, so idle/lessons cannot
+# repeat the same sentence back-to-back.
+_last_line: dict[str, str] = {}
+
 
 def _is_cached(user_id: str, event: str) -> str | None:
     """Return a cached line if fresh (< 30s), else None."""
@@ -80,13 +84,25 @@ def _set_cache(user_id: str, event: str, line: str) -> None:
                                       datetime.now(timezone.utc).timestamp())
 
 
-def _fallback(event: str) -> str:
-    """Pick a random-ish fallback line for the event."""
+def _fallback(event: str, avoid: str | None = None) -> str:
+    """Pick a random-ish fallback line for the event, avoiding *avoid*."""
     lines = FALLBACK_LINES.get(event, FALLBACK_LINES['idle'])
-    # Avoid repeating the same line on consecutive calls: pick based on
-    # a simple time-based rotation.
+    if len(lines) == 1:
+        return lines[0]
+    # Pick based on a simple time-based rotation, then step forward if that
+    # line is the one we just sent.
     idx = int(datetime.now(timezone.utc).timestamp()) % len(lines)
+    if avoid is not None and lines[idx] == avoid:
+        idx = (idx + 1) % len(lines)
     return lines[idx]
+
+
+def _avoid_repeat(user_id: str, event: str, line: str) -> str:
+    """Record and return *line*, substituting a fallback on a repeat."""
+    if _last_line.get(user_id) == line:
+        line = _fallback(event, avoid=line)
+    _last_line[user_id] = line
+    return line
 
 
 def generate_line(user_id: str,
@@ -112,7 +128,7 @@ def generate_line(user_id: str,
     # Check cache first — avoids an LLM call on every 15s idle tick
     cached = _is_cached(user_id, event)
     if cached:
-        return cached
+        return _avoid_repeat(user_id, event, cached)
 
     # Retrieve memories
     memories = get_memories(user_id, limit=10)
@@ -136,6 +152,7 @@ def generate_line(user_id: str,
             line = line[:MAX_LINE_LENGTH - 3] + '...'
         if not line:
             line = _fallback(event)
+        line = _avoid_repeat(user_id, event, line)
         _set_cache(user_id, event, line)
         logger.info("generate_line: %s/%s → %r", user_id[:8], event,
                     line[:80])
@@ -144,5 +161,6 @@ def generate_line(user_id: str,
         logger.warning("generate_line: LLM call failed, using fallback",
                        exc_info=True)
         line = _fallback(event)
+        line = _avoid_repeat(user_id, event, line)
         _set_cache(user_id, event, line)
         return line

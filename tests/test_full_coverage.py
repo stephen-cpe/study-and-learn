@@ -69,6 +69,53 @@ def test_map_summaries_creates_one_entry_per_section(monkeypatch):
     assert 'section 1/' in digest
 
 
+def test_map_progress_reports_real_section_total(monkeypatch):
+    """Progress must show the real section count across files, not the cap."""
+    monkeypatch.setenv('RAG_MAP_SECTION_CHARS', '40')
+    entries = [
+        MagicMock(extracted_text=('A' * 30) + '\n\n' + ('B' * 30)),
+        MagicMock(extracted_text=('C' * 30) + '\n\n' + ('D' * 30)),
+    ]
+    captured = []
+
+    with patch('src.models.ContentRegistry') as mock_cr, \
+         patch('src.services.ai_client.call_ollama', return_value='summary'):
+        mock_cr.query.filter_by.return_value.first.side_effect = entries
+        rag_retriever._map_summaries(
+            ['hash-a', 'hash-b'], ['a.txt', 'b.txt'], 'goal',
+            summary_max_chars=100,
+            progress_callback=lambda done, total: captured.append((done, total)),
+        )
+
+    assert captured
+    assert all(total == 4 for _done, total in captured)
+    assert captured[-1][0] == 4
+
+
+def test_map_progress_total_is_capped_at_max_sections(monkeypatch):
+    monkeypatch.setenv('RAG_MAP_SECTION_CHARS', '40')
+    monkeypatch.setenv('RAG_MAP_MAX_SECTIONS', '3')
+    entries = [
+        MagicMock(extracted_text=('A' * 30) + '\n\n' + ('B' * 30)),
+        MagicMock(extracted_text=('C' * 30) + '\n\n' + ('D' * 30)),
+        MagicMock(extracted_text=('E' * 30) + '\n\n' + ('F' * 30)),
+    ]
+    captured = []
+
+    with patch('src.models.ContentRegistry') as mock_cr, \
+         patch('src.services.ai_client.call_ollama', return_value='summary'):
+        mock_cr.query.filter_by.return_value.first.side_effect = entries
+        rag_retriever._map_summaries(
+            ['hash-a', 'hash-b', 'hash-c'], ['a.txt', 'b.txt', 'c.txt'], 'goal',
+            summary_max_chars=100,
+            progress_callback=lambda done, total: captured.append((done, total)),
+        )
+
+    assert captured
+    assert all(total == 3 for _done, total in captured)
+    assert captured[-1][0] == 3
+
+
 def test_map_summaries_llm_failure_degrades_to_verbatim(monkeypatch):
     """If the LLM fails on a section the raw text is kept (coverage preserved)."""
     monkeypatch.setenv('RAG_SUMMARY_MAP', 'true')
