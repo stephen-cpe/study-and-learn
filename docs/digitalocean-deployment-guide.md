@@ -2,8 +2,9 @@
 ## For $48/month Ubuntu 26.04 Droplet + DuckDNS + Let's Encrypt SSL
 ### Complete Guide for Windows 11 Users
 
-## Disclaimer
-_This guide documents the DigitalOcean production deployment configuration. The original droplet has been decommissioned; this guide is retained as a reference for future redeployments._
+## Status
+
+> **Not actively maintained.** Last known working deployment: before the droplet was decommissioned on 8 August 2026 (last deployment-relevant guide revision: July 2026). The guide was last edited on 15 September 2026. Cloud-provider console steps, pricing, instance types and OS package versions may be out of date.
 
 ---
 
@@ -198,7 +199,7 @@ This creates three seed accounts for testing:
 
 The app uses Ollama Cloud (`AI_BACKEND=cloud`) for all chat/completion calls, but the ChromaDB vector store uses a **local Ollama embedding model** (`qwen3-embedding:0.6b`) to embed query text during RAG retrieval. This model is tiny (~600 MB) and runs in CPU-only mode — no GPU needed.
 
-Without this model, the RAG retrieval pipeline silently fails: ChromaDB cannot embed the learning goal query, so it returns empty context and empty sources. The app generates lessons without document-grounded context (pure LLM hallucination), and the "View Sources" button never appears.
+Without this model, ChromaDB cannot embed the learning goal query, so similarity retrieval returns no chunks and no source entries: the **View Sources** button is missing. The full-coverage digest built at upload time still grounds generation in the extracted text, but lessons lose retrieval and source citations. Pull `qwen3-embedding:0.6b` to restore both.
 
 ```bash
 # Install Ollama
@@ -222,7 +223,7 @@ curl http://localhost:11434/api/tags
 > **Why local Ollama for embeddings when AI_BACKEND=cloud?**  
 > Ollama Cloud's API only supports the OpenAI-compatible `/v1/chat/completions` endpoint. The `langchain_ollama.OllamaEmbeddings` class uses the native Ollama `/api/embed` endpoint, which is not exposed by Ollama Cloud. So embedding calls must go to a local Ollama instance. The `qwen3-embedding:0.6b` model is tiny (~600 MB) and runs in CPU-only mode — it won't compete with the app for resources.
 >
-> **What about the chat model?** Chat/completion calls (lesson generation, quiz generation, relevance checks) go through `ai_client_cloud.py` to Ollama Cloud (`AI_BACKEND=cloud`, `OLLAMA_MODEL=gemma4:31b-cloud`). You do NOT need to pull the chat model locally — only the embedding model. `gemma4:31b-cloud` is the default; override `OLLAMA_MODEL` to use any other cloud chat model your Ollama Cloud instance serves.
+> **What about the chat model?** Chat/completion calls (lesson generation, quiz generation, relevance checks) go through `ai_client_cloud.py` to Ollama Cloud (`AI_BACKEND=cloud`, `OLLAMA_MODEL` set to a cloud chat model). You do NOT need to pull the chat model locally — only the embedding model. The default is defined in `config_defaults.py`; override `OLLAMA_MODEL` to use any other cloud chat model your Ollama Cloud instance serves.
 
 ### Step 6.4: Create Environment File
 
@@ -280,10 +281,10 @@ chmod 600 .env
 cd /home/study-and-learn
 mkdir -p logs
 touch logs/access.log logs/error.log
-mkdir -p data/flask_session data/progress_cache data/uploads data/tts data/chroma_db
+mkdir -p uploads data/flask_session data/progress_cache data/tts data/chroma_db
 ```
 
-> These directories are created automatically by the app on startup, but creating them now avoids first-run permission issues.
+> `uploads/` is the default upload folder; the `data/` directories hold session, progress, TTS and Chroma data. The app creates them on demand, but creating them now avoids first-run permission issues.
 
 ### Step 6.6: Verify the App Starts
 
@@ -385,7 +386,7 @@ pidfile = "/tmp/study-and-learn.pid"
 > The app uses `cachelib.FileSystemCache` for Flask sessions (`data/flask_session/`) and progress tracking (`data/progress_cache/`). These are per-process filesystem caches. Multiple Gunicorn workers would split the cache and break session/progress consistency. A single worker with 8 threads keeps all caching in one process and trivially handles 3 concurrent users.
 >
 > **Why `--timeout 7200` (2 hours)?**  
-> Lesson generation with cloud AI (default model `gemma4:31b-cloud`, override via `OLLAMA_MODEL`) and 3+ modules can take 45-90 minutes end-to-end (lessons + checkpoints + quiz + narration script + edge-tts audio). The 2-hour timeout ensures Gunicorn doesn't kill long-running generation requests. The app's own JS hard-timeout is also 2 hours and stops polling without redirecting.
+> Lesson generation with cloud AI (the configured `OLLAMA_MODEL`) and 3+ modules can take 45-90 minutes end-to-end (lessons + checkpoints + quiz + narration script + edge-tts audio). The 2-hour timeout ensures Gunicorn doesn't kill long-running generation requests. The app's own JS hard-timeout is also 2 hours and stops polling without redirecting.
 >
 > **Why `--bind 127.0.0.1:5000`?**  
 > Gunicorn binds to localhost only. Nginx (the public-facing reverse proxy) forwards external traffic to Gunicorn. This means port 5000 is never exposed to the internet directly.
@@ -609,6 +610,13 @@ Should show: `*/5 * * * * /root/duckdns/duck.sh >/dev/null 2>&1`
 
 ## 10. Configure GitHub Secrets for CI/CD
 
+> **Out of date (checked November 2026):** Sections 10–11 describe the former three-job CI/CD pipeline. The current `.github/workflows/ci-cd.yml` runs `ruff` and `pytest` only; it does not deploy, run a smoke test, or read the `DO_SSH_*` secrets. Deploy manually:
+>
+> ```bash
+> ssh root@YOUR_DROPLET_IP
+> cd /home/study-and-learn && git pull && source venv/bin/activate && pip install -r requirements.txt && sudo systemctl restart study-and-learn
+> ```
+
 Your GitHub Actions workflow (`.github/workflows/ci-cd.yml`) is a 3-job pipeline that runs on every push/PR to `main`. The deploy and smoke-test jobs require **3 secrets** to SSH into your droplet.
 
 ### Step 10.1: Get Your Droplet IP (DO_SSH_HOST)
@@ -688,7 +696,7 @@ cat ~/.ssh/github_actions_do
 5. **Verify** all 3 secrets are listed
 
 > **Why no `SECRET_KEY` or API keys in GitHub Secrets?**  
-> Like the malware-detector pattern, `SECRET_KEY`, `OLLAMA_CLOUD_API_KEY`, and `CHROMA_CLOUD_API_KEY` live only on the droplet in `.env` — they are NOT in GitHub Secrets and NOT deployed by CI/CD. CI/CD only deploys code (`git pull` + `pip install` + `systemctl restart`). This keeps secrets off GitHub entirely.
+> `SECRET_KEY`, `OLLAMA_CLOUD_API_KEY`, and `CHROMA_CLOUD_API_KEY` live only on the droplet in `.env` — they are NOT in GitHub Secrets and NOT deployed by CI/CD. CI/CD only deploys code (`git pull` + `pip install` + `systemctl restart`). This keeps secrets off GitHub entirely.
 
 ---
 
@@ -732,7 +740,7 @@ git push origin main
 1. Go to: https://github.com/stephen-cpe/study-and-learn/actions
 2. Click on the running workflow
 3. Watch each job complete (green checkmarks):
-   - **test** — runs pytest (445 tests, ~4-6 min)
+   - **test** — runs `ruff` and `pytest`
    - **deploy** — SSH to droplet, pull code, recreate venv, restart service (~1-2 min)
    - **smoke-test** — curl /health, verify HTTP 200 (~30 sec)
 
@@ -773,7 +781,7 @@ sudo systemctl status study-and-learn
 curl http://127.0.0.1:5000/health
 ```
 
-**Your app is deployed with CI/CD.** Every `git push origin main` automatically tests, deploys, and verifies.
+Every push to `main` runs lint and tests; deploy manually as shown above.
 
 ---
 
@@ -877,13 +885,13 @@ pytest -v tests/
 2. Directory exists: `ls -la /home/study-and-learn`
 3. Service restarts: `sudo systemctl status study-and-learn`
 4. Git pull works: `cd /home/study-and-learn && git pull origin main`
-5. Gunicorn restarted after pull: The CI/CD workflow must restart the service after `git pull`
+5. Gunicorn restarted after pull: restart the service manually after `git pull`
 
 ### Lesson Generation Hangs
 
 **Symptom:** Progress page stays at "Building lesson..." for a long time
 
-**This is expected with cloud AI.** Full generation with the default cloud chat model (`gemma4:31b-cloud`, override via `OLLAMA_MODEL`) and 3+ modules can take 45-90 minutes. The JS hard-timeout is 2 hours and will show a "still working" message without redirecting. Check:
+**This is expected with cloud AI.** Full generation with the configured `OLLAMA_MODEL` and 3+ modules can take 45-90 minutes. The JS hard-timeout is 2 hours and will show a "still working" message without redirecting. Check:
 
 1. Is Ollama Cloud reachable? `curl -H "Authorization: Bearer $OLLAMA_CLOUD_API_KEY" https://ollama.com/api/tags`
 2. Check app logs: `tail -50 /home/study-and-learn/logs/error.log`
@@ -925,7 +933,7 @@ pytest -v tests/
 
 **Symptom:** The "View Sources" button does not appear in the lesson deck in production, but it works locally on Windows 11.
 
-**Root Cause:** The ChromaDB vector store uses `langchain_ollama.OllamaEmbeddings` to embed query text during RAG retrieval. This class calls the **local Ollama** API (`http://localhost:11434/api/embed`), NOT the Ollama Cloud OpenAI-compatible endpoint. If Ollama is not installed on the droplet (or the `qwen3-embedding:0.6b` model is not pulled), the embedding call fails, ChromaDB returns empty context and empty sources, and lessons are generated without document-grounded context (pure LLM hallucination).
+**Root Cause:** The ChromaDB vector store uses `langchain_ollama.OllamaEmbeddings` to embed query text during RAG retrieval. This class calls the **local Ollama** API (`http://localhost:11434/api/embed`), NOT the Ollama Cloud OpenAI-compatible endpoint. If Ollama is not installed on the droplet (or the `qwen3-embedding:0.6b` model is not pulled), the embedding call fails, ChromaDB returns empty context and empty sources, so the **View Sources** button is missing. The full-coverage digest built at upload time still grounds generation in the extracted text, but lessons lose retrieval and source citations.
 
 **Diagnosis:**
 ```bash

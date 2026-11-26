@@ -1,1 +1,5 @@
-Single-database configuration for Flask.
+# Database migrations
+
+Fresh databases are initialized with `init_db.sql` in the repository root.
+
+The Alembic revisions in `versions/` are not yet a complete upgrade path: they do not include every table and column in `src/models.py`. Do not run `flask db upgrade` against a database you need to keep until the missing revisions are added.

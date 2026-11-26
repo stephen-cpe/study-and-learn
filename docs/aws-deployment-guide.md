@@ -2,8 +2,9 @@
 ## For Ubuntu 26.04 LTS (t3.xlarge) + DuckDNS + Let's Encrypt SSL
 ### Complete Guide for Windows 11 Users
 
-## Disclaimer
-_This guide documents a temporary AWS EC2 deployment for testing and verification. The instance is intended to be decommissioned after confirming the application deploys and runs correctly._
+## Status
+
+> **Not actively maintained.** Last updated 15 September 2026. The EC2 instance was temporary and is not part of the current deployment. Cloud-provider console steps, pricing, instance types and OS package versions may be out of date.
 
 ---
 
@@ -91,12 +92,12 @@ curl -fsSL https://ollama.com/install.sh | sh
 systemctl enable ollama
 systemctl start ollama
 
-# ── Create logs and data directories ─────────────────────────────────────────
+# ── Create logs, uploads and data directories ────────────────────────────────
 mkdir -p /home/ubuntu/study-and-learn/logs
 touch /home/ubuntu/study-and-learn/logs/access.log /home/ubuntu/study-and-learn/logs/error.log
-mkdir -p /home/ubuntu/study-and-learn/data/flask_session \
+mkdir -p /home/ubuntu/study-and-learn/uploads \
+         /home/ubuntu/study-and-learn/data/flask_session \
          /home/ubuntu/study-and-learn/data/progress_cache \
-         /home/ubuntu/study-and-learn/data/uploads \
          /home/ubuntu/study-and-learn/data/tts \
          /home/ubuntu/study-and-learn/data/chroma_db
 
@@ -294,7 +295,7 @@ Verify the tables were created:
 sudo -u postgres psql -d study_and_learn -c "\dt"
 ```
 
-You should see: `users`, `study_paths`, `content_registry`, `lesson_progress`, `alembic_version`
+You should see: `users`, `study_paths`, `content_registry`, `lesson_progress`, `mascot_memory`, `suggestion`, `background_task`, `alembic_version`
 
 This creates three seed accounts for testing:
 
@@ -603,7 +604,7 @@ Visit: `https://studyandlearn.duckdns.org`
 - Verify the results page shows a summary and study path
 - Click **Generate Interactive Lessons** and verify modules appear
 
-> **Note:** Lesson generation with cloud AI (default model `gemma4:31b-cloud`, override via `OLLAMA_MODEL`) and 3+ modules can take 45-90 minutes. The progress page will show the mascot animating during this time. This is expected behavior.
+> **Note:** Lesson generation with cloud AI (the configured `OLLAMA_MODEL`) and 3+ modules can take 45-90 minutes. The progress page will show the mascot animating during this time. This is expected behavior.
 
 ---
 
@@ -717,7 +718,7 @@ python3 -m venv venv
 
 **Symptom:** The "View Sources" button does not appear in the lesson deck.
 
-**Root Cause:** The ChromaDB vector store uses `langchain_ollama.OllamaEmbeddings` to embed query text during RAG retrieval. This class calls the **local Ollama** API (`http://localhost:11434/api/embed`), NOT the Ollama Cloud endpoint. If Ollama is not running (or the `qwen3-embedding:0.6b` model is not pulled), the embedding call fails, ChromaDB returns empty context and empty sources, and lessons are generated without document-grounded context.
+**Root Cause:** The ChromaDB vector store uses `langchain_ollama.OllamaEmbeddings` to embed query text during RAG retrieval. This class calls the **local Ollama** API (`http://localhost:11434/api/embed`), NOT the Ollama Cloud endpoint. If Ollama is not running (or the `qwen3-embedding:0.6b` model is not pulled), the embedding call fails, ChromaDB returns empty context and empty sources, so the **View Sources** button is missing. The full-coverage digest built at upload time still grounds generation in the extracted text, but lessons lose retrieval and source citations.
 
 **Diagnosis:**
 ```bash
@@ -760,7 +761,7 @@ For a stable IP, use an Elastic IP (free under AWS Free Tier):
 
 **Symptom:** Progress page stays at "Building lesson..." for a long time
 
-**This is expected with cloud AI.** Full generation with the default cloud chat model (`gemma4:31b-cloud`, override via `OLLAMA_MODEL`) and 3+ modules can take 45-90 minutes. The JS hard-timeout is 2 hours and will show a "still working" message without redirecting. Check:
+**This is expected with cloud AI.** Full generation with the configured `OLLAMA_MODEL` and 3+ modules can take 45-90 minutes. The JS hard-timeout is 2 hours and will show a "still working" message without redirecting. Check:
 
 1. Is Ollama Cloud reachable? `curl -H "Authorization: Bearer $OLLAMA_CLOUD_API_KEY" https://ollama.com/api/tags`
 2. Check app logs: `tail -50 /home/ubuntu/study-and-learn/logs/error.log`
@@ -828,7 +829,7 @@ Internet
                  |
                  +-- PostgreSQL (study_and_learn database)
                  +-- Local Ollama :11434 (qwen3-embedding:0.6b for RAG embeddings)
-                 +-- Ollama Cloud (chat LLM: gemma4:31b-cloud)
+                 +-- Ollama Cloud (chat LLM: OLLAMA_MODEL)
                  +-- Chroma Cloud (vector storage)
                  +-- Edge-TTS (neural text-to-speech, background worker thread)
 ```
