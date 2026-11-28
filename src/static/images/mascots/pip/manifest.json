@@ -1,0 +1,510 @@
+{
+ "animations": {
+  "acknowledge": {
+   "end_pose": "neutral",
+   "frames": [
+    380,
+    480,
+    190,
+    850
+   ],
+   "loop": false,
+   "sheet": "acknowledge.png",
+   "start_pose": "neutral",
+   "total_ms": 1900
+  },
+  "celebrate": {
+   "end_pose": "neutral",
+   "frames": [
+    250,
+    150,
+    110,
+    140,
+    110,
+    140,
+    160,
+    550
+   ],
+   "loop": false,
+   "sheet": "celebrate.png",
+   "start_pose": "neutral",
+   "total_ms": 1610
+  },
+  "confused": {
+   "end_pose": "neutral",
+   "frames": [
+    430,
+    320,
+    150,
+    260,
+    1030,
+    180,
+    640
+   ],
+   "loop": false,
+   "sheet": "confused.png",
+   "start_pose": "neutral",
+   "total_ms": 3010
+  },
+  "curious": {
+   "end_pose": "neutral",
+   "frames": [
+    450,
+    490,
+    1550,
+    270,
+    650
+   ],
+   "loop": false,
+   "sheet": "curious.png",
+   "start_pose": "neutral",
+   "total_ms": 3410
+  },
+  "error": {
+   "end_pose": "neutral",
+   "frames": [
+    350,
+    350,
+    70,
+    100,
+    60,
+    650,
+    600
+   ],
+   "loop": false,
+   "sheet": "error.png",
+   "start_pose": "neutral",
+   "total_ms": 2180
+  },
+  "goodbye": {
+   "end_pose": "neutral",
+   "frames": [
+    350,
+    100,
+    330,
+    90,
+    200,
+    260,
+    600,
+    300,
+    700
+   ],
+   "loop": false,
+   "sheet": "goodbye.png",
+   "start_pose": "neutral",
+   "total_ms": 2930
+  },
+  "hello": {
+   "end_pose": "neutral",
+   "frames": [
+    350,
+    320,
+    190,
+    150,
+    190,
+    220,
+    650
+   ],
+   "loop": false,
+   "sheet": "hello.png",
+   "start_pose": "neutral",
+   "total_ms": 2070
+  },
+  "idea": {
+   "end_pose": "neutral",
+   "frames": [
+    550,
+    520,
+    1610,
+    300,
+    700
+   ],
+   "loop": false,
+   "sheet": "idea.png",
+   "start_pose": "neutral",
+   "total_ms": 3680
+  },
+  "idle-blink": {
+   "end_pose": "neutral",
+   "frames": [
+    2500,
+    80,
+    110,
+    70,
+    400
+   ],
+   "loop": true,
+   "sheet": "idle-blink.png",
+   "start_pose": "neutral",
+   "total_ms": 3160
+  },
+  "idle-double-blink": {
+   "end_pose": "neutral",
+   "frames": [
+    1100,
+    70,
+    100,
+    60,
+    380,
+    60,
+    80,
+    40,
+    1150
+   ],
+   "loop": false,
+   "sheet": "idle-double-blink.png",
+   "start_pose": "neutral",
+   "total_ms": 3040
+  },
+  "idle-look-around": {
+   "end_pose": "neutral",
+   "frames": [
+    1200,
+    90,
+    850,
+    90,
+    850,
+    90,
+    1200
+   ],
+   "loop": true,
+   "sheet": "idle-look-around.png",
+   "start_pose": "neutral",
+   "total_ms": 4370
+  },
+  "idle-tail-sway": {
+   "end_pose": "neutral",
+   "frames": [
+    900,
+    500,
+    650,
+    500,
+    450,
+    500,
+    650,
+    500,
+    900
+   ],
+   "loop": true,
+   "sheet": "idle-tail-sway.png",
+   "start_pose": "neutral",
+   "total_ms": 5550
+  },
+  "listening": {
+   "end_pose": "neutral",
+   "frames": [
+    1300,
+    340,
+    2200,
+    300,
+    2400
+   ],
+   "loop": true,
+   "sheet": "listening.png",
+   "start_pose": "neutral",
+   "total_ms": 6540
+  },
+  "look-down": {
+   "end_pose": "neutral",
+   "frames": [
+    420,
+    460,
+    1400,
+    230,
+    600
+   ],
+   "loop": false,
+   "sheet": "look-down.png",
+   "start_pose": "neutral",
+   "total_ms": 3110
+  },
+  "look-left": {
+   "end_pose": "neutral",
+   "frames": [
+    400,
+    110,
+    330,
+    1480,
+    190,
+    110,
+    550
+   ],
+   "loop": false,
+   "sheet": "look-left.png",
+   "start_pose": "neutral",
+   "total_ms": 3170
+  },
+  "look-right": {
+   "end_pose": "neutral",
+   "frames": [
+    400,
+    110,
+    330,
+    1480,
+    190,
+    110,
+    550
+   ],
+   "loop": false,
+   "sheet": "look-right.png",
+   "start_pose": "neutral",
+   "total_ms": 3170
+  },
+  "look-up": {
+   "end_pose": "neutral",
+   "frames": [
+    420,
+    460,
+    1400,
+    230,
+    600
+   ],
+   "loop": false,
+   "sheet": "look-up.png",
+   "start_pose": "neutral",
+   "total_ms": 3110
+  },
+  "notice": {
+   "end_pose": "neutral",
+   "frames": [
+    550,
+    470,
+    680,
+    220,
+    700
+   ],
+   "loop": false,
+   "sheet": "notice.png",
+   "start_pose": "neutral",
+   "total_ms": 2620
+  },
+  "power-down": {
+   "end_pose": "resting",
+   "frames": [
+    450,
+    350,
+    350,
+    320,
+    1300
+   ],
+   "loop": false,
+   "sheet": "power-down.png",
+   "start_pose": "neutral",
+   "total_ms": 2770
+  },
+  "processing": {
+   "end_pose": "focused gaze",
+   "frames": [
+    1300,
+    130,
+    160,
+    130,
+    3250
+   ],
+   "loop": true,
+   "sheet": "processing.png",
+   "start_pose": "focused gaze",
+   "total_ms": 4970
+  },
+  "reading": {
+   "end_pose": "neutral",
+   "frames": [
+    550,
+    130,
+    120,
+    120,
+    280,
+    70,
+    120,
+    120,
+    300,
+    750
+   ],
+   "loop": true,
+   "sheet": "reading.png",
+   "start_pose": "neutral",
+   "total_ms": 2560
+  },
+  "relieved": {
+   "end_pose": "neutral",
+   "frames": [
+    300,
+    320,
+    800,
+    380,
+    700
+   ],
+   "loop": false,
+   "sheet": "relieved.png",
+   "start_pose": "neutral",
+   "total_ms": 2500
+  },
+  "searching": {
+   "end_pose": "neutral",
+   "frames": [
+    420,
+    70,
+    780,
+    710,
+    70,
+    480,
+    680,
+    520
+   ],
+   "loop": true,
+   "sheet": "searching.png",
+   "start_pose": "neutral",
+   "total_ms": 3730
+  },
+  "sleepy": {
+   "end_pose": "neutral",
+   "frames": [
+    1500,
+    380,
+    380,
+    850,
+    260,
+    850
+   ],
+   "loop": true,
+   "sheet": "sleepy.png",
+   "start_pose": "neutral",
+   "total_ms": 4220
+  },
+  "speaking": {
+   "end_pose": "neutral",
+   "frames": [
+    280,
+    150,
+    110,
+    230,
+    170,
+    190,
+    120,
+    200,
+    850
+   ],
+   "loop": true,
+   "sheet": "speaking.png",
+   "start_pose": "neutral",
+   "total_ms": 2300
+  },
+  "success": {
+   "end_pose": "neutral",
+   "frames": [
+    320,
+    450,
+    190,
+    260,
+    220,
+    220,
+    180,
+    520
+   ],
+   "loop": false,
+   "sheet": "success.png",
+   "start_pose": "neutral",
+   "total_ms": 2360
+  },
+  "thinking": {
+   "end_pose": "neutral",
+   "frames": [
+    700,
+    90,
+    1500,
+    450,
+    350,
+    90,
+    700
+   ],
+   "loop": true,
+   "sheet": "thinking.png",
+   "start_pose": "neutral",
+   "total_ms": 3880
+  },
+  "typing": {
+   "end_pose": "neutral",
+   "frames": [
+    350,
+    220,
+    110,
+    80,
+    100,
+    130,
+    90,
+    100,
+    70,
+    120,
+    420,
+    550
+   ],
+   "loop": true,
+   "sheet": "typing.png",
+   "start_pose": "neutral",
+   "total_ms": 2340
+  },
+  "unsure": {
+   "end_pose": "neutral",
+   "frames": [
+    400,
+    100,
+    420,
+    350,
+    250,
+    230,
+    550
+   ],
+   "loop": false,
+   "sheet": "unsure.png",
+   "start_pose": "neutral",
+   "total_ms": 2300
+  },
+  "waiting": {
+   "end_pose": "neutral",
+   "frames": [
+    2600,
+    90,
+    700,
+    90,
+    2500
+   ],
+   "loop": true,
+   "sheet": "waiting.png",
+   "start_pose": "neutral",
+   "total_ms": 5980
+  },
+  "wake-up": {
+   "end_pose": "neutral",
+   "frames": [
+    500,
+    260,
+    260,
+    300,
+    280,
+    700
+   ],
+   "loop": false,
+   "sheet": "wake-up.png",
+   "start_pose": "resting",
+   "total_ms": 2300
+  },
+  "warning": {
+   "end_pose": "neutral",
+   "frames": [
+    300,
+    160,
+    1330,
+    950
+   ],
+   "loop": false,
+   "sheet": "warning.png",
+   "start_pose": "neutral",
+   "total_ms": 2740
+  }
+ },
+ "body_height": 90,
+ "frame_height": 100,
+ "frame_width": 68,
+ "id": "pip",
+ "name": "Pip"
+}

@@ -1,0 +1,845 @@
+{
+  "sprite": "trace.png",
+  "working_grid": "128x128 cells at ~9.8x9.73 px/cell (measured)",
+  "canvas": [
+    140,
+    140
+  ],
+  "anchor": [
+    66,
+    132
+  ],
+  "count": 32,
+  "animations": [
+    {
+      "name": "idle-blink",
+      "category": "Idle and attention",
+      "description": "Hold the curious expression, blink once quickly, reopen.",
+      "gif": "gifs/idle-blink.gif",
+      "frames_dir": "frames/idle-blink",
+      "behavior": "loop",
+      "loops": true,
+      "frame_count": 5,
+      "frame_durations_ms": [
+        2200,
+        60,
+        70,
+        50,
+        1400
+      ],
+      "total_duration_ms": 3780,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "idle-double-blink",
+      "category": "Idle and attention",
+      "description": "Two short blinks with an open beat; the second is quicker.",
+      "gif": "gifs/idle-double-blink.gif",
+      "frames_dir": "frames/idle-double-blink",
+      "behavior": "one-shot",
+      "loops": false,
+      "frame_count": 9,
+      "frame_durations_ms": [
+        600,
+        50,
+        60,
+        50,
+        260,
+        40,
+        50,
+        40,
+        700
+      ],
+      "total_duration_ms": 1850,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "idle-look-around",
+      "category": "Idle and attention",
+      "description": "Eyes drift left, pause, glance right, return home. Wire stays still.",
+      "gif": "gifs/idle-look-around.gif",
+      "frames_dir": "frames/idle-look-around",
+      "behavior": "loop",
+      "loops": true,
+      "frame_count": 7,
+      "frame_durations_ms": [
+        1400,
+        120,
+        1220,
+        110,
+        760,
+        130,
+        1130
+      ],
+      "total_duration_ms": 4870,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "idle-sway",
+      "category": "Idle and attention",
+      "description": "Upper wire leans a few cells each way; bottom stays planted.",
+      "gif": "gifs/idle-sway.gif",
+      "frames_dir": "frames/idle-sway",
+      "behavior": "loop",
+      "loops": true,
+      "frame_count": 9,
+      "frame_durations_ms": [
+        700,
+        170,
+        620,
+        170,
+        470,
+        170,
+        620,
+        170,
+        170
+      ],
+      "total_duration_ms": 3260,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "notice",
+      "category": "Idle and attention",
+      "description": "Pupils turn to the viewer first; brows lift a beat later.",
+      "gif": "gifs/notice.gif",
+      "frames_dir": "frames/notice",
+      "behavior": "one-shot",
+      "loops": false,
+      "frame_count": 5,
+      "frame_durations_ms": [
+        500,
+        600,
+        1260,
+        120,
+        520
+      ],
+      "total_duration_ms": 3000,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "listening",
+      "category": "Idle and attention",
+      "description": "Lean to one side, attentive gaze, small occasional nods.",
+      "gif": "gifs/listening.gif",
+      "frames_dir": "frames/listening",
+      "behavior": "loop",
+      "loops": true,
+      "frame_count": 5,
+      "frame_durations_ms": [
+        1100,
+        170,
+        1410,
+        170,
+        1210
+      ],
+      "total_duration_ms": 4060,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "curious",
+      "category": "Idle and attention",
+      "description": "One brow rises while the pupils track just above the viewer.",
+      "gif": "gifs/curious.gif",
+      "frames_dir": "frames/curious",
+      "behavior": "one-shot",
+      "loops": false,
+      "frame_count": 6,
+      "frame_durations_ms": [
+        400,
+        340,
+        160,
+        1560,
+        120,
+        520
+      ],
+      "total_duration_ms": 3100,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "sleepy",
+      "category": "Idle and attention",
+      "description": "Lids droop, the upper loop dips, then the eyes ease open.",
+      "gif": "gifs/sleepy.gif",
+      "frames_dir": "frames/sleepy",
+      "behavior": "loop",
+      "loops": true,
+      "frame_count": 11,
+      "frame_durations_ms": [
+        1000,
+        250,
+        650,
+        200,
+        500,
+        150,
+        750,
+        220,
+        520,
+        200,
+        200
+      ],
+      "total_duration_ms": 4640,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "thinking",
+      "category": "Assistant activity",
+      "description": "Look up to one side; the status light slowly pulses (teal tones).",
+      "gif": "gifs/thinking.gif",
+      "frames_dir": "frames/thinking",
+      "behavior": "loop",
+      "loops": true,
+      "frame_count": 4,
+      "frame_durations_ms": [
+        650,
+        650,
+        650,
+        650
+      ],
+      "total_duration_ms": 2600,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "searching",
+      "category": "Assistant activity",
+      "description": "Pupils scan in three deliberate stops, pause, return to the first.",
+      "gif": "gifs/searching.gif",
+      "frames_dir": "frames/searching",
+      "behavior": "loop",
+      "loops": true,
+      "frame_count": 5,
+      "frame_durations_ms": [
+        450,
+        580,
+        1180,
+        80,
+        80
+      ],
+      "total_duration_ms": 2370,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "reading",
+      "category": "Assistant activity",
+      "description": "Eyes scan a short line, snap back, repeat one cell lower, reset.",
+      "gif": "gifs/reading.gif",
+      "frames_dir": "frames/reading",
+      "behavior": "loop",
+      "loops": true,
+      "frame_count": 13,
+      "frame_durations_ms": [
+        200,
+        90,
+        90,
+        90,
+        250,
+        130,
+        70,
+        90,
+        90,
+        90,
+        250,
+        50,
+        50
+      ],
+      "total_duration_ms": 1540,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "typing",
+      "category": "Assistant activity",
+      "description": "Look slightly down; short irregular upper-body dips for keystrokes.",
+      "gif": "gifs/typing.gif",
+      "frames_dir": "frames/typing",
+      "behavior": "loop",
+      "loops": true,
+      "frame_count": 11,
+      "frame_durations_ms": [
+        140,
+        120,
+        90,
+        140,
+        80,
+        160,
+        100,
+        130,
+        90,
+        110,
+        150
+      ],
+      "total_duration_ms": 1310,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "writing",
+      "category": "Assistant activity",
+      "description": "One long smooth eye sweep, pause at the end, return for the next line.",
+      "gif": "gifs/writing.gif",
+      "frames_dir": "frames/writing",
+      "behavior": "loop",
+      "loops": true,
+      "frame_count": 19,
+      "frame_durations_ms": [
+        250,
+        130,
+        130,
+        130,
+        130,
+        130,
+        680,
+        110,
+        110,
+        110,
+        130,
+        130,
+        130,
+        130,
+        130,
+        680,
+        110,
+        110,
+        110
+      ],
+      "total_duration_ms": 3570,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "processing",
+      "category": "Assistant activity",
+      "description": "Focused gaze; the status light cycles dim-medium-bright, quietly.",
+      "gif": "gifs/processing.gif",
+      "frames_dir": "frames/processing",
+      "behavior": "loop",
+      "loops": true,
+      "frame_count": 4,
+      "frame_durations_ms": [
+        800,
+        800,
+        800,
+        800
+      ],
+      "total_duration_ms": 3200,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "waiting",
+      "category": "Assistant activity",
+      "description": "Patient holds with one glance toward the collared tip.",
+      "gif": "gifs/waiting.gif",
+      "frames_dir": "frames/waiting",
+      "behavior": "loop",
+      "loops": true,
+      "frame_count": 5,
+      "frame_durations_ms": [
+        2200,
+        110,
+        1410,
+        130,
+        2530
+      ],
+      "total_duration_ms": 6380,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "idea",
+      "category": "Assistant activity",
+      "description": "Glance up, pause, both brows lift as the light brightens once.",
+      "gif": "gifs/idea.gif",
+      "frames_dir": "frames/idea",
+      "behavior": "one-shot",
+      "loops": false,
+      "frame_count": 5,
+      "frame_durations_ms": [
+        350,
+        650,
+        1550,
+        140,
+        540
+      ],
+      "total_duration_ms": 3230,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "success",
+      "category": "Feedback and reactions",
+      "description": "One confident nod and one clear teal acknowledgment pulse.",
+      "gif": "gifs/success.gif",
+      "frames_dir": "frames/success",
+      "behavior": "one-shot",
+      "loops": false,
+      "frame_count": 6,
+      "frame_durations_ms": [
+        300,
+        110,
+        200,
+        120,
+        790,
+        350
+      ],
+      "total_duration_ms": 1870,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "celebrate",
+      "category": "Feedback and reactions",
+      "description": "Anticipation, buoyant hop, landing, quick settle (biggest move).",
+      "gif": "gifs/celebrate.gif",
+      "frames_dir": "frames/celebrate",
+      "behavior": "one-shot",
+      "loops": false,
+      "frame_count": 8,
+      "frame_durations_ms": [
+        250,
+        200,
+        90,
+        190,
+        90,
+        200,
+        110,
+        480
+      ],
+      "total_duration_ms": 1610,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "acknowledge",
+      "category": "Feedback and reactions",
+      "description": "A restrained single nod; steady eyes, steady light.",
+      "gif": "gifs/acknowledge.gif",
+      "frames_dir": "frames/acknowledge",
+      "behavior": "one-shot",
+      "loops": false,
+      "frame_count": 5,
+      "frame_durations_ms": [
+        350,
+        110,
+        210,
+        110,
+        570
+      ],
+      "total_duration_ms": 1350,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "unsure",
+      "category": "Feedback and reactions",
+      "description": "Pupils hesitate between two spots; one brow lifts, one stays low.",
+      "gif": "gifs/unsure.gif",
+      "frames_dir": "frames/unsure",
+      "behavior": "one-shot",
+      "loops": false,
+      "frame_count": 7,
+      "frame_durations_ms": [
+        350,
+        410,
+        350,
+        370,
+        940,
+        120,
+        520
+      ],
+      "total_duration_ms": 3060,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "confused",
+      "category": "Feedback and reactions",
+      "description": "Look one way, tilt the upper loop the other way, puzzled hold.",
+      "gif": "gifs/confused.gif",
+      "frames_dir": "frames/confused",
+      "behavior": "one-shot",
+      "loops": false,
+      "frame_count": 5,
+      "frame_durations_ms": [
+        350,
+        400,
+        1120,
+        140,
+        540
+      ],
+      "total_duration_ms": 2550,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "warning",
+      "category": "Feedback and reactions",
+      "description": "Straighten and hold an alert posture (reads in grayscale).",
+      "gif": "gifs/warning.gif",
+      "frames_dir": "frames/warning",
+      "behavior": "one-shot",
+      "loops": false,
+      "frame_count": 4,
+      "frame_durations_ms": [
+        350,
+        1620,
+        110,
+        510
+      ],
+      "total_duration_ms": 2590,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "error",
+      "category": "Feedback and reactions",
+      "description": "Recoil, one blink, recover to a composed pose; light dims briefly.",
+      "gif": "gifs/error.gif",
+      "frames_dir": "frames/error",
+      "behavior": "one-shot",
+      "loops": false,
+      "frame_count": 8,
+      "frame_durations_ms": [
+        350,
+        160,
+        60,
+        70,
+        60,
+        120,
+        90,
+        940
+      ],
+      "total_duration_ms": 1850,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "relieved",
+      "category": "Feedback and reactions",
+      "description": "Lower the brows, soften the lids, ease the loop back to rest.",
+      "gif": "gifs/relieved.gif",
+      "frames_dir": "frames/relieved",
+      "behavior": "one-shot",
+      "loops": false,
+      "frame_count": 7,
+      "frame_durations_ms": [
+        350,
+        120,
+        670,
+        150,
+        500,
+        120,
+        470
+      ],
+      "total_duration_ms": 2380,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "look-left",
+      "category": "Direction, greetings, and transitions",
+      "description": "Both pupils move left and hold to direct attention.",
+      "gif": "gifs/look-left.gif",
+      "frames_dir": "frames/look-left",
+      "behavior": "one-shot",
+      "loops": false,
+      "frame_count": 5,
+      "frame_durations_ms": [
+        350,
+        90,
+        1240,
+        120,
+        470
+      ],
+      "total_duration_ms": 2270,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "look-right",
+      "category": "Direction, greetings, and transitions",
+      "description": "Same timing as look-left, with the pupils moving right.",
+      "gif": "gifs/look-right.gif",
+      "frames_dir": "frames/look-right",
+      "behavior": "one-shot",
+      "loops": false,
+      "frame_count": 5,
+      "frame_durations_ms": [
+        350,
+        90,
+        1240,
+        120,
+        470
+      ],
+      "total_duration_ms": 2270,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "look-up",
+      "category": "Direction, greetings, and transitions",
+      "description": "Pupils lead upward, then the brows lift slightly.",
+      "gif": "gifs/look-up.gif",
+      "frames_dir": "frames/look-up",
+      "behavior": "one-shot",
+      "loops": false,
+      "frame_count": 5,
+      "frame_durations_ms": [
+        350,
+        280,
+        1210,
+        120,
+        470
+      ],
+      "total_duration_ms": 2430,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "look-down",
+      "category": "Direction, greetings, and transitions",
+      "description": "Lower the pupils and tip the upper loop forward a little.",
+      "gif": "gifs/look-down.gif",
+      "frames_dir": "frames/look-down",
+      "behavior": "one-shot",
+      "loops": false,
+      "frame_count": 5,
+      "frame_durations_ms": [
+        350,
+        280,
+        1220,
+        120,
+        470
+      ],
+      "total_duration_ms": 2440,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "hello",
+      "category": "Direction, greetings, and transitions",
+      "description": "A small welcoming bounce, then an asymmetric brow lift.",
+      "gif": "gifs/hello.gif",
+      "frames_dir": "frames/hello",
+      "behavior": "one-shot",
+      "loops": false,
+      "frame_count": 7,
+      "frame_durations_ms": [
+        300,
+        170,
+        170,
+        230,
+        1310,
+        120,
+        470
+      ],
+      "total_duration_ms": 2770,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "goodbye",
+      "category": "Direction, greetings, and transitions",
+      "description": "A warm longer blink and a gentle bow, ending on the original pose.",
+      "gif": "gifs/goodbye.gif",
+      "frames_dir": "frames/goodbye",
+      "behavior": "one-shot",
+      "loops": false,
+      "frame_count": 9,
+      "frame_durations_ms": [
+        350,
+        100,
+        100,
+        90,
+        150,
+        90,
+        250,
+        150,
+        550
+      ],
+      "total_duration_ms": 1830,
+      "start_pose": "neutral",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "wake-up",
+      "category": "Direction, greetings, and transitions",
+      "description": "From the drooped pose, one eye opens first, then straighten.",
+      "gif": "gifs/wake-up.gif",
+      "frames_dir": "frames/wake-up",
+      "behavior": "one-shot",
+      "loops": false,
+      "frame_count": 6,
+      "frame_durations_ms": [
+        700,
+        400,
+        400,
+        340,
+        370,
+        550
+      ],
+      "total_duration_ms": 2760,
+      "start_pose": "drooped-sleepy",
+      "end_pose": "neutral",
+      "canvas": [
+        140,
+        140
+      ]
+    },
+    {
+      "name": "power-down",
+      "category": "Direction, greetings, and transitions",
+      "description": "Dim the light, lower the brows, settle eyes-closed and hold.",
+      "gif": "gifs/power-down.gif",
+      "frames_dir": "frames/power-down",
+      "behavior": "one-shot",
+      "loops": false,
+      "frame_count": 7,
+      "frame_durations_ms": [
+        450,
+        650,
+        650,
+        170,
+        420,
+        170,
+        1470
+      ],
+      "total_duration_ms": 3980,
+      "start_pose": "neutral",
+      "end_pose": "eyes-closed-rest",
+      "canvas": [
+        140,
+        140
+      ]
+    }
+  ]
+}

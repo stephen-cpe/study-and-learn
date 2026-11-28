@@ -1,0 +1,888 @@
+{
+ "pack": "raster-animations",
+ "character": "Raster (Azthreus Systems)",
+ "canvas": {
+  "width": 96,
+  "height": 96,
+  "ground_y": 91,
+  "char_height_px": 90,
+  "note": "96x96 working grid (see README: 72x72 lost the wrist and closed the gripper notch on this artwork)"
+ },
+ "arms": {
+  "armL": "viewer's left arm = Raster's anatomical right (static in hello)",
+  "armR": "viewer's right arm = Raster's anatomical left (the waving arm)"
+ },
+ "palette_file": "source/palette.json",
+ "animations": [
+  {
+   "name": "idle-blink",
+   "filename": "gifs/idle-blink.gif",
+   "mode": "loop",
+   "frames": [
+    "frames/idle-blink/000.png",
+    "frames/idle-blink/001.png",
+    "frames/idle-blink/002.png",
+    "frames/idle-blink/003.png"
+   ],
+   "frame_count": 4,
+   "durations_ms": [
+    1700,
+    80,
+    100,
+    80
+   ],
+   "total_ms": 1960,
+   "start_pose": "neutral",
+   "end_pose": "blink0.45"
+  },
+  {
+   "name": "idle-look-around",
+   "filename": "gifs/idle-look-around.gif",
+   "mode": "loop",
+   "frames": [
+    "frames/idle-look-around/000.png",
+    "frames/idle-look-around/001.png",
+    "frames/idle-look-around/002.png",
+    "frames/idle-look-around/003.png",
+    "frames/idle-look-around/004.png",
+    "frames/idle-look-around/005.png",
+    "frames/idle-look-around/006.png",
+    "frames/idle-look-around/007.png"
+   ],
+   "frame_count": 8,
+   "durations_ms": [
+    1500,
+    900,
+    140,
+    700,
+    140,
+    900,
+    140,
+    600
+   ],
+   "total_ms": 5020,
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "idle-antenna-settle",
+   "filename": "gifs/idle-antenna-settle.gif",
+   "mode": "loop",
+   "frames": [
+    "frames/idle-antenna-settle/000.png",
+    "frames/idle-antenna-settle/001.png",
+    "frames/idle-antenna-settle/002.png",
+    "frames/idle-antenna-settle/003.png"
+   ],
+   "frame_count": 4,
+   "durations_ms": [
+    2300,
+    130,
+    170,
+    130
+   ],
+   "total_ms": 2730,
+   "start_pose": "neutral",
+   "end_pose": "ant:normal_mid"
+  },
+  {
+   "name": "listening",
+   "filename": "gifs/listening.gif",
+   "mode": "loop",
+   "frames": [
+    "frames/listening/000.png",
+    "frames/listening/001.png",
+    "frames/listening/002.png",
+    "frames/listening/003.png"
+   ],
+   "frame_count": 4,
+   "durations_ms": [
+    700,
+    150,
+    2400,
+    150
+   ],
+   "total_ms": 3400,
+   "start_pose": "neutral",
+   "end_pose": "head+1+0 gaze+1+0"
+  },
+  {
+   "name": "sleepy",
+   "filename": "gifs/sleepy.gif",
+   "mode": "loop",
+   "frames": [
+    "frames/sleepy/000.png",
+    "frames/sleepy/001.png",
+    "frames/sleepy/002.png",
+    "frames/sleepy/003.png",
+    "frames/sleepy/004.png"
+   ],
+   "frame_count": 5,
+   "durations_ms": [
+    600,
+    1300,
+    350,
+    600,
+    350
+   ],
+   "total_ms": 3200,
+   "start_pose": "head+0+1 blink0.45 eye:normal_dim ant:normal_dim",
+   "end_pose": "head+0+1 blink0.45 eye:normal_dim ant:normal_dim"
+  },
+  {
+   "name": "thinking",
+   "filename": "gifs/thinking.gif",
+   "mode": "loop",
+   "frames": [
+    "frames/thinking/000.png",
+    "frames/thinking/001.png",
+    "frames/thinking/002.png",
+    "frames/thinking/003.png",
+    "frames/thinking/004.png",
+    "frames/thinking/005.png",
+    "frames/thinking/006.png",
+    "frames/thinking/007.png"
+   ],
+   "frame_count": 8,
+   "durations_ms": [
+    900,
+    160,
+    1000,
+    250,
+    350,
+    600,
+    160,
+    600
+   ],
+   "total_ms": 4020,
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "searching",
+   "filename": "gifs/searching.gif",
+   "mode": "loop",
+   "frames": [
+    "frames/searching/000.png",
+    "frames/searching/001.png",
+    "frames/searching/002.png",
+    "frames/searching/003.png",
+    "frames/searching/004.png",
+    "frames/searching/005.png",
+    "frames/searching/006.png"
+   ],
+   "frame_count": 7,
+   "durations_ms": [
+    500,
+    350,
+    600,
+    300,
+    450,
+    350,
+    400
+   ],
+   "total_ms": 2950,
+   "start_pose": "head-1+0 gaze-2-1",
+   "end_pose": "head-1+0 gaze-2-1"
+  },
+  {
+   "name": "reading",
+   "filename": "gifs/reading.gif",
+   "mode": "loop",
+   "frames": [
+    "frames/reading/000.png",
+    "frames/reading/001.png",
+    "frames/reading/002.png",
+    "frames/reading/003.png",
+    "frames/reading/004.png",
+    "frames/reading/005.png",
+    "frames/reading/006.png"
+   ],
+   "frame_count": 7,
+   "durations_ms": [
+    400,
+    300,
+    300,
+    300,
+    400,
+    120,
+    200
+   ],
+   "total_ms": 2020,
+   "start_pose": "gaze-2+0",
+   "end_pose": "gaze-2+0 blink0.45"
+  },
+  {
+   "name": "typing",
+   "filename": "gifs/typing.gif",
+   "mode": "loop",
+   "frames": [
+    "frames/typing/000.png",
+    "frames/typing/001.png",
+    "frames/typing/002.png",
+    "frames/typing/003.png"
+   ],
+   "frame_count": 4,
+   "durations_ms": [
+    140,
+    140,
+    140,
+    140
+   ],
+   "total_ms": 560,
+   "start_pose": "armL=r2 armR=r2 gaze+0+1",
+   "end_pose": "armL=r2 armR=r2 gaze+0+1"
+  },
+  {
+   "name": "speaking",
+   "filename": "gifs/speaking.gif",
+   "mode": "loop",
+   "frames": [
+    "frames/speaking/000.png",
+    "frames/speaking/001.png",
+    "frames/speaking/002.png",
+    "frames/speaking/003.png",
+    "frames/speaking/004.png",
+    "frames/speaking/005.png",
+    "frames/speaking/006.png",
+    "frames/speaking/007.png"
+   ],
+   "frame_count": 8,
+   "durations_ms": [
+    250,
+    250,
+    250,
+    250,
+    250,
+    250,
+    250,
+    250
+   ],
+   "total_ms": 2000,
+   "start_pose": "armL=r2 armR=r1",
+   "end_pose": "armL=r1 armR=r2"
+  },
+  {
+   "name": "processing",
+   "filename": "gifs/processing.gif",
+   "mode": "loop",
+   "frames": [
+    "frames/processing/000.png",
+    "frames/processing/001.png",
+    "frames/processing/002.png",
+    "frames/processing/003.png"
+   ],
+   "frame_count": 4,
+   "durations_ms": [
+    170,
+    170,
+    170,
+    170
+   ],
+   "total_ms": 680,
+   "start_pose": "lamps:bright/dim/dim",
+   "end_pose": "lamps:dim/dim/dim"
+  },
+  {
+   "name": "waiting",
+   "filename": "gifs/waiting.gif",
+   "mode": "loop",
+   "frames": [
+    "frames/waiting/000.png",
+    "frames/waiting/001.png",
+    "frames/waiting/002.png",
+    "frames/waiting/003.png",
+    "frames/waiting/004.png"
+   ],
+   "frame_count": 5,
+   "durations_ms": [
+    2800,
+    120,
+    150,
+    120,
+    600
+   ],
+   "total_ms": 3790,
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "idle-double-blink",
+   "filename": "gifs/idle-double-blink.gif",
+   "mode": "once",
+   "frames": [
+    "frames/idle-double-blink/000.png",
+    "frames/idle-double-blink/001.png",
+    "frames/idle-double-blink/002.png",
+    "frames/idle-double-blink/003.png",
+    "frames/idle-double-blink/004.png",
+    "frames/idle-double-blink/005.png",
+    "frames/idle-double-blink/006.png",
+    "frames/idle-double-blink/007.png",
+    "frames/idle-double-blink/008.png"
+   ],
+   "frame_count": 9,
+   "durations_ms": [
+    700,
+    70,
+    80,
+    70,
+    180,
+    70,
+    80,
+    70,
+    1000
+   ],
+   "total_ms": 2320,
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "notice",
+   "filename": "gifs/notice.gif",
+   "mode": "once",
+   "frames": [
+    "frames/notice/000.png",
+    "frames/notice/001.png",
+    "frames/notice/002.png",
+    "frames/notice/003.png"
+   ],
+   "frame_count": 4,
+   "durations_ms": [
+    450,
+    260,
+    450,
+    500
+   ],
+   "total_ms": 1660,
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "curious",
+   "filename": "gifs/curious.gif",
+   "mode": "once",
+   "frames": [
+    "frames/curious/000.png",
+    "frames/curious/001.png",
+    "frames/curious/002.png",
+    "frames/curious/003.png",
+    "frames/curious/004.png",
+    "frames/curious/005.png",
+    "frames/curious/006.png"
+   ],
+   "frame_count": 7,
+   "durations_ms": [
+    350,
+    160,
+    750,
+    200,
+    250,
+    450,
+    400
+   ],
+   "total_ms": 2560,
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "idea",
+   "filename": "gifs/idea.gif",
+   "mode": "once",
+   "frames": [
+    "frames/idea/000.png",
+    "frames/idea/001.png",
+    "frames/idea/002.png",
+    "frames/idea/003.png",
+    "frames/idea/004.png",
+    "frames/idea/005.png",
+    "frames/idea/006.png",
+    "frames/idea/007.png",
+    "frames/idea/008.png",
+    "frames/idea/009.png",
+    "frames/idea/010.png",
+    "frames/idea/011.png"
+   ],
+   "frame_count": 12,
+   "durations_ms": [
+    250,
+    90,
+    90,
+    80,
+    230,
+    80,
+    90,
+    270,
+    80,
+    110,
+    120,
+    350
+   ],
+   "total_ms": 1840,
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "success",
+   "filename": "gifs/success.gif",
+   "mode": "once",
+   "frames": [
+    "frames/success/000.png",
+    "frames/success/001.png",
+    "frames/success/002.png",
+    "frames/success/003.png",
+    "frames/success/004.png",
+    "frames/success/005.png"
+   ],
+   "frame_count": 6,
+   "durations_ms": [
+    300,
+    140,
+    160,
+    160,
+    400,
+    500
+   ],
+   "total_ms": 1660,
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "celebrate",
+   "filename": "gifs/celebrate.gif",
+   "mode": "once",
+   "frames": [
+    "frames/celebrate/000.png",
+    "frames/celebrate/001.png",
+    "frames/celebrate/002.png",
+    "frames/celebrate/003.png",
+    "frames/celebrate/004.png"
+   ],
+   "frame_count": 5,
+   "durations_ms": [
+    400,
+    160,
+    880,
+    220,
+    500
+   ],
+   "total_ms": 2160,
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "acknowledge",
+   "filename": "gifs/acknowledge.gif",
+   "mode": "once",
+   "frames": [
+    "frames/acknowledge/000.png",
+    "frames/acknowledge/001.png",
+    "frames/acknowledge/002.png",
+    "frames/acknowledge/003.png",
+    "frames/acknowledge/004.png"
+   ],
+   "frame_count": 5,
+   "durations_ms": [
+    350,
+    130,
+    140,
+    130,
+    450
+   ],
+   "total_ms": 1200,
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "unsure",
+   "filename": "gifs/unsure.gif",
+   "mode": "once",
+   "frames": [
+    "frames/unsure/000.png",
+    "frames/unsure/001.png",
+    "frames/unsure/002.png",
+    "frames/unsure/003.png",
+    "frames/unsure/004.png",
+    "frames/unsure/005.png",
+    "frames/unsure/006.png",
+    "frames/unsure/007.png"
+   ],
+   "frame_count": 8,
+   "durations_ms": [
+    300,
+    120,
+    120,
+    120,
+    120,
+    250,
+    350,
+    400
+   ],
+   "total_ms": 1780,
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "confused",
+   "filename": "gifs/confused.gif",
+   "mode": "once",
+   "frames": [
+    "frames/confused/000.png",
+    "frames/confused/001.png",
+    "frames/confused/002.png",
+    "frames/confused/003.png",
+    "frames/confused/004.png",
+    "frames/confused/005.png",
+    "frames/confused/006.png"
+   ],
+   "frame_count": 7,
+   "durations_ms": [
+    350,
+    150,
+    400,
+    120,
+    120,
+    350,
+    400
+   ],
+   "total_ms": 1890,
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "warning",
+   "filename": "gifs/warning.gif",
+   "mode": "once",
+   "frames": [
+    "frames/warning/000.png",
+    "frames/warning/001.png",
+    "frames/warning/002.png",
+    "frames/warning/003.png",
+    "frames/warning/004.png",
+    "frames/warning/005.png",
+    "frames/warning/006.png"
+   ],
+   "frame_count": 7,
+   "durations_ms": [
+    300,
+    400,
+    450,
+    400,
+    450,
+    400,
+    500
+   ],
+   "total_ms": 2900,
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "error",
+   "filename": "gifs/error.gif",
+   "mode": "once",
+   "frames": [
+    "frames/error/000.png",
+    "frames/error/001.png",
+    "frames/error/002.png",
+    "frames/error/003.png",
+    "frames/error/004.png",
+    "frames/error/005.png",
+    "frames/error/006.png",
+    "frames/error/007.png",
+    "frames/error/008.png",
+    "frames/error/009.png"
+   ],
+   "frame_count": 10,
+   "durations_ms": [
+    350,
+    300,
+    400,
+    300,
+    400,
+    250,
+    250,
+    350,
+    500,
+    500
+   ],
+   "total_ms": 3600,
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "encourage",
+   "filename": "gifs/encourage.gif",
+   "mode": "once",
+   "frames": [
+    "frames/encourage/000.png",
+    "frames/encourage/001.png",
+    "frames/encourage/002.png",
+    "frames/encourage/003.png",
+    "frames/encourage/004.png",
+    "frames/encourage/005.png",
+    "frames/encourage/006.png",
+    "frames/encourage/007.png",
+    "frames/encourage/008.png",
+    "frames/encourage/009.png",
+    "frames/encourage/010.png",
+    "frames/encourage/011.png"
+   ],
+   "frame_count": 12,
+   "durations_ms": [
+    350,
+    150,
+    150,
+    160,
+    220,
+    170,
+    300,
+    190,
+    210,
+    230,
+    250,
+    600
+   ],
+   "total_ms": 2980,
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "look-left",
+   "filename": "gifs/look-left.gif",
+   "mode": "once",
+   "frames": [
+    "frames/look-left/000.png",
+    "frames/look-left/001.png",
+    "frames/look-left/002.png",
+    "frames/look-left/003.png",
+    "frames/look-left/004.png"
+   ],
+   "frame_count": 5,
+   "durations_ms": [
+    300,
+    150,
+    1200,
+    180,
+    350
+   ],
+   "total_ms": 2180,
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "look-right",
+   "filename": "gifs/look-right.gif",
+   "mode": "once",
+   "frames": [
+    "frames/look-right/000.png",
+    "frames/look-right/001.png",
+    "frames/look-right/002.png",
+    "frames/look-right/003.png",
+    "frames/look-right/004.png"
+   ],
+   "frame_count": 5,
+   "durations_ms": [
+    300,
+    150,
+    1200,
+    180,
+    350
+   ],
+   "total_ms": 2180,
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "look-up",
+   "filename": "gifs/look-up.gif",
+   "mode": "once",
+   "frames": [
+    "frames/look-up/000.png",
+    "frames/look-up/001.png",
+    "frames/look-up/002.png",
+    "frames/look-up/003.png",
+    "frames/look-up/004.png"
+   ],
+   "frame_count": 5,
+   "durations_ms": [
+    300,
+    150,
+    1200,
+    180,
+    350
+   ],
+   "total_ms": 2180,
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "look-down",
+   "filename": "gifs/look-down.gif",
+   "mode": "once",
+   "frames": [
+    "frames/look-down/000.png",
+    "frames/look-down/001.png",
+    "frames/look-down/002.png",
+    "frames/look-down/003.png",
+    "frames/look-down/004.png"
+   ],
+   "frame_count": 5,
+   "durations_ms": [
+    300,
+    150,
+    1200,
+    180,
+    350
+   ],
+   "total_ms": 2180,
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "hello",
+   "filename": "gifs/hello.gif",
+   "mode": "once",
+   "frames": [
+    "frames/hello/000.png",
+    "frames/hello/001.png",
+    "frames/hello/002.png",
+    "frames/hello/003.png",
+    "frames/hello/004.png",
+    "frames/hello/005.png",
+    "frames/hello/006.png",
+    "frames/hello/007.png",
+    "frames/hello/008.png",
+    "frames/hello/009.png",
+    "frames/hello/010.png",
+    "frames/hello/011.png",
+    "frames/hello/012.png",
+    "frames/hello/013.png",
+    "frames/hello/014.png",
+    "frames/hello/015.png",
+    "frames/hello/016.png"
+   ],
+   "frame_count": 17,
+   "durations_ms": [
+    500,
+    110,
+    110,
+    110,
+    110,
+    100,
+    130,
+    110,
+    110,
+    110,
+    110,
+    140,
+    120,
+    120,
+    120,
+    120,
+    700
+   ],
+   "total_ms": 2930,
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "goodbye",
+   "filename": "gifs/goodbye.gif",
+   "mode": "once",
+   "frames": [
+    "frames/goodbye/000.png",
+    "frames/goodbye/001.png",
+    "frames/goodbye/002.png",
+    "frames/goodbye/003.png",
+    "frames/goodbye/004.png",
+    "frames/goodbye/005.png",
+    "frames/goodbye/006.png",
+    "frames/goodbye/007.png",
+    "frames/goodbye/008.png",
+    "frames/goodbye/009.png",
+    "frames/goodbye/010.png",
+    "frames/goodbye/011.png",
+    "frames/goodbye/012.png",
+    "frames/goodbye/013.png",
+    "frames/goodbye/014.png",
+    "frames/goodbye/015.png",
+    "frames/goodbye/016.png",
+    "frames/goodbye/017.png",
+    "frames/goodbye/018.png"
+   ],
+   "frame_count": 19,
+   "durations_ms": [
+    400,
+    90,
+    90,
+    90,
+    90,
+    80,
+    90,
+    80,
+    80,
+    80,
+    80,
+    330,
+    150,
+    170,
+    190,
+    210,
+    230,
+    250,
+    450
+   ],
+   "total_ms": 3230,
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "wake-up",
+   "filename": "gifs/wake-up.gif",
+   "mode": "once",
+   "frames": [
+    "frames/wake-up/000.png",
+    "frames/wake-up/001.png",
+    "frames/wake-up/002.png",
+    "frames/wake-up/003.png",
+    "frames/wake-up/004.png",
+    "frames/wake-up/005.png"
+   ],
+   "frame_count": 6,
+   "durations_ms": [
+    600,
+    250,
+    250,
+    300,
+    400,
+    900
+   ],
+   "total_ms": 2700,
+   "start_pose": "asleep",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "power-down",
+   "filename": "gifs/power-down.gif",
+   "mode": "once",
+   "frames": [
+    "frames/power-down/000.png",
+    "frames/power-down/001.png",
+    "frames/power-down/002.png",
+    "frames/power-down/003.png",
+    "frames/power-down/004.png"
+   ],
+   "frame_count": 5,
+   "durations_ms": [
+    500,
+    250,
+    250,
+    300,
+    1050
+   ],
+   "total_ms": 2350,
+   "start_pose": "neutral",
+   "end_pose": "asleep"
+  }
+ ]
+}

@@ -1,0 +1,157 @@
+{
+  "_comment": [
+    "Pip animation rig - single place to edit shared motion parameters.",
+    "Coordinates are WORKING GRID CELLS on the 128x192 canvas (1 cell = 6 native px of pip.png).",
+    "Edit here, then re-run:  python layers.py && python build.py",
+    "Timelines for the 32 animations live in motions.py."
+  ],
+
+  "source_png": "../../pip.png",
+
+  "grid": {
+    "cell_px": 6,
+    "origin": [256, 43],
+    "_origin_note": "native pip.png pixel (256,43) == working cell (0,0)",
+    "canvas": [128, 192],
+    "ground": 184,
+    "ground_note": "soles sit on this row; feet anchor here"
+  },
+
+  "pivots": {
+    "neck": [48.3, 111.8],
+    "neck_note": "center of the visible gray neck bolt - head rotation pivot",
+    "tail": [72, 150],
+    "tail_note": "where the tail emerges from the torso",
+    "arm_near": [31, 125],
+    "arm_far": [64, 125]
+  },
+
+  "cuts": {
+    "head_note": "head = rows < 109, plus rows 109-110 for x 52..92 (the jaw overhang next to the neck; the tail tip lives at x 101-112 and must stay in the tail)",
+    "head_split_x": 52,
+    "jaw_overhang_x": [52, 92],
+    "head_split_y": 109,
+    "jaw_overhang_y": 111,
+    "gray_zone": [45, 108, 51, 115],
+    "gray_zone_note": "only the neck bolt may quantize to gray (kills antialias speckle elsewhere)",
+    "neck_filler_rects": [[40, 105, 57, 108], [52, 109, 57, 110]],
+    "neck_filler_note": "dark underlay behind the head so the neck seam never opens during chin poses; kept clear of the gray bolt and inside the neutral silhouette",
+    "tail_left_by_row": {
+      "110": 101, "114": 93, "120": 87, "125": 81, "131": 82
+    },
+    "tail_rows": [110, 150],
+    "tail_root_rows": [136, 150],
+    "tail_root_x": [70, 95],
+    "tail_note": "rows 110-135 = swinging band right of tail_left_by_row; rows 136-150 = fill-only root shared with the hip",
+    "arm_near_rect": [21, 124, 36, 135],
+    "arm_far_rect": [61, 124, 75, 135],
+    "arm_root_rows": [[124, 126], [134, 135]],
+    "arm_note": "root rows are duplicated into the body so the arm never leaves a hole"
+  },
+
+  "eyes": {
+    "L": {
+      "bbox": [37, 53, 56, 72],
+      "mint_rects": [[41, 53, 52, 56], [37, 57, 56, 68], [41, 69, 52, 72]],
+      "pupil": [43, 57, 52, 68],
+      "catch": [45, 58, 48, 61],
+      "lid_row": [62, 63],
+      "lid_span": [41, 52]
+    },
+    "R": {
+      "bbox": [63, 44, 82, 63],
+      "mint_rects": [[67, 44, 78, 47], [63, 48, 82, 59], [67, 60, 78, 63]],
+      "pupil": [67, 48, 76, 59],
+      "catch": [69, 49, 72, 52],
+      "lid_row": [53, 54],
+      "lid_span": [67, 78]
+    },
+    "eye_note": "mint shape is cut from the source; pupil+catchlight are rebuilt clean and always move together",
+    "gaze_clamp_x": 4,
+    "gaze_clamp_y": 2,
+    "gazes": {
+      "home":    [0, 0],
+      "left":    [-4, 0],
+      "right":   [4, 0],
+      "up":      [0, -2],
+      "down":    [0, 2],
+      "up_left": [-3, -2],
+      "up_right": [3, -2],
+      "low_left": [-3, 1],
+      "tail_side": [3, 1]
+    },
+    "viewer_converge": 2,
+    "viewer_note": "'toward the viewer' = pupils converge 2 cells (L eye +2, R eye -2)"
+  },
+
+  "mouth": {
+    "zone_a": [53, 90, 58, 98],
+    "zone_b": [59, 89, 90, 98],
+    "corner": [47, 82, 58, 89],
+    "tooth_unit": [63, 92, 75, 98],
+    "opening_rows": { "C": 2, "R": 3, "S": 5 },
+    "mouth_note": "C=closed(thin seam) R=resting(the source smile) S=slightly open; the tooth is redrawn in every shape",
+    "top_shade_row": 89
+  },
+
+  "timing": {
+    "blink_half_ms": 80,
+    "blink_close_ms": 110,
+    "blink_open_ms": 70,
+    "blink_hold_ms": 2500,
+    "double_blink_gap_ms": 420,
+    "listen_gaze_delay_ms": 160,
+    "listen_tilt_delay_ms": 160,
+    "listen_hold_ms": 1900,
+    "listen_quiet_ms": 2400,
+    "glance_hold_ms": 850,
+    "glance_travel_ms": 90,
+    "nod_down_ms": 130,
+    "nod_up_ms": 170,
+    "tap_ms": 130,
+    "mouth_step_ms": 160,
+    "hold_long_ms": 1200
+  },
+
+  "motion": {
+    "tilt_deep": -5.0,
+    "tilt_opposite": 5.0,
+    "tilt_soft": -3.0,
+    "dip_soft": 3.0,
+    "head_lift": -2,
+    "head_dip": 2,
+    "tail_sway_deg": 3.5,
+    "tail_settle_deg": -4.0,
+    "tail_wag_deg": 4.5,
+    "hop_height": 12,
+    "crouch": 2,
+    "arm_raise_deg": 16,
+    "arm_wave_deg": 22
+  },
+
+  "head_pose_note": [
+    "Reusable head poses (yaw turn, pitch nod, roll tilt).",
+    "turn_L/turn_R squeeze or stretch the projected snout (columns >= snout_x0) and",
+    "change how much of the far eye (eye R) shows; chin_up/chin_down shear the head",
+    "by row zones so the snout dips/lifts and the neck exposure changes; tilt is the",
+    "sideways roll (head_rot) kept for listening so it never reads as a turn.",
+    "zone rows are shifted as whole rows with seam fill - never a flat cutout."
+  ],
+  "far_eye": "R",
+  "head_pose_zones": [[0, 52], [53, 78], [79, 99], [100, 110]],
+  "head_poses": {
+    "neutral":      {"label": "neutral (approved model pose, preserved exactly)"},
+    "turn_L":       {"label": "turn toward screen-left (face toward front)",
+                     "snout_x0": 82, "snout_squeeze": 0.75, "far_eye_dw": 3},
+    "turn_R":       {"label": "turn toward screen-right (a little more profile)",
+                     "snout_x0": 82, "snout_squeeze": 1.20, "far_eye_dw": -3},
+    "chin_up":      {"label": "chin up (snout lifts away from the chest, more neck shows)",
+                     "zone_shift": [0, -2, -5, -3]},
+    "chin_up_soft": {"label": "small upward rebound",
+                     "zone_shift": [0, -1, -2, -1]},
+    "chin_down":    {"label": "chin down (snout dips toward the chest, less neck shows)",
+                     "zone_shift": [0, 2, 5, 3]},
+    "tilt":         {"label": "listening tilt (sideways toward one shoulder)",
+                     "head_rot": -6.0}
+  }
+}

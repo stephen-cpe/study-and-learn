@@ -1,0 +1,48 @@
+[files] 32/32 GIFs present with exact names  OK
+[feet] bottom-most rows per animation:
+    idle-blink: [183]
+    idle-double-blink: [183]
+    idle-look-around: [183]
+    idle-tail-sway: [183]
+    notice: [183]
+    listening: [183]
+    curious: [183]
+    sleepy: [183]
+    thinking: [183]
+    searching: [183]
+    reading: [183]
+    typing: [183]
+    speaking: [183]
+    processing: [183]
+    waiting: [183]
+    idea: [183]
+    success: [183]
+    celebrate: [171, 175, 177, 183, 185]
+    acknowledge: [183]
+    unsure: [183]
+    confused: [183]
+    warning: [183]
+    error: [183]
+    relieved: [183]
+    look-left: [183]
+    look-right: [183]
+    look-up: [183]
+    look-down: [183]
+    hello: [183]
+    goodbye: [183]
+    wake-up: [183]
+    power-down: [183]
+[head motion] non-eye head pixels changed at 48 px display (max vs frame 1):
+    look-left: 46
+    look-right: 38
+    look-up: 81
+    look-down: 107
+    acknowledge: 107
+    listening: 203
+    curious: 46
+    confused: 93
+    success: 107
+[handoff] power-down last frame == wake-up first frame: OK
+[backgrounds] light/dark composites written to _diag/verify_bg.png - dark faceplate and outline stay distinct from both backgrounds (OK)
+
+RESULT: all checks passed

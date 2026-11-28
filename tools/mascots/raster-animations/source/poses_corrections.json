@@ -1,0 +1,14 @@
+{
+ "comment": [
+  "Hand corrections for the generated arm poses. The generator (make_poses.py)",
+  "renders each pose from the arm chain's own pixels and then applies these edits,",
+  "so a wrist pose or gripper shape can be fixed here without touching any code.",
+  "Coordinates are in the 96x96 canvas space (parts.json has the pivots).",
+  "Example: {\"pose\": \"R_r5\", \"set\": [[70, 50, \"#f6f7f3\"]], \"clear\": [[71, 51]]}",
+  "Use pose \"*\" to edit every pose. Rebuild with: python source/make_poses.py",
+  "and then rebuild any clips: python source/render.py hello",
+  "The exported pose PNGs in source/pose_art/ can also be edited directly;",
+  "render.py reads those files, so a direct PNG edit takes effect on the next build."
+ ],
+ "edits": []
+}

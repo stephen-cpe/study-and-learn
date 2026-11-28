@@ -90,3 +90,6 @@ docs/STATUS.md.local
 # Others
 *.bak
 *.exe
+
+# Temporary mascot art import; remove this line and the folder after the mascot work
+study-and-learn-new-mascot-test/

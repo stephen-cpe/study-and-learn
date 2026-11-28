@@ -1,0 +1,865 @@
+{
+ "character": "Pip (Azthreus robotic baby T. rex)",
+ "canvas": [
+  128,
+  192
+ ],
+ "working_scale": {
+  "cell_px": 6,
+  "note": "1 working pixel = 6 native pip.png pixels; motion happens in whole working pixels, scaling is nearest-neighbour"
+ },
+ "ground": 184,
+ "head_poses": {
+  "neutral": "neutral (approved model pose, preserved exactly)",
+  "turn_L": "turn toward screen-left (face toward front)",
+  "turn_R": "turn toward screen-right (a little more profile)",
+  "chin_up": "chin up (snout lifts away from the chest, more neck shows)",
+  "chin_up_soft": "small upward rebound",
+  "chin_down": "chin down (snout dips toward the chest, less neck shows)",
+  "tilt": "listening tilt (sideways toward one shoulder)"
+ },
+ "animations": [
+  {
+   "name": "idle-blink",
+   "file": "gifs/idle-blink.gif",
+   "category": "Idle and attention",
+   "frames": [
+    "frames/idle-blink/01.png",
+    "frames/idle-blink/02.png",
+    "frames/idle-blink/03.png",
+    "frames/idle-blink/04.png",
+    "frames/idle-blink/05.png"
+   ],
+   "durations_ms": [
+    2500,
+    80,
+    110,
+    70,
+    400
+   ],
+   "total_ms": 3160,
+   "behavior": "loop",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "idle-double-blink",
+   "file": "gifs/idle-double-blink.gif",
+   "category": "Idle and attention",
+   "frames": [
+    "frames/idle-double-blink/01.png",
+    "frames/idle-double-blink/02.png",
+    "frames/idle-double-blink/03.png",
+    "frames/idle-double-blink/04.png",
+    "frames/idle-double-blink/05.png",
+    "frames/idle-double-blink/06.png",
+    "frames/idle-double-blink/07.png",
+    "frames/idle-double-blink/08.png",
+    "frames/idle-double-blink/09.png"
+   ],
+   "durations_ms": [
+    1100,
+    70,
+    100,
+    60,
+    380,
+    60,
+    80,
+    40,
+    1150
+   ],
+   "total_ms": 3040,
+   "behavior": "one-shot",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "idle-look-around",
+   "file": "gifs/idle-look-around.gif",
+   "category": "Idle and attention",
+   "frames": [
+    "frames/idle-look-around/01.png",
+    "frames/idle-look-around/02.png",
+    "frames/idle-look-around/03.png",
+    "frames/idle-look-around/04.png",
+    "frames/idle-look-around/05.png",
+    "frames/idle-look-around/06.png",
+    "frames/idle-look-around/07.png"
+   ],
+   "durations_ms": [
+    1200,
+    90,
+    850,
+    90,
+    850,
+    90,
+    1200
+   ],
+   "total_ms": 4370,
+   "behavior": "loop",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "idle-tail-sway",
+   "file": "gifs/idle-tail-sway.gif",
+   "category": "Idle and attention",
+   "frames": [
+    "frames/idle-tail-sway/01.png",
+    "frames/idle-tail-sway/02.png",
+    "frames/idle-tail-sway/03.png",
+    "frames/idle-tail-sway/04.png",
+    "frames/idle-tail-sway/05.png",
+    "frames/idle-tail-sway/06.png",
+    "frames/idle-tail-sway/07.png",
+    "frames/idle-tail-sway/08.png",
+    "frames/idle-tail-sway/09.png"
+   ],
+   "durations_ms": [
+    900,
+    500,
+    650,
+    500,
+    450,
+    500,
+    650,
+    500,
+    900
+   ],
+   "total_ms": 5550,
+   "behavior": "loop",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "notice",
+   "file": "gifs/notice.gif",
+   "category": "Idle and attention",
+   "frames": [
+    "frames/notice/01.png",
+    "frames/notice/02.png",
+    "frames/notice/03.png",
+    "frames/notice/04.png",
+    "frames/notice/05.png"
+   ],
+   "durations_ms": [
+    550,
+    470,
+    680,
+    220,
+    700
+   ],
+   "total_ms": 2620,
+   "behavior": "one-shot",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "listening",
+   "file": "gifs/listening.gif",
+   "category": "Idle and attention",
+   "frames": [
+    "frames/listening/01.png",
+    "frames/listening/02.png",
+    "frames/listening/03.png",
+    "frames/listening/04.png",
+    "frames/listening/05.png"
+   ],
+   "durations_ms": [
+    1300,
+    340,
+    2200,
+    300,
+    2400
+   ],
+   "total_ms": 6540,
+   "behavior": "loop",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "curious",
+   "file": "gifs/curious.gif",
+   "category": "Idle and attention",
+   "frames": [
+    "frames/curious/01.png",
+    "frames/curious/02.png",
+    "frames/curious/03.png",
+    "frames/curious/04.png",
+    "frames/curious/05.png"
+   ],
+   "durations_ms": [
+    450,
+    490,
+    1550,
+    270,
+    650
+   ],
+   "total_ms": 3410,
+   "behavior": "one-shot",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "sleepy",
+   "file": "gifs/sleepy.gif",
+   "category": "Idle and attention",
+   "frames": [
+    "frames/sleepy/01.png",
+    "frames/sleepy/02.png",
+    "frames/sleepy/03.png",
+    "frames/sleepy/04.png",
+    "frames/sleepy/05.png",
+    "frames/sleepy/06.png"
+   ],
+   "durations_ms": [
+    1500,
+    380,
+    380,
+    850,
+    260,
+    850
+   ],
+   "total_ms": 4220,
+   "behavior": "loop",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "thinking",
+   "file": "gifs/thinking.gif",
+   "category": "Assistant activity",
+   "frames": [
+    "frames/thinking/01.png",
+    "frames/thinking/02.png",
+    "frames/thinking/03.png",
+    "frames/thinking/04.png",
+    "frames/thinking/05.png",
+    "frames/thinking/06.png",
+    "frames/thinking/07.png"
+   ],
+   "durations_ms": [
+    700,
+    90,
+    1500,
+    450,
+    350,
+    90,
+    700
+   ],
+   "total_ms": 3880,
+   "behavior": "loop",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "searching",
+   "file": "gifs/searching.gif",
+   "category": "Assistant activity",
+   "frames": [
+    "frames/searching/01.png",
+    "frames/searching/02.png",
+    "frames/searching/03.png",
+    "frames/searching/04.png",
+    "frames/searching/05.png",
+    "frames/searching/06.png",
+    "frames/searching/07.png",
+    "frames/searching/08.png"
+   ],
+   "durations_ms": [
+    420,
+    70,
+    780,
+    710,
+    70,
+    480,
+    680,
+    520
+   ],
+   "total_ms": 3730,
+   "behavior": "loop",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "reading",
+   "file": "gifs/reading.gif",
+   "category": "Assistant activity",
+   "frames": [
+    "frames/reading/01.png",
+    "frames/reading/02.png",
+    "frames/reading/03.png",
+    "frames/reading/04.png",
+    "frames/reading/05.png",
+    "frames/reading/06.png",
+    "frames/reading/07.png",
+    "frames/reading/08.png",
+    "frames/reading/09.png",
+    "frames/reading/10.png"
+   ],
+   "durations_ms": [
+    550,
+    130,
+    120,
+    120,
+    280,
+    70,
+    120,
+    120,
+    300,
+    750
+   ],
+   "total_ms": 2560,
+   "behavior": "loop",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "typing",
+   "file": "gifs/typing.gif",
+   "category": "Assistant activity",
+   "frames": [
+    "frames/typing/01.png",
+    "frames/typing/02.png",
+    "frames/typing/03.png",
+    "frames/typing/04.png",
+    "frames/typing/05.png",
+    "frames/typing/06.png",
+    "frames/typing/07.png",
+    "frames/typing/08.png",
+    "frames/typing/09.png",
+    "frames/typing/10.png",
+    "frames/typing/11.png",
+    "frames/typing/12.png"
+   ],
+   "durations_ms": [
+    350,
+    220,
+    110,
+    80,
+    100,
+    130,
+    90,
+    100,
+    70,
+    120,
+    420,
+    550
+   ],
+   "total_ms": 2340,
+   "behavior": "loop",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "speaking",
+   "file": "gifs/speaking.gif",
+   "category": "Assistant activity",
+   "frames": [
+    "frames/speaking/01.png",
+    "frames/speaking/02.png",
+    "frames/speaking/03.png",
+    "frames/speaking/04.png",
+    "frames/speaking/05.png",
+    "frames/speaking/06.png",
+    "frames/speaking/07.png",
+    "frames/speaking/08.png",
+    "frames/speaking/09.png"
+   ],
+   "durations_ms": [
+    280,
+    150,
+    110,
+    230,
+    170,
+    190,
+    120,
+    200,
+    850
+   ],
+   "total_ms": 2300,
+   "behavior": "loop",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "processing",
+   "file": "gifs/processing.gif",
+   "category": "Assistant activity",
+   "frames": [
+    "frames/processing/01.png",
+    "frames/processing/02.png",
+    "frames/processing/03.png",
+    "frames/processing/04.png",
+    "frames/processing/05.png"
+   ],
+   "durations_ms": [
+    1300,
+    130,
+    160,
+    130,
+    3250
+   ],
+   "total_ms": 4970,
+   "behavior": "loop",
+   "start_pose": "focused gaze",
+   "end_pose": "focused gaze"
+  },
+  {
+   "name": "waiting",
+   "file": "gifs/waiting.gif",
+   "category": "Assistant activity",
+   "frames": [
+    "frames/waiting/01.png",
+    "frames/waiting/02.png",
+    "frames/waiting/03.png",
+    "frames/waiting/04.png",
+    "frames/waiting/05.png"
+   ],
+   "durations_ms": [
+    2600,
+    90,
+    700,
+    90,
+    2500
+   ],
+   "total_ms": 5980,
+   "behavior": "loop",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "idea",
+   "file": "gifs/idea.gif",
+   "category": "Assistant activity",
+   "frames": [
+    "frames/idea/01.png",
+    "frames/idea/02.png",
+    "frames/idea/03.png",
+    "frames/idea/04.png",
+    "frames/idea/05.png"
+   ],
+   "durations_ms": [
+    550,
+    520,
+    1610,
+    300,
+    700
+   ],
+   "total_ms": 3680,
+   "behavior": "one-shot",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "success",
+   "file": "gifs/success.gif",
+   "category": "Feedback and reactions",
+   "frames": [
+    "frames/success/01.png",
+    "frames/success/02.png",
+    "frames/success/03.png",
+    "frames/success/04.png",
+    "frames/success/05.png",
+    "frames/success/06.png",
+    "frames/success/07.png",
+    "frames/success/08.png"
+   ],
+   "durations_ms": [
+    320,
+    450,
+    190,
+    260,
+    220,
+    220,
+    180,
+    520
+   ],
+   "total_ms": 2360,
+   "behavior": "one-shot",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "celebrate",
+   "file": "gifs/celebrate.gif",
+   "category": "Feedback and reactions",
+   "frames": [
+    "frames/celebrate/01.png",
+    "frames/celebrate/02.png",
+    "frames/celebrate/03.png",
+    "frames/celebrate/04.png",
+    "frames/celebrate/05.png",
+    "frames/celebrate/06.png",
+    "frames/celebrate/07.png",
+    "frames/celebrate/08.png"
+   ],
+   "durations_ms": [
+    250,
+    150,
+    110,
+    140,
+    110,
+    140,
+    160,
+    550
+   ],
+   "total_ms": 1610,
+   "behavior": "one-shot",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "acknowledge",
+   "file": "gifs/acknowledge.gif",
+   "category": "Feedback and reactions",
+   "frames": [
+    "frames/acknowledge/01.png",
+    "frames/acknowledge/02.png",
+    "frames/acknowledge/03.png",
+    "frames/acknowledge/04.png"
+   ],
+   "durations_ms": [
+    380,
+    480,
+    190,
+    850
+   ],
+   "total_ms": 1900,
+   "behavior": "one-shot",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "unsure",
+   "file": "gifs/unsure.gif",
+   "category": "Feedback and reactions",
+   "frames": [
+    "frames/unsure/01.png",
+    "frames/unsure/02.png",
+    "frames/unsure/03.png",
+    "frames/unsure/04.png",
+    "frames/unsure/05.png",
+    "frames/unsure/06.png",
+    "frames/unsure/07.png"
+   ],
+   "durations_ms": [
+    400,
+    100,
+    420,
+    350,
+    250,
+    230,
+    550
+   ],
+   "total_ms": 2300,
+   "behavior": "one-shot",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "confused",
+   "file": "gifs/confused.gif",
+   "category": "Feedback and reactions",
+   "frames": [
+    "frames/confused/01.png",
+    "frames/confused/02.png",
+    "frames/confused/03.png",
+    "frames/confused/04.png",
+    "frames/confused/05.png",
+    "frames/confused/06.png",
+    "frames/confused/07.png"
+   ],
+   "durations_ms": [
+    430,
+    320,
+    150,
+    260,
+    1030,
+    180,
+    640
+   ],
+   "total_ms": 3010,
+   "behavior": "one-shot",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "warning",
+   "file": "gifs/warning.gif",
+   "category": "Feedback and reactions",
+   "frames": [
+    "frames/warning/01.png",
+    "frames/warning/02.png",
+    "frames/warning/03.png",
+    "frames/warning/04.png"
+   ],
+   "durations_ms": [
+    300,
+    160,
+    1330,
+    950
+   ],
+   "total_ms": 2740,
+   "behavior": "one-shot",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "error",
+   "file": "gifs/error.gif",
+   "category": "Feedback and reactions",
+   "frames": [
+    "frames/error/01.png",
+    "frames/error/02.png",
+    "frames/error/03.png",
+    "frames/error/04.png",
+    "frames/error/05.png",
+    "frames/error/06.png",
+    "frames/error/07.png"
+   ],
+   "durations_ms": [
+    350,
+    350,
+    70,
+    100,
+    60,
+    650,
+    600
+   ],
+   "total_ms": 2180,
+   "behavior": "one-shot",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "relieved",
+   "file": "gifs/relieved.gif",
+   "category": "Feedback and reactions",
+   "frames": [
+    "frames/relieved/01.png",
+    "frames/relieved/02.png",
+    "frames/relieved/03.png",
+    "frames/relieved/04.png",
+    "frames/relieved/05.png"
+   ],
+   "durations_ms": [
+    300,
+    320,
+    800,
+    380,
+    700
+   ],
+   "total_ms": 2500,
+   "behavior": "one-shot",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "look-left",
+   "file": "gifs/look-left.gif",
+   "category": "Direction, greetings, and transitions",
+   "frames": [
+    "frames/look-left/01.png",
+    "frames/look-left/02.png",
+    "frames/look-left/03.png",
+    "frames/look-left/04.png",
+    "frames/look-left/05.png",
+    "frames/look-left/06.png",
+    "frames/look-left/07.png"
+   ],
+   "durations_ms": [
+    400,
+    110,
+    330,
+    1480,
+    190,
+    110,
+    550
+   ],
+   "total_ms": 3170,
+   "behavior": "one-shot",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "look-right",
+   "file": "gifs/look-right.gif",
+   "category": "Direction, greetings, and transitions",
+   "frames": [
+    "frames/look-right/01.png",
+    "frames/look-right/02.png",
+    "frames/look-right/03.png",
+    "frames/look-right/04.png",
+    "frames/look-right/05.png",
+    "frames/look-right/06.png",
+    "frames/look-right/07.png"
+   ],
+   "durations_ms": [
+    400,
+    110,
+    330,
+    1480,
+    190,
+    110,
+    550
+   ],
+   "total_ms": 3170,
+   "behavior": "one-shot",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "look-up",
+   "file": "gifs/look-up.gif",
+   "category": "Direction, greetings, and transitions",
+   "frames": [
+    "frames/look-up/01.png",
+    "frames/look-up/02.png",
+    "frames/look-up/03.png",
+    "frames/look-up/04.png",
+    "frames/look-up/05.png"
+   ],
+   "durations_ms": [
+    420,
+    460,
+    1400,
+    230,
+    600
+   ],
+   "total_ms": 3110,
+   "behavior": "one-shot",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "look-down",
+   "file": "gifs/look-down.gif",
+   "category": "Direction, greetings, and transitions",
+   "frames": [
+    "frames/look-down/01.png",
+    "frames/look-down/02.png",
+    "frames/look-down/03.png",
+    "frames/look-down/04.png",
+    "frames/look-down/05.png"
+   ],
+   "durations_ms": [
+    420,
+    460,
+    1400,
+    230,
+    600
+   ],
+   "total_ms": 3110,
+   "behavior": "one-shot",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "hello",
+   "file": "gifs/hello.gif",
+   "category": "Direction, greetings, and transitions",
+   "frames": [
+    "frames/hello/01.png",
+    "frames/hello/02.png",
+    "frames/hello/03.png",
+    "frames/hello/04.png",
+    "frames/hello/05.png",
+    "frames/hello/06.png",
+    "frames/hello/07.png"
+   ],
+   "durations_ms": [
+    350,
+    320,
+    190,
+    150,
+    190,
+    220,
+    650
+   ],
+   "total_ms": 2070,
+   "behavior": "one-shot",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "goodbye",
+   "file": "gifs/goodbye.gif",
+   "category": "Direction, greetings, and transitions",
+   "frames": [
+    "frames/goodbye/01.png",
+    "frames/goodbye/02.png",
+    "frames/goodbye/03.png",
+    "frames/goodbye/04.png",
+    "frames/goodbye/05.png",
+    "frames/goodbye/06.png",
+    "frames/goodbye/07.png",
+    "frames/goodbye/08.png",
+    "frames/goodbye/09.png"
+   ],
+   "durations_ms": [
+    350,
+    100,
+    330,
+    90,
+    200,
+    260,
+    600,
+    300,
+    700
+   ],
+   "total_ms": 2930,
+   "behavior": "one-shot",
+   "start_pose": "neutral",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "wake-up",
+   "file": "gifs/wake-up.gif",
+   "category": "Direction, greetings, and transitions",
+   "frames": [
+    "frames/wake-up/01.png",
+    "frames/wake-up/02.png",
+    "frames/wake-up/03.png",
+    "frames/wake-up/04.png",
+    "frames/wake-up/05.png",
+    "frames/wake-up/06.png"
+   ],
+   "durations_ms": [
+    500,
+    260,
+    260,
+    300,
+    280,
+    700
+   ],
+   "total_ms": 2300,
+   "behavior": "one-shot",
+   "start_pose": "resting",
+   "end_pose": "neutral"
+  },
+  {
+   "name": "power-down",
+   "file": "gifs/power-down.gif",
+   "category": "Direction, greetings, and transitions",
+   "frames": [
+    "frames/power-down/01.png",
+    "frames/power-down/02.png",
+    "frames/power-down/03.png",
+    "frames/power-down/04.png",
+    "frames/power-down/05.png"
+   ],
+   "durations_ms": [
+    450,
+    350,
+    350,
+    320,
+    1300
+   ],
+   "total_ms": 2770,
+   "behavior": "one-shot",
+   "start_pose": "neutral",
+   "end_pose": "resting"
+  }
+ ]
+}

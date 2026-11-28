@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Raster — animation pack preview</title>
+<style>
+  /* ---- page chrome (system fonts, dark-ish modern) ---------------------- */
+  :root { --stage: #181a22; --sprite: 96px; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px 28px 60px;
+    background: #15171d; color: #e6e8ee;
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  body.stage-light { --stage: #f0f0f2; }
+  body.stage-dark  { --stage: #181a22; }
+  body.size-48 { --sprite: 48px; }
+  body.size-96 { --sprite: 96px; }
+  h1 { font-size: 22px; margin: 0 0 2px; }
+  h2 { font-size: 17px; margin: 34px 0 10px; border-bottom: 1px solid #2c3040; padding-bottom: 6px; }
+  h3 { font-size: 14px; margin: 18px 0 8px; color: #9aa3b5; text-transform: uppercase; letter-spacing: .06em; }
+  .sub { margin: 0 0 14px; color: #9aa3b5; }
+  code, .mono { font-family: Consolas, "Courier New", monospace; font-size: 12px; }
+  a { color: #7ab8ff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* ---- global controls -------------------------------------------------- */
+  .global-controls {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    background: #1d2027; border: 1px solid #2c3040; border-radius: 10px;
+    padding: 10px 14px; margin-bottom: 8px;
+  }
+  .global-controls .label { color: #9aa3b5; margin-left: 8px; }
+  button {
+    font: inherit; color: #e6e8ee; background: #2a2f3a;
+    border: 1px solid #3a4152; border-radius: 6px; padding: 4px 12px; cursor: pointer;
+  }
+  button:hover { background: #343b49; }
+  button.active { background: #3d6bd6; border-color: #5a86e8; }
+  button:disabled { opacity: .45; cursor: default; }
+
+  /* ---- sprite stages (all viewers honour --sprite and --stage) ---------- */
+  .stage {
+    display: flex; align-items: center; justify-content: center;
+    background: var(--stage); border-radius: 8px; border: 1px solid #2c3040;
+    min-height: calc(var(--sprite) + 18px);
+  }
+  canvas.sprite, img.sprite {
+    width: var(--sprite); height: var(--sprite);
+    image-rendering: pixelated;          /* crisp pixels for the 96x96 art */
+    display: block;
+  }
+
+  /* ---- gallery ---------------------------------------------------------- */
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 14px; }
+  .cell {
+    background: #1d2027; border: 1px solid #2c3040; border-radius: 10px; padding: 10px;
+  }
+  .cell .meta { display: flex; align-items: center; gap: 8px; margin: 8px 0 2px; }
+  .cell .meta strong { font-size: 14px; }
+  .badge {
+    font-size: 11px; padding: 1px 8px; border-radius: 99px; letter-spacing: .04em;
+  }
+  .badge.loop { background: #1d3a63; color: #8fc0ff; }
+  .badge.once { background: #4a3616; color: #f2c56b; }
+  .cell .info { color: #9aa3b5; font-size: 12px; margin-bottom: 8px; }
+  .cell .controls { display: flex; gap: 6px; margin-bottom: 6px; }
+  .cell .controls button { padding: 3px 10px; font-size: 12px; }
+  input[type=range] { width: 100%; accent-color: #3d6bd6; }
+
+  /* ---- hello: reference vs Raster --------------------------------------- */
+  .cmp-pair { display: flex; gap: 24px; flex-wrap: wrap; }
+  .cmp-pair figure { margin: 0; }
+  .cmp-pair figcaption { color: #9aa3b5; font-size: 12px; margin-top: 6px; max-width: 300px; }
+  /* Fixed viewport; each GIF is absolutely positioned so that the waving
+     shoulder points coincide (math in the script below). */
+  .cmp-view {
+    position: relative; width: 300px; height: 280px; overflow: hidden;
+    background: var(--stage); border: 1px solid #2c3040; border-radius: 8px;
+  }
+  .cmp-view img { position: absolute; }
+  /* Raster is pixel art: nearest-neighbour at any zoom. The 759 px sample is
+     smooth art, so it keeps normal filtering (nearest downscale aliases badly). */
+  #cmp-hello { image-rendering: pixelated; }
+  #cmp-sample { image-rendering: auto; }
+  img.sheet { image-rendering: pixelated; max-width: 100%; border: 1px solid #2c3040; border-radius: 8px; }
+
+  .note { color: #9aa3b5; font-size: 12px; max-width: 760px; }
+</style>
+</head>
+<body class="size-96 stage-dark">
+
+<header>
+  <h1>Raster — animation pack preview</h1>
+  <p class="sub">32 transparent 96&times;96 pixel-art animations of Raster (Azthreus Systems) &middot; works offline (file://)</p>
+  <div class="global-controls">
+    <span class="label">Sprite size</span>
+    <button id="size48">48 px</button>
+    <button id="size96" class="active">96 px</button>
+    <span class="label">Stage</span>
+    <button id="stageLight">Light</button>
+    <button id="stageDark" class="active">Dark</button>
+    <span class="label" style="margin-left:auto">GIFs shown as scrubable PNG-frame players &middot; per-clip Play / Replay / Pause</span>
+  </div>
+</header>
+
+<section id="sec-compare">
+  <h2>hello: reference vs Raster</h2>
+  <p class="note">Left: the sample reference robot (<span class="mono">../references/mascots/wave/mascot-wave.gif</span>).
+     Right: Raster (<span class="mono">gifs/hello.gif</span>). Both are displayed at the same character height (240 px)
+     and aligned so the waving shoulder points coincide.</p>
+  <div class="cmp-pair">
+    <figure>
+      <div class="cmp-view"><img id="cmp-sample" src="../references/mascots/wave/mascot-wave.gif" alt="sample robot wave"></div>
+      <figcaption>Sample reference &mdash; <span class="mono">../references/mascots/wave/mascot-wave.gif</span> (759 px GIF, character y=70..663, shoulder (507, 473))</figcaption>
+    </figure>
+    <figure>
+      <div class="cmp-view"><img id="cmp-hello" src="gifs/hello.gif" alt="Raster hello wave"></div>
+      <figcaption>Raster &mdash; <span class="mono">gifs/hello.gif</span> (96 px GIF, character y=2..91, shoulder (66.5, 58.5))
+        <button id="replayHello" style="margin-left:6px">Replay</button></figcaption>
+    </figure>
+  </div>
+  <h3>Pre-rendered comparison sheet</h3>
+  <p class="note"><span class="mono">source/_hello_compare.png</span> &mdash; sample robot vs Raster hello at equal height, aligned at the waving shoulder (rendered by <span class="mono">source\compare_reference.py</span>).</p>
+  <img class="sheet" src="source/_hello_compare.png" alt="hello comparison: sample robot vs Raster at equal height, shoulder aligned">
+</section>
+
+<section id="sec-power">
+  <h2>power-down &rarr; wake-up handoff</h2>
+  <p class="note">One Play button: <span class="mono">gifs/power-down.gif</span> plays to its end and freezes on the last frame (asleep),
+     holds a 400&nbsp;ms beat, then continues seamlessly into <span class="mono">gifs/wake-up.gif</span>, whose first frame is the same asleep pose.
+     Driven by the PNG frames + <span class="mono">manifest.json</span> timings. Honours the current size and stage.</p>
+  <div style="max-width:260px">
+    <div class="stage"><canvas id="seq-canvas" class="sprite" width="96" height="96"></canvas></div>
+    <div class="controls" style="display:flex;gap:6px;margin-top:8px">
+      <button id="seq-play">Play</button>
+    </div>
+  </div>
+</section>
+
+<section id="sec-gallery">
+  <h2>Gallery &mdash; all 32 animations</h2>
+  <h3>Loops (12)</h3>
+  <div class="gallery" id="gallery-loops"></div>
+  <h3>One-shots (20)</h3>
+  <div class="gallery" id="gallery-onces"></div>
+</section>
+
+<script>
+"use strict";
+
+/* ===========================================================================
+ * Manifest data, inlined as a JS literal so the page works over file://
+ * (no fetch()). Source of truth: raster-animations/manifest.json.
+ * Frame paths are relative to this file (raster-animations/).
+ * =========================================================================== */
+const ANIMATIONS = [
+ {name:"idle-blink", filename:"gifs/idle-blink.gif", mode:"loop", frame_count:4,
+  frames:["frames/idle-blink/000.png","frames/idle-blink/001.png","frames/idle-blink/002.png","frames/idle-blink/003.png"],
+  durations_ms:[1700,80,100,80], total_ms:1960, start_pose:"neutral", end_pose:"blink0.45"},
+ {name:"idle-look-around", filename:"gifs/idle-look-around.gif", mode:"loop", frame_count:8,
+  frames:["frames/idle-look-around/000.png","frames/idle-look-around/001.png","frames/idle-look-around/002.png","frames/idle-look-around/003.png","frames/idle-look-around/004.png","frames/idle-look-around/005.png","frames/idle-look-around/006.png","frames/idle-look-around/007.png"],
+  durations_ms:[1500,900,140,700,140,900,140,600], total_ms:5020, start_pose:"neutral", end_pose:"neutral"},
+ {name:"idle-antenna-settle", filename:"gifs/idle-antenna-settle.gif", mode:"loop", frame_count:4,
+  frames:["frames/idle-antenna-settle/000.png","frames/idle-antenna-settle/001.png","frames/idle-antenna-settle/002.png","frames/idle-antenna-settle/003.png"],
+  durations_ms:[2300,130,170,130], total_ms:2730, start_pose:"neutral", end_pose:"ant:normal_mid"},
+ {name:"listening", filename:"gifs/listening.gif", mode:"loop", frame_count:4,
+  frames:["frames/listening/000.png","frames/listening/001.png","frames/listening/002.png","frames/listening/003.png"],
+  durations_ms:[700,150,2400,150], total_ms:3400, start_pose:"neutral", end_pose:"head+1+0 gaze+1+0"},
+ {name:"sleepy", filename:"gifs/sleepy.gif", mode:"loop", frame_count:5,
+  frames:["frames/sleepy/000.png","frames/sleepy/001.png","frames/sleepy/002.png","frames/sleepy/003.png","frames/sleepy/004.png"],
+  durations_ms:[600,1300,350,600,350], total_ms:3200, start_pose:"head+0+1 blink0.45 eye:normal_dim ant:normal_dim", end_pose:"head+0+1 blink0.45 eye:normal_dim ant:normal_dim"},
+ {name:"thinking", filename:"gifs/thinking.gif", mode:"loop", frame_count:8,
+  frames:["frames/thinking/000.png","frames/thinking/001.png","frames/thinking/002.png","frames/thinking/003.png","frames/thinking/004.png","frames/thinking/005.png","frames/thinking/006.png","frames/thinking/007.png"],
+  durations_ms:[900,160,1000,250,350,600,160,600], total_ms:4020, start_pose:"neutral", end_pose:"neutral"},
+ {name:"searching", filename:"gifs/searching.gif", mode:"loop", frame_count:7,
+  frames:["frames/searching/000.png","frames/searching/001.png","frames/searching/002.png","frames/searching/003.png","frames/searching/004.png","frames/searching/005.png","frames/searching/006.png"],
+  durations_ms:[500,350,600,300,450,350,400], total_ms:2950, start_pose:"head-1+0 gaze-2-1", end_pose:"head-1+0 gaze-2-1"},
+ {name:"reading", filename:"gifs/reading.gif", mode:"loop", frame_count:7,
+  frames:["frames/reading/000.png","frames/reading/001.png","frames/reading/002.png","frames/reading/003.png","frames/reading/004.png","frames/reading/005.png","frames/reading/006.png"],
+  durations_ms:[400,300,300,300,400,120,200], total_ms:2020, start_pose:"gaze-2+0", end_pose:"gaze-2+0 blink0.45"},
+ {name:"typing", filename:"gifs/typing.gif", mode:"loop", frame_count:4,
+  frames:["frames/typing/000.png","frames/typing/001.png","frames/typing/002.png","frames/typing/003.png"],
+  durations_ms:[140,140,140,140], total_ms:560, start_pose:"armL=r2 armR=r2 gaze+0+1", end_pose:"armL=r2 armR=r2 gaze+0+1"},
+ {name:"speaking", filename:"gifs/speaking.gif", mode:"loop", frame_count:8,
+  frames:["frames/speaking/000.png","frames/speaking/001.png","frames/speaking/002.png","frames/speaking/003.png","frames/speaking/004.png","frames/speaking/005.png","frames/speaking/006.png","frames/speaking/007.png"],
+  durations_ms:[250,250,250,250,250,250,250,250], total_ms:2000, start_pose:"armL=r2 armR=r1", end_pose:"armL=r1 armR=r2"},
+ {name:"processing", filename:"gifs/processing.gif", mode:"loop", frame_count:4,
+  frames:["frames/processing/000.png","frames/processing/001.png","frames/processing/002.png","frames/processing/003.png"],
+  durations_ms:[170,170,170,170], total_ms:680, start_pose:"lamps:bright/dim/dim", end_pose:"lamps:dim/dim/dim"},
+ {name:"waiting", filename:"gifs/waiting.gif", mode:"loop", frame_count:5,
+  frames:["frames/waiting/000.png","frames/waiting/001.png","frames/waiting/002.png","frames/waiting/003.png","frames/waiting/004.png"],
+  durations_ms:[2800,120,150,120,600], total_ms:3790, start_pose:"neutral", end_pose:"neutral"},
+ {name:"idle-double-blink", filename:"gifs/idle-double-blink.gif", mode:"once", frame_count:9,
+  frames:["frames/idle-double-blink/000.png","frames/idle-double-blink/001.png","frames/idle-double-blink/002.png","frames/idle-double-blink/003.png","frames/idle-double-blink/004.png","frames/idle-double-blink/005.png","frames/idle-double-blink/006.png","frames/idle-double-blink/007.png","frames/idle-double-blink/008.png"],
+  durations_ms:[700,70,80,70,180,70,80,70,1000], total_ms:2320, start_pose:"neutral", end_pose:"neutral"},
+ {name:"notice", filename:"gifs/notice.gif", mode:"once", frame_count:4,
+  frames:["frames/notice/000.png","frames/notice/001.png","frames/notice/002.png","frames/notice/003.png"],
+  durations_ms:[450,260,450,500], total_ms:1660, start_pose:"neutral", end_pose:"neutral"},
+ {name:"curious", filename:"gifs/curious.gif", mode:"once", frame_count:7,
+  frames:["frames/curious/000.png","frames/curious/001.png","frames/curious/002.png","frames/curious/003.png","frames/curious/004.png","frames/curious/005.png","frames/curious/006.png"],
+  durations_ms:[350,160,750,200,250,450,400], total_ms:2560, start_pose:"neutral", end_pose:"neutral"},
+ {name:"idea", filename:"gifs/idea.gif", mode:"once", frame_count:12,
+  frames:["frames/idea/000.png","frames/idea/001.png","frames/idea/002.png","frames/idea/003.png","frames/idea/004.png","frames/idea/005.png","frames/idea/006.png","frames/idea/007.png","frames/idea/008.png","frames/idea/009.png","frames/idea/010.png","frames/idea/011.png"],
+  durations_ms:[250,90,90,80,230,80,90,270,80,110,120,350], total_ms:1840, start_pose:"neutral", end_pose:"neutral"},
+ {name:"success", filename:"gifs/success.gif", mode:"once", frame_count:6,
+  frames:["frames/success/000.png","frames/success/001.png","frames/success/002.png","frames/success/003.png","frames/success/004.png","frames/success/005.png"],
+  durations_ms:[300,140,160,160,400,500], total_ms:1660, start_pose:"neutral", end_pose:"neutral"},
+ {name:"celebrate", filename:"gifs/celebrate.gif", mode:"once", frame_count:5,
+  frames:["frames/celebrate/000.png","frames/celebrate/001.png","frames/celebrate/002.png","frames/celebrate/003.png","frames/celebrate/004.png"],
+  durations_ms:[400,160,880,220,500], total_ms:2160, start_pose:"neutral", end_pose:"neutral"},
+ {name:"acknowledge", filename:"gifs/acknowledge.gif", mode:"once", frame_count:5,
+  frames:["frames/acknowledge/000.png","frames/acknowledge/001.png","frames/acknowledge/002.png","frames/acknowledge/003.png","frames/acknowledge/004.png"],
+  durations_ms:[350,130,140,130,450], total_ms:1200, start_pose:"neutral", end_pose:"neutral"},
+ {name:"unsure", filename:"gifs/unsure.gif", mode:"once", frame_count:8,
+  frames:["frames/unsure/000.png","frames/unsure/001.png","frames/unsure/002.png","frames/unsure/003.png","frames/unsure/004.png","frames/unsure/005.png","frames/unsure/006.png","frames/unsure/007.png"],
+  durations_ms:[300,120,120,120,120,250,350,400], total_ms:1780, start_pose:"neutral", end_pose:"neutral"},
+ {name:"confused", filename:"gifs/confused.gif", mode:"once", frame_count:7,
+  frames:["frames/confused/000.png","frames/confused/001.png","frames/confused/002.png","frames/confused/003.png","frames/confused/004.png","frames/confused/005.png","frames/confused/006.png"],
+  durations_ms:[350,150,400,120,120,350,400], total_ms:1890, start_pose:"neutral", end_pose:"neutral"},
+ {name:"warning", filename:"gifs/warning.gif", mode:"once", frame_count:7,
+  frames:["frames/warning/000.png","frames/warning/001.png","frames/warning/002.png","frames/warning/003.png","frames/warning/004.png","frames/warning/005.png","frames/warning/006.png"],
+  durations_ms:[300,400,450,400,450,400,500], total_ms:2900, start_pose:"neutral", end_pose:"neutral"},
+ {name:"error", filename:"gifs/error.gif", mode:"once", frame_count:10,
+  frames:["frames/error/000.png","frames/error/001.png","frames/error/002.png","frames/error/003.png","frames/error/004.png","frames/error/005.png","frames/error/006.png","frames/error/007.png","frames/error/008.png","frames/error/009.png"],
+  durations_ms:[350,300,400,300,400,250,250,350,500,500], total_ms:3600, start_pose:"neutral", end_pose:"neutral"},
+ {name:"encourage", filename:"gifs/encourage.gif", mode:"once", frame_count:12,
+  frames:["frames/encourage/000.png","frames/encourage/001.png","frames/encourage/002.png","frames/encourage/003.png","frames/encourage/004.png","frames/encourage/005.png","frames/encourage/006.png","frames/encourage/007.png","frames/encourage/008.png","frames/encourage/009.png","frames/encourage/010.png","frames/encourage/011.png"],
+  durations_ms:[350,150,150,160,220,170,300,190,210,230,250,600], total_ms:2980, start_pose:"neutral", end_pose:"neutral"},
+ {name:"look-left", filename:"gifs/look-left.gif", mode:"once", frame_count:5,
+  frames:["frames/look-left/000.png","frames/look-left/001.png","frames/look-left/002.png","frames/look-left/003.png","frames/look-left/004.png"],
+  durations_ms:[300,150,1200,180,350], total_ms:2180, start_pose:"neutral", end_pose:"neutral"},
+ {name:"look-right", filename:"gifs/look-right.gif", mode:"once", frame_count:5,
+  frames:["frames/look-right/000.png","frames/look-right/001.png","frames/look-right/002.png","frames/look-right/003.png","frames/look-right/004.png"],
+  durations_ms:[300,150,1200,180,350], total_ms:2180, start_pose:"neutral", end_pose:"neutral"},
+ {name:"look-up", filename:"gifs/look-up.gif", mode:"once", frame_count:5,
+  frames:["frames/look-up/000.png","frames/look-up/001.png","frames/look-up/002.png","frames/look-up/003.png","frames/look-up/004.png"],
+  durations_ms:[300,150,1200,180,350], total_ms:2180, start_pose:"neutral", end_pose:"neutral"},
+ {name:"look-down", filename:"gifs/look-down.gif", mode:"once", frame_count:5,
+  frames:["frames/look-down/000.png","frames/look-down/001.png","frames/look-down/002.png","frames/look-down/003.png","frames/look-down/004.png"],
+  durations_ms:[300,150,1200,180,350], total_ms:2180, start_pose:"neutral", end_pose:"neutral"},
+ {name:"hello", filename:"gifs/hello.gif", mode:"once", frame_count:17,
+  frames:["frames/hello/000.png","frames/hello/001.png","frames/hello/002.png","frames/hello/003.png","frames/hello/004.png","frames/hello/005.png","frames/hello/006.png","frames/hello/007.png","frames/hello/008.png","frames/hello/009.png","frames/hello/010.png","frames/hello/011.png","frames/hello/012.png","frames/hello/013.png","frames/hello/014.png","frames/hello/015.png","frames/hello/016.png"],
+  durations_ms:[500,110,110,110,110,100,130,110,110,110,110,140,120,120,120,120,700], total_ms:2930, start_pose:"neutral", end_pose:"neutral"},
+ {name:"goodbye", filename:"gifs/goodbye.gif", mode:"once", frame_count:19,
+  frames:["frames/goodbye/000.png","frames/goodbye/001.png","frames/goodbye/002.png","frames/goodbye/003.png","frames/goodbye/004.png","frames/goodbye/005.png","frames/goodbye/006.png","frames/goodbye/007.png","frames/goodbye/008.png","frames/goodbye/009.png","frames/goodbye/010.png","frames/goodbye/011.png","frames/goodbye/012.png","frames/goodbye/013.png","frames/goodbye/014.png","frames/goodbye/015.png","frames/goodbye/016.png","frames/goodbye/017.png","frames/goodbye/018.png"],
+  durations_ms:[400,90,90,90,90,80,90,80,80,80,80,330,150,170,190,210,230,250,450], total_ms:3230, start_pose:"neutral", end_pose:"neutral"},
+ {name:"wake-up", filename:"gifs/wake-up.gif", mode:"once", frame_count:6,
+  frames:["frames/wake-up/000.png","frames/wake-up/001.png","frames/wake-up/002.png","frames/wake-up/003.png","frames/wake-up/004.png","frames/wake-up/005.png"],
+  durations_ms:[600,250,250,300,400,900], total_ms:2700, start_pose:"asleep", end_pose:"neutral"},
+ {name:"power-down", filename:"gifs/power-down.gif", mode:"once", frame_count:5,
+  frames:["frames/power-down/000.png","frames/power-down/001.png","frames/power-down/002.png","frames/power-down/003.png","frames/power-down/004.png"],
+  durations_ms:[500,250,250,300,1050], total_ms:2350, start_pose:"neutral", end_pose:"asleep"}
+];
+
+const byName = {};
+ANIMATIONS.forEach(function (a) { byName[a.name] = a; });
+
+/* Roster order: 12 loops, then 20 one-shots (matches manifest.json order). */
+const ROSTER_LOOPS = ["idle-blink","idle-look-around","idle-antenna-settle","listening","sleepy",
+  "thinking","searching","reading","typing","speaking","processing","waiting"];
+const ROSTER_ONCE = ["idle-double-blink","notice","curious","idea","success","celebrate","acknowledge",
+  "unsure","confused","warning","error","encourage","look-left","look-right","look-up","look-down",
+  "hello","goodbye","wake-up","power-down"];
+
+/* ===========================================================================
+ * ClipPlayer — the single viewer code path used everywhere.
+ * Plays a clip's frames/<name>/NNN.png sequence through a 96x96 canvas using
+ * the manifest's per-frame durations_ms (GIFs auto-play, so true pause/scrub
+ * needs the PNG sequence). mode "loop" repeats, mode "once" stops frozen on
+ * its last frame.
+ * =========================================================================== */
+class ClipPlayer {
+  constructor(clip, ui) {
+    this.clip = clip;
+    this.ui = ui || {};
+    this.n = clip.frames.length;
+    this.i = 0;
+    this.timer = null;
+    this.playing = false;
+    this.pausedAt = false;
+    this.finished = false;
+    this.remaining = 0;
+    this.t0 = 0;
+    this.onEnd = this.ui.onEnd || null;
+    const self = this;
+    this.images = clip.frames.map(function (src) {
+      const im = new Image();
+      im.onload = function () { if (!self.playing) self.draw(self.i); };
+      im.src = src;
+      return im;
+    });
+    if (this.ui.canvas) {
+      this.ctx = this.ui.canvas.getContext("2d");
+      this.ctx.imageSmoothingEnabled = false;
+    }
+    if (this.ui.scrub) {
+      this.ui.scrub.min = 0;
+      this.ui.scrub.max = this.n - 1;
+      this.ui.scrub.addEventListener("input", function () {
+        self.pause();
+        self.finished = false;
+        self.pausedAt = true;            // Play continues from the scrubbed frame
+        self.show(+self.ui.scrub.value);
+        self.syncUI();
+      });
+    }
+    if (this.ui.play)   this.ui.play.addEventListener("click", function () { self.play(); });
+    if (this.ui.replay) this.ui.replay.addEventListener("click", function () { self.replay(); });
+    if (this.ui.pauseBtn) this.ui.pauseBtn.addEventListener("click", function () { self.togglePause(); });
+    this.show(0);
+    this.syncUI();
+  }
+  show(i) { this.i = i; this.draw(i); }
+  draw(i) {
+    if (this.ctx) {
+      this.ctx.clearRect(0, 0, 96, 96);
+      const im = this.images[i];
+      if (im && im.complete && im.naturalWidth) this.ctx.drawImage(im, 0, 0);
+    }
+    if (this.ui.scrub) this.ui.scrub.value = i;
+  }
+  tick() {
+    this.draw(this.i);
+    this.remaining = this.clip.durations_ms[this.i];
+    this.t0 = performance.now();
+    const self = this;
+    this.timer = setTimeout(function () { self.advance(); }, this.remaining);
+    this.syncUI();
+  }
+  advance() {
+    let next = this.i + 1;
+    if (next >= this.n) {
+      if (this.clip.mode === "loop") {
+        next = 0;
+      } else {
+        this.playing = false;
+        this.finished = true;
+        this.pausedAt = false;
+        this.show(this.n - 1);           // frozen on the last frame
+        this.syncUI();
+        if (this.onEnd) this.onEnd();
+        return;
+      }
+    }
+    this.i = next;
+    this.tick();
+  }
+  play() {
+    if (this.playing) return;
+    if (this.pausedAt) {                 // resume mid-clip
+      this.playing = true;
+      this.t0 = performance.now();
+      const self = this;
+      this.timer = setTimeout(function () { self.advance(); }, Math.max(this.remaining, 0));
+      this.syncUI();
+      return;
+    }
+    if (this.finished) this.i = 0;       // Play after the end restarts
+    this.finished = false;
+    this.playing = true;
+    this.tick();
+  }
+  replay() {
+    clearTimeout(this.timer);
+    this.pausedAt = false;
+    this.finished = false;
+    this.playing = true;
+    this.i = 0;
+    this.tick();
+  }
+  pause() {
+    if (!this.playing) return;
+    clearTimeout(this.timer);
+    this.remaining -= performance.now() - this.t0;
+    this.playing = false;
+    this.pausedAt = true;
+    this.syncUI();
+  }
+  togglePause() {
+    if (this.playing) this.pause(); else this.play();
+    this.syncUI();
+  }
+  syncUI() {
+    if (this.ui.pauseBtn) {
+      this.ui.pauseBtn.textContent = this.playing ? "Pause" : "Resume";
+      this.ui.pauseBtn.disabled = !this.playing && !this.pausedAt;
+    }
+    if (this.ui.play) this.ui.play.disabled = this.playing;
+    if (this.ui.replay) this.ui.replay.disabled = false;
+  }
+}
+
+/* ---- gallery (one viewer per animation, shared code path) ---------------- */
+function fmtMs(ms) { return (ms / 1000).toFixed(2) + " s (" + ms + " ms)"; }
+
+function buildCell(clip) {
+  const cell = document.createElement("article");
+  cell.className = "cell";
+  cell.innerHTML =
+    '<div class="stage"><canvas class="sprite" width="96" height="96"></canvas></div>' +
+    '<div class="meta"><strong></strong><span class="badge"></span></div>' +
+    '<div class="info"></div>' +
+    '<div class="controls"><button data-act="play">Play</button>' +
+    '<button data-act="replay">Replay</button><button data-act="pause">Pause</button></div>' +
+    '<input type="range" min="0" max="' + (clip.frame_count - 1) + '" value="0" title="frame scrubber">';
+  cell.querySelector("strong").textContent = clip.name;
+  const badge = cell.querySelector(".badge");
+  badge.textContent = clip.mode;
+  badge.classList.add(clip.mode);
+  cell.querySelector(".info").innerHTML =
+    clip.frame_count + " frames &middot; " + fmtMs(clip.total_ms) + "<br>" +
+    '<a href="' + clip.filename + '">' + clip.filename + "</a>";
+  new ClipPlayer(clip, {
+    canvas: cell.querySelector("canvas"),
+    scrub: cell.querySelector("input[type=range]"),
+    play: cell.querySelector('[data-act=play]'),
+    replay: cell.querySelector('[data-act=replay]'),
+    pauseBtn: cell.querySelector('[data-act=pause]')
+  });
+  return cell;
+}
+
+const gLoops = document.getElementById("gallery-loops");
+const gOnce = document.getElementById("gallery-onces");
+ROSTER_LOOPS.forEach(function (n) { gLoops.appendChild(buildCell(byName[n])); });
+ROSTER_ONCE.forEach(function (n) { gOnce.appendChild(buildCell(byName[n])); });
+
+/* ---- global size + stage switch (CSS vars, so every viewer follows) ------ */
+function setGroup(prefix, cls) {
+  document.querySelectorAll(".global-controls button").forEach(function (b) {
+    if (b.id.indexOf(prefix) === 0) b.classList.toggle("active", b.id === cls);
+  });
+}
+document.getElementById("size48").addEventListener("click", function () {
+  document.body.classList.remove("size-96"); document.body.classList.add("size-48"); setGroup("size", "size48");
+});
+document.getElementById("size96").addEventListener("click", function () {
+  document.body.classList.remove("size-48"); document.body.classList.add("size-96"); setGroup("size", "size96");
+});
+document.getElementById("stageLight").addEventListener("click", function () {
+  document.body.classList.remove("stage-dark"); document.body.classList.add("stage-light"); setGroup("stage", "stageLight");
+});
+document.getElementById("stageDark").addEventListener("click", function () {
+  document.body.classList.remove("stage-light"); document.body.classList.add("stage-dark"); setGroup("stage", "stageDark");
+});
+
+/* ===========================================================================
+ * hello: reference vs Raster — equal character height, shoulder-aligned.
+ *
+ * Sample robot: 759 px tall GIF; character occupies rows y=70..663 (inclusive)
+ *   -> character height 594 px; waving shoulder at (507, 473) in GIF pixels.
+ * Raster: 96x96 GIF; character occupies rows y=2..91 (inclusive)
+ *   -> character height 90 px (ground row y=91); waving shoulder at (66.5, 58.5).
+ *
+ * Both are shown at matched character height H: scale s = H / charHeight, so the
+ * full GIF display size is (gifW*s, gifH*s). Each <img> is absolutely placed in
+ * a fixed viewport so its shoulder lands on the shared anchor point:
+ *     left = ANCHOR_X - shoulderX * s
+ *     top  = ANCHOR_Y - shoulderY * s
+ * =========================================================================== */
+const H = 240;                 // matched character height, px
+const ANCHOR_X = 150, ANCHOR_Y = 170;   // shoulder anchor inside the 300x280 viewport
+
+function alignSprite(imgId, gifHeightPx, charTopRow, charBottomRow, shoulderX, shoulderY) {
+  const img = document.getElementById(imgId);
+  const charH = charBottomRow - charTopRow + 1;   // rows are inclusive
+  const s = H / charH;
+  img.style.height = (gifHeightPx * s) + "px";
+  img.style.width = "auto";
+  img.style.left = (ANCHOR_X - shoulderX * s) + "px";
+  img.style.top = (ANCHOR_Y - shoulderY * s) + "px";
+}
+alignSprite("cmp-sample", 759, 70, 663, 507, 473);
+alignSprite("cmp-hello", 96, 2, 91, 66.5, 58.5);
+
+/* Restart the once-mode hello GIF from frame 0 (drop src, reflow, reassign). */
+document.getElementById("replayHello").addEventListener("click", function () {
+  const img = document.getElementById("cmp-hello");
+  img.removeAttribute("src");
+  void img.offsetWidth;
+  img.src = "gifs/hello.gif";
+});
+
+/* ===========================================================================
+ * power-down -> wake-up handoff player.
+ * Plays gifs/power-down.gif to its end (frozen on the last frame, asleep),
+ * holds a 400 ms beat, then continues into gifs/wake-up.gif (whose first frame
+ * is the same asleep pose) — all through the shared ClipPlayer on PNG frames.
+ * The beat is folded into power-down's final (asleep) frame duration; wake-up's
+ * first frame is identical pixels, so the handoff is seamless.
+ * =========================================================================== */
+const pd = byName["power-down"], wu = byName["wake-up"];
+const seqClip = {
+  name: "power-down -> wake-up",
+  mode: "once",
+  frames: pd.frames.concat(wu.frames),
+  frame_count: pd.frame_count + wu.frame_count,
+  durations_ms: pd.durations_ms.slice(0, -1)
+    .concat([pd.durations_ms[pd.durations_ms.length - 1] + 400])   // freeze + 400 ms beat
+    .concat(wu.durations_ms),
+  total_ms: pd.total_ms + 400 + wu.total_ms,
+  start_pose: pd.start_pose,
+  end_pose: wu.end_pose
+};
+new ClipPlayer(seqClip, {
+  canvas: document.getElementById("seq-canvas"),
+  play: document.getElementById("seq-play")
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Trace animation pack</title>
+<style>
+  :root { --bg:#f2f3f7; --fg:#1b1d26; --card:#ffffff; --line:#d8dbe4; --stage:#e9ebf2; }
+  body.dark { --bg:#15171e; --fg:#e8eaf2; --card:#1e212b; --line:#343846; --stage:#0c0d12; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:24px; background:var(--bg); color:var(--fg);
+         font:14px/1.45 system-ui,Segoe UI,sans-serif; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .sub { opacity:.7; margin-bottom:16px; }
+  .bar { position:sticky; top:0; z-index:5; display:flex; gap:8px; flex-wrap:wrap;
+          align-items:center; padding:10px 0 14px; background:var(--bg); }
+  button, select { font:inherit; padding:6px 12px; border:1px solid var(--line);
+          border-radius:8px; background:var(--card); color:var(--fg); cursor:pointer; }
+  button:hover { border-color:#8ab4f8; }
+  .cat { font-size:15px; margin:22px 0 10px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px;
+           padding:12px; }
+  .meta { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  .name { font-weight:600; }
+  .tag { font-size:11px; padding:2px 8px; border-radius:99px; border:1px solid var(--line); }
+  .tag.loop { color:#0a7d4b; border-color:#0a7d4b; }
+  .tag.one-shot { color:#a2570a; border-color:#a2570a; }
+  .stages { display:flex; gap:14px; align-items:flex-end; }
+  .stage { background:var(--stage); border:1px solid var(--line); border-radius:10px;
+            padding:8px; display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .stage img { image-rendering:pixelated; display:block; }
+  .stage:first-child img { width:48px; height:48px; }
+  .stage:last-child img { width:96px; height:96px; }
+  .px { font-size:10px; opacity:.6; }
+  .desc { margin:8px 0 4px; min-height:34px; }
+  .info { font-size:11px; opacity:.6; }
+  .controls { display:flex; gap:6px; margin-top:8px; }
+  .controls button { padding:4px 10px; font-size:12px; }
+</style>
+</head>
+<body>
+  <h1>Trace animation pack</h1>
+  <div class="sub">32 animations &middot; 140&times;140 canvas &middot; transparent GIF + PNG
+    frames &middot; generated from trace.png</div>
+  <div class="bar">
+    <button id="bg">Dark background</button>
+    <button id="playall">Play all</button>
+    <button id="stopall">All still</button>
+    <span class="sub" style="margin:0">Thumbnails stay still until you press Play.</span>
+  </div>
+  <h2 class="cat">Idle and attention</h2><div class="grid">
+      <div class="card" data-name="idle-blink" data-gif="gifs/idle-blink.gif"
+           data-still="frames/idle-blink/00.png">
+        <div class="meta">
+          <span class="name">idle-blink</span>
+          <span class="tag loop">loop</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="idle-blink 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="idle-blink 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">Hold the curious expression, blink once quickly, reopen.</div>
+        <div class="info">5 frames &middot; 3780 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="idle-double-blink" data-gif="gifs/idle-double-blink.gif"
+           data-still="frames/idle-double-blink/00.png">
+        <div class="meta">
+          <span class="name">idle-double-blink</span>
+          <span class="tag one-shot">one-shot</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="idle-double-blink 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="idle-double-blink 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">Two short blinks with an open beat; the second is quicker.</div>
+        <div class="info">9 frames &middot; 1850 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="idle-look-around" data-gif="gifs/idle-look-around.gif"
+           data-still="frames/idle-look-around/00.png">
+        <div class="meta">
+          <span class="name">idle-look-around</span>
+          <span class="tag loop">loop</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="idle-look-around 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="idle-look-around 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">Eyes drift left, pause, glance right, return home. Wire stays still.</div>
+        <div class="info">7 frames &middot; 4870 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="idle-sway" data-gif="gifs/idle-sway.gif"
+           data-still="frames/idle-sway/00.png">
+        <div class="meta">
+          <span class="name">idle-sway</span>
+          <span class="tag loop">loop</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="idle-sway 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="idle-sway 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">Upper wire leans a few cells each way; bottom stays planted.</div>
+        <div class="info">9 frames &middot; 3260 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="notice" data-gif="gifs/notice.gif"
+           data-still="frames/notice/00.png">
+        <div class="meta">
+          <span class="name">notice</span>
+          <span class="tag one-shot">one-shot</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="notice 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="notice 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">Pupils turn to the viewer first; brows lift a beat later.</div>
+        <div class="info">5 frames &middot; 3000 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="listening" data-gif="gifs/listening.gif"
+           data-still="frames/listening/00.png">
+        <div class="meta">
+          <span class="name">listening</span>
+          <span class="tag loop">loop</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="listening 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="listening 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">Lean to one side, attentive gaze, small occasional nods.</div>
+        <div class="info">5 frames &middot; 4060 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="curious" data-gif="gifs/curious.gif"
+           data-still="frames/curious/00.png">
+        <div class="meta">
+          <span class="name">curious</span>
+          <span class="tag one-shot">one-shot</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="curious 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="curious 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">One brow rises while the pupils track just above the viewer.</div>
+        <div class="info">6 frames &middot; 3100 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="sleepy" data-gif="gifs/sleepy.gif"
+           data-still="frames/sleepy/00.png">
+        <div class="meta">
+          <span class="name">sleepy</span>
+          <span class="tag loop">loop</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="sleepy 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="sleepy 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">Lids droop, the upper loop dips, then the eyes ease open.</div>
+        <div class="info">11 frames &middot; 4640 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div></div><h2 class="cat">Assistant activity</h2><div class="grid">
+      <div class="card" data-name="thinking" data-gif="gifs/thinking.gif"
+           data-still="frames/thinking/00.png">
+        <div class="meta">
+          <span class="name">thinking</span>
+          <span class="tag loop">loop</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="thinking 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="thinking 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">Look up to one side; the status light slowly pulses (teal tones).</div>
+        <div class="info">4 frames &middot; 2600 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="searching" data-gif="gifs/searching.gif"
+           data-still="frames/searching/00.png">
+        <div class="meta">
+          <span class="name">searching</span>
+          <span class="tag loop">loop</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="searching 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="searching 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">Pupils scan in three deliberate stops, pause, return to the first.</div>
+        <div class="info">5 frames &middot; 2370 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="reading" data-gif="gifs/reading.gif"
+           data-still="frames/reading/00.png">
+        <div class="meta">
+          <span class="name">reading</span>
+          <span class="tag loop">loop</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="reading 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="reading 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">Eyes scan a short line, snap back, repeat one cell lower, reset.</div>
+        <div class="info">13 frames &middot; 1540 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="typing" data-gif="gifs/typing.gif"
+           data-still="frames/typing/00.png">
+        <div class="meta">
+          <span class="name">typing</span>
+          <span class="tag loop">loop</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="typing 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="typing 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">Look slightly down; short irregular upper-body dips for keystrokes.</div>
+        <div class="info">11 frames &middot; 1310 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="writing" data-gif="gifs/writing.gif"
+           data-still="frames/writing/00.png">
+        <div class="meta">
+          <span class="name">writing</span>
+          <span class="tag loop">loop</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="writing 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="writing 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">One long smooth eye sweep, pause at the end, return for the next line.</div>
+        <div class="info">19 frames &middot; 3570 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="processing" data-gif="gifs/processing.gif"
+           data-still="frames/processing/00.png">
+        <div class="meta">
+          <span class="name">processing</span>
+          <span class="tag loop">loop</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="processing 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="processing 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">Focused gaze; the status light cycles dim-medium-bright, quietly.</div>
+        <div class="info">4 frames &middot; 3200 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="waiting" data-gif="gifs/waiting.gif"
+           data-still="frames/waiting/00.png">
+        <div class="meta">
+          <span class="name">waiting</span>
+          <span class="tag loop">loop</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="waiting 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="waiting 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">Patient holds with one glance toward the collared tip.</div>
+        <div class="info">5 frames &middot; 6380 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="idea" data-gif="gifs/idea.gif"
+           data-still="frames/idea/00.png">
+        <div class="meta">
+          <span class="name">idea</span>
+          <span class="tag one-shot">one-shot</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="idea 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="idea 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">Glance up, pause, both brows lift as the light brightens once.</div>
+        <div class="info">5 frames &middot; 3230 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div></div><h2 class="cat">Feedback and reactions</h2><div class="grid">
+      <div class="card" data-name="success" data-gif="gifs/success.gif"
+           data-still="frames/success/00.png">
+        <div class="meta">
+          <span class="name">success</span>
+          <span class="tag one-shot">one-shot</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="success 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="success 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">One confident nod and one clear teal acknowledgment pulse.</div>
+        <div class="info">6 frames &middot; 1870 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="celebrate" data-gif="gifs/celebrate.gif"
+           data-still="frames/celebrate/00.png">
+        <div class="meta">
+          <span class="name">celebrate</span>
+          <span class="tag one-shot">one-shot</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="celebrate 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="celebrate 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">Anticipation, buoyant hop, landing, quick settle (biggest move).</div>
+        <div class="info">8 frames &middot; 1610 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="acknowledge" data-gif="gifs/acknowledge.gif"
+           data-still="frames/acknowledge/00.png">
+        <div class="meta">
+          <span class="name">acknowledge</span>
+          <span class="tag one-shot">one-shot</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="acknowledge 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="acknowledge 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">A restrained single nod; steady eyes, steady light.</div>
+        <div class="info">5 frames &middot; 1350 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="unsure" data-gif="gifs/unsure.gif"
+           data-still="frames/unsure/00.png">
+        <div class="meta">
+          <span class="name">unsure</span>
+          <span class="tag one-shot">one-shot</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="unsure 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="unsure 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">Pupils hesitate between two spots; one brow lifts, one stays low.</div>
+        <div class="info">7 frames &middot; 3060 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="confused" data-gif="gifs/confused.gif"
+           data-still="frames/confused/00.png">
+        <div class="meta">
+          <span class="name">confused</span>
+          <span class="tag one-shot">one-shot</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="confused 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="confused 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">Look one way, tilt the upper loop the other way, puzzled hold.</div>
+        <div class="info">5 frames &middot; 2550 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="warning" data-gif="gifs/warning.gif"
+           data-still="frames/warning/00.png">
+        <div class="meta">
+          <span class="name">warning</span>
+          <span class="tag one-shot">one-shot</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="warning 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="warning 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">Straighten and hold an alert posture (reads in grayscale).</div>
+        <div class="info">4 frames &middot; 2590 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="error" data-gif="gifs/error.gif"
+           data-still="frames/error/00.png">
+        <div class="meta">
+          <span class="name">error</span>
+          <span class="tag one-shot">one-shot</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="error 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="error 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">Recoil, one blink, recover to a composed pose; light dims briefly.</div>
+        <div class="info">8 frames &middot; 1850 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="relieved" data-gif="gifs/relieved.gif"
+           data-still="frames/relieved/00.png">
+        <div class="meta">
+          <span class="name">relieved</span>
+          <span class="tag one-shot">one-shot</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="relieved 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="relieved 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">Lower the brows, soften the lids, ease the loop back to rest.</div>
+        <div class="info">7 frames &middot; 2380 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div></div><h2 class="cat">Direction, greetings, and transitions</h2><div class="grid">
+      <div class="card" data-name="look-left" data-gif="gifs/look-left.gif"
+           data-still="frames/look-left/00.png">
+        <div class="meta">
+          <span class="name">look-left</span>
+          <span class="tag one-shot">one-shot</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="look-left 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="look-left 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">Both pupils move left and hold to direct attention.</div>
+        <div class="info">5 frames &middot; 2270 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="look-right" data-gif="gifs/look-right.gif"
+           data-still="frames/look-right/00.png">
+        <div class="meta">
+          <span class="name">look-right</span>
+          <span class="tag one-shot">one-shot</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="look-right 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="look-right 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">Same timing as look-left, with the pupils moving right.</div>
+        <div class="info">5 frames &middot; 2270 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="look-up" data-gif="gifs/look-up.gif"
+           data-still="frames/look-up/00.png">
+        <div class="meta">
+          <span class="name">look-up</span>
+          <span class="tag one-shot">one-shot</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="look-up 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="look-up 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">Pupils lead upward, then the brows lift slightly.</div>
+        <div class="info">5 frames &middot; 2430 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="look-down" data-gif="gifs/look-down.gif"
+           data-still="frames/look-down/00.png">
+        <div class="meta">
+          <span class="name">look-down</span>
+          <span class="tag one-shot">one-shot</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="look-down 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="look-down 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">Lower the pupils and tip the upper loop forward a little.</div>
+        <div class="info">5 frames &middot; 2440 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="hello" data-gif="gifs/hello.gif"
+           data-still="frames/hello/00.png">
+        <div class="meta">
+          <span class="name">hello</span>
+          <span class="tag one-shot">one-shot</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="hello 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="hello 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">A small welcoming bounce, then an asymmetric brow lift.</div>
+        <div class="info">7 frames &middot; 2770 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="goodbye" data-gif="gifs/goodbye.gif"
+           data-still="frames/goodbye/00.png">
+        <div class="meta">
+          <span class="name">goodbye</span>
+          <span class="tag one-shot">one-shot</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="goodbye 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="goodbye 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">A warm longer blink and a gentle bow, ending on the original pose.</div>
+        <div class="info">9 frames &middot; 1830 ms
+          &middot; neutral &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="wake-up" data-gif="gifs/wake-up.gif"
+           data-still="frames/wake-up/00.png">
+        <div class="meta">
+          <span class="name">wake-up</span>
+          <span class="tag one-shot">one-shot</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="wake-up 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="wake-up 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">From the drooped pose, one eye opens first, then straighten.</div>
+        <div class="info">6 frames &middot; 2760 ms
+          &middot; drooped-sleepy &rarr; neutral</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div>
+      <div class="card" data-name="power-down" data-gif="gifs/power-down.gif"
+           data-still="frames/power-down/00.png">
+        <div class="meta">
+          <span class="name">power-down</span>
+          <span class="tag one-shot">one-shot</span>
+        </div>
+        <div class="stages">
+          <div class="stage"><img alt="power-down 48px"><span class="px">48 px</span></div>
+          <div class="stage"><img alt="power-down 96px"><span class="px">96 px</span></div>
+        </div>
+        <div class="desc">Dim the light, lower the brows, settle eyes-closed and hold.</div>
+        <div class="info">7 frames &middot; 3980 ms
+          &middot; neutral &rarr; eyes-closed-rest</div>
+        <div class="controls">
+          <button class="play">Play</button>
+          <button class="replay">Replay</button>
+          <button class="stop">Still</button>
+        </div>
+      </div></div>
+<script>
+  function applySizes() {
+    document.querySelectorAll('.card').forEach(card => {
+      const imgs = card.querySelectorAll('img');
+      imgs.forEach(img => {
+        if (!img.dataset.state || img.dataset.state === 'still')
+          img.src = card.dataset.still;
+      });
+    });
+  }
+  function setPlay(card, mode) {
+    const imgs = card.querySelectorAll('img');
+    imgs.forEach(img => {
+      if (mode === 'play') { img.dataset.state = 'play'; img.src = card.dataset.gif; }
+      else if (mode === 'replay') {
+        img.dataset.state = 'play';
+        img.src = card.dataset.still;
+        void img.offsetWidth;
+        img.src = card.dataset.gif + '?t=' + Date.now();
+      } else { img.dataset.state = 'still'; img.src = card.dataset.still; }
+    });
+  }
+  document.querySelectorAll('.card').forEach(card => {
+    card.querySelector('.play').onclick = () => setPlay(card, 'play');
+    card.querySelector('.replay').onclick = () => setPlay(card, 'replay');
+    card.querySelector('.stop').onclick = () => setPlay(card, 'still');
+    card.querySelector('.stages').onclick = () => setPlay(card, 'replay');
+  });
+  document.getElementById('bg').onclick = function () {
+    document.body.classList.toggle('dark');
+    this.textContent = document.body.classList.contains('dark')
+      ? 'Light background' : 'Dark background';
+  };
+  document.getElementById('playall').onclick = () =>
+    document.querySelectorAll('.card').forEach(c => setPlay(c, 'play'));
+  document.getElementById('stopall').onclick = () =>
+    document.querySelectorAll('.card').forEach(c => setPlay(c, 'still'));
+  applySizes();
+</script>
+</body>
+</html>

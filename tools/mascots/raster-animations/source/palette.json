@@ -1,0 +1,52 @@
+{
+ "comment": "Fixed palette and signal-cue ramps for the Raster animation pack. Every pixel of every exported frame uses one of these colours. Cue ramps are listed light -> dark and are applied through the eye / antenna / chest-lamp masks only; the faceplate, eye catchlights and all other highlights stay stable.",
+ "fixed_palette": [
+  "#0b0d16", "#141c30", "#2a3552", "#3b5473", "#5b7495", "#7d97ba", "#a8c0dc",
+  "#46516d", "#67748f", "#36405a", "#111827", "#253049",
+  "#6a7c8c", "#b2b6b8", "#e6e7e4", "#f6f7f3",
+  "#c98263", "#d99774", "#efb28a",
+  "#2c6b64", "#3f877e", "#5aa397", "#9cd6cc", "#d3f0ea",
+  "#0ab00f", "#66d714", "#0d860a", "#f7f7f2",
+  "#d9bf92", "#4f938d", "#e09272"
+ ],
+ "signal_palettes": {
+  "normal": ["#f2ff20", "#ececa3", "#b5e550", "#abc32f", "#809c13", "#607c3c",
+             "#0eff00", "#1fc600", "#089000", "#0a5d00", "#063b00"],
+  "warning_error": ["#bbdb44", "#f7e379", "#f2a134", "#e51f1f"]
+ },
+ "cues": {
+  "eye": {
+   "base": null,
+   "normal_bright": ["#0eff00", "#1fc600", "#089000"],
+   "normal_mid":   ["#1fc600", "#089000", "#0a5d00"],
+   "normal_dim":   ["#089000", "#0a5d00", "#063b00"],
+   "warn_a": ["#f7e379", "#bbdb44", "#809c13"],
+   "warn_b": ["#f2a134", "#f7e379", "#bbdb44"],
+   "err_a":  ["#f2a134", "#bbdb44", "#607c3c"],
+   "err_b":  ["#e51f1f", "#f2a134", "#bbdb44"],
+   "off":    ["#0a5d00", "#063b00", "#063b00"]
+  },
+  "antenna": {
+   "base": null,
+   "normal_bright": ["#f2ff20", "#ececa3", "#b5e550"],
+   "normal_mid":   ["#b5e550", "#abc32f", "#809c13"],
+   "normal_dim":   ["#abc32f", "#809c13", "#607c3c"],
+   "warn_a": ["#f7e379", "#bbdb44", "#809c13"],
+   "warn_b": ["#f2a134", "#f7e379", "#bbdb44"],
+   "err_a":  ["#f2a134", "#bbdb44", "#607c3c"],
+   "err_b":  ["#e51f1f", "#f2a134", "#bbdb44"],
+   "off":    ["#607c3c", "#607c3c", "#607c3c"]
+  },
+  "lamp": {
+   "base": null,
+   "off":    ["#141c30", "#141c30", "#141c30"],
+   "dim":    ["#253049", "#253049", "#253049"],
+   "bright": ["#f2ff20", "#ececa3", "#b5e550"],
+   "bright_cool": ["#d3f0ea", "#9cd6cc", "#5aa397"],
+   "bright_warm": ["#f7e379", "#f2a134", "#e51f1f"]
+  }
+ },
+ "cue_color_roles": {
+  "comment": "green ramp = eyes; yellow-green ramp = antenna signal bulb; chest lamps brighten with the nearest ramp to their base hue. Warning cues run yellow (#f7e379 / #bbdb44) to amber (#f2a134); error cues run amber (#f2a134) to red (#e51f1f)."
+ }
+}

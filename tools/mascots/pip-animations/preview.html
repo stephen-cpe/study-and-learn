@@ -1,0 +1,1625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pip - animation pack preview</title>
+<style>
+  :root { --bg: #f2f3f5; --card: #ffffff; --fg: #1d2330; --muted: #6a7386; --stage: #ffffff; --line: #dde1e8; }
+  body.dark { --bg: #0f1116; --card: #181b23; --fg: #e8ecf4; --muted: #98a1b5; --stage: #12141c; --line: #2a2f3c; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 14px/1.5 system-ui, "Segoe UI", sans-serif; }
+  header { position: sticky; top: 0; z-index: 5; background: var(--bg);
+           border-bottom: 1px solid var(--line); padding: 14px 22px 12px; }
+  h1 { font-size: 18px; margin: 0 0 2px; }
+  .sub { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+  button, .seg button { font: inherit; border: 1px solid var(--line); background: var(--card);
+        color: var(--fg); border-radius: 8px; padding: 5px 12px; cursor: pointer; }
+  button:hover, .seg button:hover { border-color: var(--muted); }
+  button.primary { background: #3b6ef6; border-color: #3b6ef6; color: #fff; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; padding: 5px 12px; }
+  .seg button.on { background: #3b6ef6; color: #fff; }
+  main { padding: 18px 22px 60px; }
+  section { margin-bottom: 30px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em;
+       color: var(--muted); margin: 0 0 10px; }
+  .grid { display: flex; flex-wrap: wrap; gap: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+          padding: 10px; width: 150px; }
+  .stage { background: var(--stage); border: 1px solid var(--line); border-radius: 8px;
+           display: flex; align-items: center; justify-content: center; height: 118px;
+           margin-bottom: 8px; gap: 8px; }
+  canvas.sprite { image-rendering: pixelated; height: 96px; width: auto; }
+  body.s48 canvas.sprite { height: 48px; }
+  body.s48 .stage { height: 70px; }
+  canvas.v48 { image-rendering: pixelated; height: 48px; width: auto; }
+  canvas.v96 { image-rendering: pixelated; height: 96px; width: auto; }
+  img.v96 { image-rendering: pixelated; height: 96px; width: auto; }
+  .name { font-weight: 600; font-size: 13px; word-break: break-all; }
+  .meta { color: var(--muted); font-size: 11px; margin-bottom: 8px; }
+  .card .row, .row { display: flex; gap: 6px; }
+  .card button { flex: 1; padding: 4px 0; font-size: 12px; border-radius: 6px; }
+  .card.playing { outline: 2px solid #3b6ef6; }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+           padding: 12px 14px; margin-bottom: 12px; }
+  .cmp { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .cmp .who { width: 150px; }
+  .cmp .box { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .cmp .lab { font-size: 10px; color: var(--muted); }
+  .cmp .stage { height: 118px; margin: 0; padding: 4px 8px; }
+  .poses { display: flex; gap: 12px; flex-wrap: wrap; }
+  .poses .p { text-align: center; }
+  .poses .stage { height: 118px; margin: 0 0 4px; padding: 6px; }
+  .poses .lab { font-size: 11px; color: var(--muted); max-width: 110px; }
+  .hint { color: var(--muted); font-size: 12px; max-width: 560px; margin: 0 0 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Pip &mdash; animation pack</h1>
+  <div class="sub">32 transparent animations &middot; 128&times;192 working canvas &middot; stills until you press play</div>
+  <div class="controls">
+    <div class="seg" id="sizeSeg">
+      <button data-size="48">48 px</button>
+      <button data-size="96" class="on">96 px</button>
+    </div>
+    <div class="seg" id="bgSeg">
+      <button data-bg="light" class="on">Light</button>
+      <button data-bg="dark">Dark</button>
+    </div>
+    <button id="playAll">Play all once</button>
+  </div>
+</header>
+<main>
+  <section>
+    <h2>Head motion &mdash; before / after this pass</h2>
+    <p class="hint">Original (baseline) and revised clips side by side at 48 px and 96 px.
+       Replay starts both sides together. Watch the snout, jawline and neck &mdash; the
+       pupils lead, then the whole head turns, dips or lifts.</p>
+    <div class="row" style="margin-bottom:10px">
+      <button class="primary" id="cmpAll">Replay all comparisons</button>
+    </div>
+    <div id="cmpList"></div>
+  </section>
+
+  <section>
+    <h2>Reusable head poses (still strip)</h2>
+    <p class="hint">Neutral, turn left, turn right, chin up, chin down, listening tilt.
+       The turns change the projected snout and the amount of far eye; the chin poses
+       pivot at the gray neck and change the neck exposure; the tilt tips sideways.</p>
+    <div class="poses" id="poseStrip"></div>
+  </section>
+
+  <section>
+    <h2>Head motion diagnostic &mdash; pupils pinned</h2>
+    <p class="hint">Turn, nod and tilt with the pupils held at neutral: only the head
+       silhouette carries the meaning. If two gestures look alike here, their key poses
+       need work.</p>
+    <div class="panel cmp">
+      <div class="box"><div class="stage"><canvas class="v96" id="diagC" width="128" height="192"></canvas></div>
+        <div class="lab">48 px below</div>
+        <canvas class="v48" id="diagCs" width="128" height="192"></canvas></div>
+      <div class="who">
+        <div class="name">head-diagnostic.gif</div>
+        <div class="meta">loop &middot; neutral &rarr; turn L &rarr; turn R &rarr; chin down &rarr; rebound &rarr; tilt</div>
+        <div class="row"><button class="primary" id="diagPlay" style="flex:1">Play</button>
+          <button id="diagReplay" style="flex:1">Replay</button></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Power-down &rarr; wake-up transition</h2>
+    <div class="panel cmp" id="transition">
+      <div class="box"><div class="stage"><canvas class="sprite" id="tCanvas" width="128" height="192"></canvas></div></div>
+      <div class="who">
+        <div class="name">power-down &rarr; wake-up</div>
+        <div class="meta">the resting endpoint is shared: the last frame of power-down is the first frame of wake-up</div>
+        <div class="row"><button class="primary" id="tPlay" style="flex:1">Play transition</button>
+          <button id="tReplay" style="flex:1">Replay</button></div>
+      </div>
+    </div>
+  </section>
+  <div id="groups"></div>
+</main>
+<script>
+const PACK = {
+ "manifest": {
+  "character": "Pip (Azthreus robotic baby T. rex)",
+  "canvas": [
+   128,
+   192
+  ],
+  "working_scale": {
+   "cell_px": 6,
+   "note": "1 working pixel = 6 native pip.png pixels; motion happens in whole working pixels, scaling is nearest-neighbour"
+  },
+  "ground": 184,
+  "head_poses": {
+   "neutral": "neutral (approved model pose, preserved exactly)",
+   "turn_L": "turn toward screen-left (face toward front)",
+   "turn_R": "turn toward screen-right (a little more profile)",
+   "chin_up": "chin up (snout lifts away from the chest, more neck shows)",
+   "chin_up_soft": "small upward rebound",
+   "chin_down": "chin down (snout dips toward the chest, less neck shows)",
+   "tilt": "listening tilt (sideways toward one shoulder)"
+  },
+  "animations": [
+   {
+    "name": "idle-blink",
+    "file": "gifs/idle-blink.gif",
+    "category": "Idle and attention",
+    "frames": [
+     "frames/idle-blink/01.png",
+     "frames/idle-blink/02.png",
+     "frames/idle-blink/03.png",
+     "frames/idle-blink/04.png",
+     "frames/idle-blink/05.png"
+    ],
+    "durations_ms": [
+     2500,
+     80,
+     110,
+     70,
+     400
+    ],
+    "total_ms": 3160,
+    "behavior": "loop",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "idle-double-blink",
+    "file": "gifs/idle-double-blink.gif",
+    "category": "Idle and attention",
+    "frames": [
+     "frames/idle-double-blink/01.png",
+     "frames/idle-double-blink/02.png",
+     "frames/idle-double-blink/03.png",
+     "frames/idle-double-blink/04.png",
+     "frames/idle-double-blink/05.png",
+     "frames/idle-double-blink/06.png",
+     "frames/idle-double-blink/07.png",
+     "frames/idle-double-blink/08.png",
+     "frames/idle-double-blink/09.png"
+    ],
+    "durations_ms": [
+     1100,
+     70,
+     100,
+     60,
+     380,
+     60,
+     80,
+     40,
+     1150
+    ],
+    "total_ms": 3040,
+    "behavior": "one-shot",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "idle-look-around",
+    "file": "gifs/idle-look-around.gif",
+    "category": "Idle and attention",
+    "frames": [
+     "frames/idle-look-around/01.png",
+     "frames/idle-look-around/02.png",
+     "frames/idle-look-around/03.png",
+     "frames/idle-look-around/04.png",
+     "frames/idle-look-around/05.png",
+     "frames/idle-look-around/06.png",
+     "frames/idle-look-around/07.png"
+    ],
+    "durations_ms": [
+     1200,
+     90,
+     850,
+     90,
+     850,
+     90,
+     1200
+    ],
+    "total_ms": 4370,
+    "behavior": "loop",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "idle-tail-sway",
+    "file": "gifs/idle-tail-sway.gif",
+    "category": "Idle and attention",
+    "frames": [
+     "frames/idle-tail-sway/01.png",
+     "frames/idle-tail-sway/02.png",
+     "frames/idle-tail-sway/03.png",
+     "frames/idle-tail-sway/04.png",
+     "frames/idle-tail-sway/05.png",
+     "frames/idle-tail-sway/06.png",
+     "frames/idle-tail-sway/07.png",
+     "frames/idle-tail-sway/08.png",
+     "frames/idle-tail-sway/09.png"
+    ],
+    "durations_ms": [
+     900,
+     500,
+     650,
+     500,
+     450,
+     500,
+     650,
+     500,
+     900
+    ],
+    "total_ms": 5550,
+    "behavior": "loop",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "notice",
+    "file": "gifs/notice.gif",
+    "category": "Idle and attention",
+    "frames": [
+     "frames/notice/01.png",
+     "frames/notice/02.png",
+     "frames/notice/03.png",
+     "frames/notice/04.png",
+     "frames/notice/05.png"
+    ],
+    "durations_ms": [
+     550,
+     470,
+     680,
+     220,
+     700
+    ],
+    "total_ms": 2620,
+    "behavior": "one-shot",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "listening",
+    "file": "gifs/listening.gif",
+    "category": "Idle and attention",
+    "frames": [
+     "frames/listening/01.png",
+     "frames/listening/02.png",
+     "frames/listening/03.png",
+     "frames/listening/04.png",
+     "frames/listening/05.png"
+    ],
+    "durations_ms": [
+     1300,
+     340,
+     2200,
+     300,
+     2400
+    ],
+    "total_ms": 6540,
+    "behavior": "loop",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "curious",
+    "file": "gifs/curious.gif",
+    "category": "Idle and attention",
+    "frames": [
+     "frames/curious/01.png",
+     "frames/curious/02.png",
+     "frames/curious/03.png",
+     "frames/curious/04.png",
+     "frames/curious/05.png"
+    ],
+    "durations_ms": [
+     450,
+     490,
+     1550,
+     270,
+     650
+    ],
+    "total_ms": 3410,
+    "behavior": "one-shot",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "sleepy",
+    "file": "gifs/sleepy.gif",
+    "category": "Idle and attention",
+    "frames": [
+     "frames/sleepy/01.png",
+     "frames/sleepy/02.png",
+     "frames/sleepy/03.png",
+     "frames/sleepy/04.png",
+     "frames/sleepy/05.png",
+     "frames/sleepy/06.png"
+    ],
+    "durations_ms": [
+     1500,
+     380,
+     380,
+     850,
+     260,
+     850
+    ],
+    "total_ms": 4220,
+    "behavior": "loop",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "thinking",
+    "file": "gifs/thinking.gif",
+    "category": "Assistant activity",
+    "frames": [
+     "frames/thinking/01.png",
+     "frames/thinking/02.png",
+     "frames/thinking/03.png",
+     "frames/thinking/04.png",
+     "frames/thinking/05.png",
+     "frames/thinking/06.png",
+     "frames/thinking/07.png"
+    ],
+    "durations_ms": [
+     700,
+     90,
+     1500,
+     450,
+     350,
+     90,
+     700
+    ],
+    "total_ms": 3880,
+    "behavior": "loop",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "searching",
+    "file": "gifs/searching.gif",
+    "category": "Assistant activity",
+    "frames": [
+     "frames/searching/01.png",
+     "frames/searching/02.png",
+     "frames/searching/03.png",
+     "frames/searching/04.png",
+     "frames/searching/05.png",
+     "frames/searching/06.png",
+     "frames/searching/07.png",
+     "frames/searching/08.png"
+    ],
+    "durations_ms": [
+     420,
+     70,
+     780,
+     710,
+     70,
+     480,
+     680,
+     520
+    ],
+    "total_ms": 3730,
+    "behavior": "loop",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "reading",
+    "file": "gifs/reading.gif",
+    "category": "Assistant activity",
+    "frames": [
+     "frames/reading/01.png",
+     "frames/reading/02.png",
+     "frames/reading/03.png",
+     "frames/reading/04.png",
+     "frames/reading/05.png",
+     "frames/reading/06.png",
+     "frames/reading/07.png",
+     "frames/reading/08.png",
+     "frames/reading/09.png",
+     "frames/reading/10.png"
+    ],
+    "durations_ms": [
+     550,
+     130,
+     120,
+     120,
+     280,
+     70,
+     120,
+     120,
+     300,
+     750
+    ],
+    "total_ms": 2560,
+    "behavior": "loop",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "typing",
+    "file": "gifs/typing.gif",
+    "category": "Assistant activity",
+    "frames": [
+     "frames/typing/01.png",
+     "frames/typing/02.png",
+     "frames/typing/03.png",
+     "frames/typing/04.png",
+     "frames/typing/05.png",
+     "frames/typing/06.png",
+     "frames/typing/07.png",
+     "frames/typing/08.png",
+     "frames/typing/09.png",
+     "frames/typing/10.png",
+     "frames/typing/11.png",
+     "frames/typing/12.png"
+    ],
+    "durations_ms": [
+     350,
+     220,
+     110,
+     80,
+     100,
+     130,
+     90,
+     100,
+     70,
+     120,
+     420,
+     550
+    ],
+    "total_ms": 2340,
+    "behavior": "loop",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "speaking",
+    "file": "gifs/speaking.gif",
+    "category": "Assistant activity",
+    "frames": [
+     "frames/speaking/01.png",
+     "frames/speaking/02.png",
+     "frames/speaking/03.png",
+     "frames/speaking/04.png",
+     "frames/speaking/05.png",
+     "frames/speaking/06.png",
+     "frames/speaking/07.png",
+     "frames/speaking/08.png",
+     "frames/speaking/09.png"
+    ],
+    "durations_ms": [
+     280,
+     150,
+     110,
+     230,
+     170,
+     190,
+     120,
+     200,
+     850
+    ],
+    "total_ms": 2300,
+    "behavior": "loop",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "processing",
+    "file": "gifs/processing.gif",
+    "category": "Assistant activity",
+    "frames": [
+     "frames/processing/01.png",
+     "frames/processing/02.png",
+     "frames/processing/03.png",
+     "frames/processing/04.png",
+     "frames/processing/05.png"
+    ],
+    "durations_ms": [
+     1300,
+     130,
+     160,
+     130,
+     3250
+    ],
+    "total_ms": 4970,
+    "behavior": "loop",
+    "start_pose": "focused gaze",
+    "end_pose": "focused gaze"
+   },
+   {
+    "name": "waiting",
+    "file": "gifs/waiting.gif",
+    "category": "Assistant activity",
+    "frames": [
+     "frames/waiting/01.png",
+     "frames/waiting/02.png",
+     "frames/waiting/03.png",
+     "frames/waiting/04.png",
+     "frames/waiting/05.png"
+    ],
+    "durations_ms": [
+     2600,
+     90,
+     700,
+     90,
+     2500
+    ],
+    "total_ms": 5980,
+    "behavior": "loop",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "idea",
+    "file": "gifs/idea.gif",
+    "category": "Assistant activity",
+    "frames": [
+     "frames/idea/01.png",
+     "frames/idea/02.png",
+     "frames/idea/03.png",
+     "frames/idea/04.png",
+     "frames/idea/05.png"
+    ],
+    "durations_ms": [
+     550,
+     520,
+     1610,
+     300,
+     700
+    ],
+    "total_ms": 3680,
+    "behavior": "one-shot",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "success",
+    "file": "gifs/success.gif",
+    "category": "Feedback and reactions",
+    "frames": [
+     "frames/success/01.png",
+     "frames/success/02.png",
+     "frames/success/03.png",
+     "frames/success/04.png",
+     "frames/success/05.png",
+     "frames/success/06.png",
+     "frames/success/07.png",
+     "frames/success/08.png"
+    ],
+    "durations_ms": [
+     320,
+     450,
+     190,
+     260,
+     220,
+     220,
+     180,
+     520
+    ],
+    "total_ms": 2360,
+    "behavior": "one-shot",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "celebrate",
+    "file": "gifs/celebrate.gif",
+    "category": "Feedback and reactions",
+    "frames": [
+     "frames/celebrate/01.png",
+     "frames/celebrate/02.png",
+     "frames/celebrate/03.png",
+     "frames/celebrate/04.png",
+     "frames/celebrate/05.png",
+     "frames/celebrate/06.png",
+     "frames/celebrate/07.png",
+     "frames/celebrate/08.png"
+    ],
+    "durations_ms": [
+     250,
+     150,
+     110,
+     140,
+     110,
+     140,
+     160,
+     550
+    ],
+    "total_ms": 1610,
+    "behavior": "one-shot",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "acknowledge",
+    "file": "gifs/acknowledge.gif",
+    "category": "Feedback and reactions",
+    "frames": [
+     "frames/acknowledge/01.png",
+     "frames/acknowledge/02.png",
+     "frames/acknowledge/03.png",
+     "frames/acknowledge/04.png"
+    ],
+    "durations_ms": [
+     380,
+     480,
+     190,
+     850
+    ],
+    "total_ms": 1900,
+    "behavior": "one-shot",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "unsure",
+    "file": "gifs/unsure.gif",
+    "category": "Feedback and reactions",
+    "frames": [
+     "frames/unsure/01.png",
+     "frames/unsure/02.png",
+     "frames/unsure/03.png",
+     "frames/unsure/04.png",
+     "frames/unsure/05.png",
+     "frames/unsure/06.png",
+     "frames/unsure/07.png"
+    ],
+    "durations_ms": [
+     400,
+     100,
+     420,
+     350,
+     250,
+     230,
+     550
+    ],
+    "total_ms": 2300,
+    "behavior": "one-shot",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "confused",
+    "file": "gifs/confused.gif",
+    "category": "Feedback and reactions",
+    "frames": [
+     "frames/confused/01.png",
+     "frames/confused/02.png",
+     "frames/confused/03.png",
+     "frames/confused/04.png",
+     "frames/confused/05.png",
+     "frames/confused/06.png",
+     "frames/confused/07.png"
+    ],
+    "durations_ms": [
+     430,
+     320,
+     150,
+     260,
+     1030,
+     180,
+     640
+    ],
+    "total_ms": 3010,
+    "behavior": "one-shot",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "warning",
+    "file": "gifs/warning.gif",
+    "category": "Feedback and reactions",
+    "frames": [
+     "frames/warning/01.png",
+     "frames/warning/02.png",
+     "frames/warning/03.png",
+     "frames/warning/04.png"
+    ],
+    "durations_ms": [
+     300,
+     160,
+     1330,
+     950
+    ],
+    "total_ms": 2740,
+    "behavior": "one-shot",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "error",
+    "file": "gifs/error.gif",
+    "category": "Feedback and reactions",
+    "frames": [
+     "frames/error/01.png",
+     "frames/error/02.png",
+     "frames/error/03.png",
+     "frames/error/04.png",
+     "frames/error/05.png",
+     "frames/error/06.png",
+     "frames/error/07.png"
+    ],
+    "durations_ms": [
+     350,
+     350,
+     70,
+     100,
+     60,
+     650,
+     600
+    ],
+    "total_ms": 2180,
+    "behavior": "one-shot",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "relieved",
+    "file": "gifs/relieved.gif",
+    "category": "Feedback and reactions",
+    "frames": [
+     "frames/relieved/01.png",
+     "frames/relieved/02.png",
+     "frames/relieved/03.png",
+     "frames/relieved/04.png",
+     "frames/relieved/05.png"
+    ],
+    "durations_ms": [
+     300,
+     320,
+     800,
+     380,
+     700
+    ],
+    "total_ms": 2500,
+    "behavior": "one-shot",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "look-left",
+    "file": "gifs/look-left.gif",
+    "category": "Direction, greetings, and transitions",
+    "frames": [
+     "frames/look-left/01.png",
+     "frames/look-left/02.png",
+     "frames/look-left/03.png",
+     "frames/look-left/04.png",
+     "frames/look-left/05.png",
+     "frames/look-left/06.png",
+     "frames/look-left/07.png"
+    ],
+    "durations_ms": [
+     400,
+     110,
+     330,
+     1480,
+     190,
+     110,
+     550
+    ],
+    "total_ms": 3170,
+    "behavior": "one-shot",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "look-right",
+    "file": "gifs/look-right.gif",
+    "category": "Direction, greetings, and transitions",
+    "frames": [
+     "frames/look-right/01.png",
+     "frames/look-right/02.png",
+     "frames/look-right/03.png",
+     "frames/look-right/04.png",
+     "frames/look-right/05.png",
+     "frames/look-right/06.png",
+     "frames/look-right/07.png"
+    ],
+    "durations_ms": [
+     400,
+     110,
+     330,
+     1480,
+     190,
+     110,
+     550
+    ],
+    "total_ms": 3170,
+    "behavior": "one-shot",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "look-up",
+    "file": "gifs/look-up.gif",
+    "category": "Direction, greetings, and transitions",
+    "frames": [
+     "frames/look-up/01.png",
+     "frames/look-up/02.png",
+     "frames/look-up/03.png",
+     "frames/look-up/04.png",
+     "frames/look-up/05.png"
+    ],
+    "durations_ms": [
+     420,
+     460,
+     1400,
+     230,
+     600
+    ],
+    "total_ms": 3110,
+    "behavior": "one-shot",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "look-down",
+    "file": "gifs/look-down.gif",
+    "category": "Direction, greetings, and transitions",
+    "frames": [
+     "frames/look-down/01.png",
+     "frames/look-down/02.png",
+     "frames/look-down/03.png",
+     "frames/look-down/04.png",
+     "frames/look-down/05.png"
+    ],
+    "durations_ms": [
+     420,
+     460,
+     1400,
+     230,
+     600
+    ],
+    "total_ms": 3110,
+    "behavior": "one-shot",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "hello",
+    "file": "gifs/hello.gif",
+    "category": "Direction, greetings, and transitions",
+    "frames": [
+     "frames/hello/01.png",
+     "frames/hello/02.png",
+     "frames/hello/03.png",
+     "frames/hello/04.png",
+     "frames/hello/05.png",
+     "frames/hello/06.png",
+     "frames/hello/07.png"
+    ],
+    "durations_ms": [
+     350,
+     320,
+     190,
+     150,
+     190,
+     220,
+     650
+    ],
+    "total_ms": 2070,
+    "behavior": "one-shot",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "goodbye",
+    "file": "gifs/goodbye.gif",
+    "category": "Direction, greetings, and transitions",
+    "frames": [
+     "frames/goodbye/01.png",
+     "frames/goodbye/02.png",
+     "frames/goodbye/03.png",
+     "frames/goodbye/04.png",
+     "frames/goodbye/05.png",
+     "frames/goodbye/06.png",
+     "frames/goodbye/07.png",
+     "frames/goodbye/08.png",
+     "frames/goodbye/09.png"
+    ],
+    "durations_ms": [
+     350,
+     100,
+     330,
+     90,
+     200,
+     260,
+     600,
+     300,
+     700
+    ],
+    "total_ms": 2930,
+    "behavior": "one-shot",
+    "start_pose": "neutral",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "wake-up",
+    "file": "gifs/wake-up.gif",
+    "category": "Direction, greetings, and transitions",
+    "frames": [
+     "frames/wake-up/01.png",
+     "frames/wake-up/02.png",
+     "frames/wake-up/03.png",
+     "frames/wake-up/04.png",
+     "frames/wake-up/05.png",
+     "frames/wake-up/06.png"
+    ],
+    "durations_ms": [
+     500,
+     260,
+     260,
+     300,
+     280,
+     700
+    ],
+    "total_ms": 2300,
+    "behavior": "one-shot",
+    "start_pose": "resting",
+    "end_pose": "neutral"
+   },
+   {
+    "name": "power-down",
+    "file": "gifs/power-down.gif",
+    "category": "Direction, greetings, and transitions",
+    "frames": [
+     "frames/power-down/01.png",
+     "frames/power-down/02.png",
+     "frames/power-down/03.png",
+     "frames/power-down/04.png",
+     "frames/power-down/05.png"
+    ],
+    "durations_ms": [
+     450,
+     350,
+     350,
+     320,
+     1300
+    ],
+    "total_ms": 2770,
+    "behavior": "one-shot",
+    "start_pose": "neutral",
+    "end_pose": "resting"
+   }
+  ]
+ },
+ "poses": [
+  {
+   "id": "neutral",
+   "label": "neutral (approved model pose, preserved exactly)",
+   "file": "poses/neutral.png"
+  },
+  {
+   "id": "turn_L",
+   "label": "turn toward screen-left (face toward front)",
+   "file": "poses/turn_L.png"
+  },
+  {
+   "id": "turn_R",
+   "label": "turn toward screen-right (a little more profile)",
+   "file": "poses/turn_R.png"
+  },
+  {
+   "id": "chin_up",
+   "label": "chin up (snout lifts away from the chest, more neck shows)",
+   "file": "poses/chin_up.png"
+  },
+  {
+   "id": "chin_down",
+   "label": "chin down (snout dips toward the chest, less neck shows)",
+   "file": "poses/chin_down.png"
+  },
+  {
+   "id": "tilt",
+   "label": "listening tilt (sideways toward one shoulder)",
+   "file": "poses/tilt.png"
+  }
+ ],
+ "diagnostic": {
+  "file": "poses/head-diagnostic.gif",
+  "frames": [
+   "poses/head-diagnostic/01.png",
+   "poses/head-diagnostic/02.png",
+   "poses/head-diagnostic/03.png",
+   "poses/head-diagnostic/04.png",
+   "poses/head-diagnostic/05.png",
+   "poses/head-diagnostic/06.png",
+   "poses/head-diagnostic/07.png",
+   "poses/head-diagnostic/08.png",
+   "poses/head-diagnostic/09.png",
+   "poses/head-diagnostic/10.png"
+  ],
+  "durations_ms": [
+   700,
+   800,
+   450,
+   800,
+   450,
+   650,
+   400,
+   450,
+   800,
+   700
+  ],
+  "note": "pupils pinned at neutral - only the head silhouette carries meaning"
+ },
+ "head_motion": [
+  {
+   "name": "look-left",
+   "before": {
+    "frames": [
+     "baseline/frames/look-left/01.png",
+     "baseline/frames/look-left/02.png",
+     "baseline/frames/look-left/03.png",
+     "baseline/frames/look-left/04.png",
+     "baseline/frames/look-left/05.png"
+    ],
+    "durations_ms": [
+     450,
+     90,
+     950,
+     90,
+     600
+    ]
+   },
+   "after": {
+    "frames": [
+     "frames/look-left/01.png",
+     "frames/look-left/02.png",
+     "frames/look-left/03.png",
+     "frames/look-left/04.png",
+     "frames/look-left/05.png",
+     "frames/look-left/06.png",
+     "frames/look-left/07.png"
+    ],
+    "durations_ms": [
+     400,
+     110,
+     330,
+     1480,
+     190,
+     110,
+     550
+    ]
+   }
+  },
+  {
+   "name": "look-right",
+   "before": {
+    "frames": [
+     "baseline/frames/look-right/01.png",
+     "baseline/frames/look-right/02.png",
+     "baseline/frames/look-right/03.png",
+     "baseline/frames/look-right/04.png",
+     "baseline/frames/look-right/05.png"
+    ],
+    "durations_ms": [
+     450,
+     90,
+     950,
+     90,
+     600
+    ]
+   },
+   "after": {
+    "frames": [
+     "frames/look-right/01.png",
+     "frames/look-right/02.png",
+     "frames/look-right/03.png",
+     "frames/look-right/04.png",
+     "frames/look-right/05.png",
+     "frames/look-right/06.png",
+     "frames/look-right/07.png"
+    ],
+    "durations_ms": [
+     400,
+     110,
+     330,
+     1480,
+     190,
+     110,
+     550
+    ]
+   }
+  },
+  {
+   "name": "look-up",
+   "before": {
+    "frames": [
+     "baseline/frames/look-up/01.png",
+     "baseline/frames/look-up/02.png",
+     "baseline/frames/look-up/03.png",
+     "baseline/frames/look-up/04.png",
+     "baseline/frames/look-up/05.png"
+    ],
+    "durations_ms": [
+     450,
+     400,
+     800,
+     200,
+     600
+    ]
+   },
+   "after": {
+    "frames": [
+     "frames/look-up/01.png",
+     "frames/look-up/02.png",
+     "frames/look-up/03.png",
+     "frames/look-up/04.png",
+     "frames/look-up/05.png"
+    ],
+    "durations_ms": [
+     420,
+     460,
+     1400,
+     230,
+     600
+    ]
+   }
+  },
+  {
+   "name": "look-down",
+   "before": {
+    "frames": [
+     "baseline/frames/look-down/01.png",
+     "baseline/frames/look-down/02.png",
+     "baseline/frames/look-down/03.png",
+     "baseline/frames/look-down/04.png",
+     "baseline/frames/look-down/05.png"
+    ],
+    "durations_ms": [
+     450,
+     400,
+     800,
+     200,
+     600
+    ]
+   },
+   "after": {
+    "frames": [
+     "frames/look-down/01.png",
+     "frames/look-down/02.png",
+     "frames/look-down/03.png",
+     "frames/look-down/04.png",
+     "frames/look-down/05.png"
+    ],
+    "durations_ms": [
+     420,
+     460,
+     1400,
+     230,
+     600
+    ]
+   }
+  },
+  {
+   "name": "acknowledge",
+   "before": {
+    "frames": [
+     "baseline/frames/acknowledge/01.png",
+     "baseline/frames/acknowledge/02.png",
+     "baseline/frames/acknowledge/03.png",
+     "baseline/frames/acknowledge/04.png",
+     "baseline/frames/acknowledge/05.png",
+     "baseline/frames/acknowledge/06.png"
+    ],
+    "durations_ms": [
+     250,
+     180,
+     130,
+     170,
+     250,
+     650
+    ]
+   },
+   "after": {
+    "frames": [
+     "frames/acknowledge/01.png",
+     "frames/acknowledge/02.png",
+     "frames/acknowledge/03.png",
+     "frames/acknowledge/04.png"
+    ],
+    "durations_ms": [
+     380,
+     480,
+     190,
+     850
+    ]
+   }
+  },
+  {
+   "name": "listening",
+   "before": {
+    "frames": [
+     "baseline/frames/listening/01.png",
+     "baseline/frames/listening/02.png",
+     "baseline/frames/listening/03.png",
+     "baseline/frames/listening/04.png",
+     "baseline/frames/listening/05.png"
+    ],
+    "durations_ms": [
+     1300,
+     280,
+     2130,
+     280,
+     2400
+    ]
+   },
+   "after": {
+    "frames": [
+     "frames/listening/01.png",
+     "frames/listening/02.png",
+     "frames/listening/03.png",
+     "frames/listening/04.png",
+     "frames/listening/05.png"
+    ],
+    "durations_ms": [
+     1300,
+     340,
+     2200,
+     300,
+     2400
+    ]
+   }
+  },
+  {
+   "name": "curious",
+   "before": {
+    "frames": [
+     "baseline/frames/curious/01.png",
+     "baseline/frames/curious/02.png",
+     "baseline/frames/curious/03.png",
+     "baseline/frames/curious/04.png",
+     "baseline/frames/curious/05.png"
+    ],
+    "durations_ms": [
+     500,
+     320,
+     1510,
+     260,
+     700
+    ]
+   },
+   "after": {
+    "frames": [
+     "frames/curious/01.png",
+     "frames/curious/02.png",
+     "frames/curious/03.png",
+     "frames/curious/04.png",
+     "frames/curious/05.png"
+    ],
+    "durations_ms": [
+     450,
+     490,
+     1550,
+     270,
+     650
+    ]
+   }
+  },
+  {
+   "name": "confused",
+   "before": {
+    "frames": [
+     "baseline/frames/confused/01.png",
+     "baseline/frames/confused/02.png",
+     "baseline/frames/confused/03.png",
+     "baseline/frames/confused/04.png",
+     "baseline/frames/confused/05.png"
+    ],
+    "durations_ms": [
+     400,
+     110,
+     1150,
+     130,
+     650
+    ]
+   },
+   "after": {
+    "frames": [
+     "frames/confused/01.png",
+     "frames/confused/02.png",
+     "frames/confused/03.png",
+     "frames/confused/04.png",
+     "frames/confused/05.png",
+     "frames/confused/06.png",
+     "frames/confused/07.png"
+    ],
+    "durations_ms": [
+     430,
+     320,
+     150,
+     260,
+     1030,
+     180,
+     640
+    ]
+   }
+  },
+  {
+   "name": "success",
+   "before": {
+    "frames": [
+     "baseline/frames/success/01.png",
+     "baseline/frames/success/02.png",
+     "baseline/frames/success/03.png",
+     "baseline/frames/success/04.png",
+     "baseline/frames/success/05.png",
+     "baseline/frames/success/06.png",
+     "baseline/frames/success/07.png",
+     "baseline/frames/success/08.png"
+    ],
+    "durations_ms": [
+     400,
+     130,
+     170,
+     210,
+     220,
+     220,
+     180,
+     550
+    ]
+   },
+   "after": {
+    "frames": [
+     "frames/success/01.png",
+     "frames/success/02.png",
+     "frames/success/03.png",
+     "frames/success/04.png",
+     "frames/success/05.png",
+     "frames/success/06.png",
+     "frames/success/07.png",
+     "frames/success/08.png"
+    ],
+    "durations_ms": [
+     320,
+     450,
+     190,
+     260,
+     220,
+     220,
+     180,
+     520
+    ]
+   }
+  }
+ ]
+};
+const MANIFEST = PACK.manifest;
+const byName = {};
+for (const a of MANIFEST.animations) byName[a.name] = a;
+
+// ---- frame image preload -------------------------------------------------
+const imgCache = {};
+let pending = 0, started = false;
+function img(src) {
+  if (imgCache[src]) return imgCache[src];
+  pending++;
+  const i = new Image();
+  i.onload = i.onerror = () => { if (--pending === 0) startStill(); };
+  i.src = src;
+  imgCache[src] = i;
+  return i;
+}
+function seq(entry, loop) {
+  return { imgs: entry.frames.map(img), durations: entry.durations_ms, loop: !!loop };
+}
+
+function draw(ctx, im) {
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, 128, 192);
+  if (im) ctx.drawImage(im, 0, 0, 128, 192);
+}
+
+// ---- player (one or several canvases, one or several segments) ------------
+function makePlayer(canvases, sequence) {
+  const ctxs = canvases.map(c => c.getContext("2d"));
+  const p = {
+    ctxs, sequence, seg: 0, i: 0, timer: null, running: false, onstop: null,
+    still() { const s = this.sequence[0]; for (const c of this.ctxs) draw(c, s.imgs[0]); },
+    stop() { clearTimeout(this.timer); this.running = false; if (this.onstop) this.onstop(); },
+    play() {                       // repeated clicks restart cleanly
+      clearTimeout(this.timer);
+      this.seg = 0; this.i = 0; this.running = true;
+      this._tick();
+    },
+    _tick() {
+      const s = this.sequence[this.seg];
+      for (const c of this.ctxs) draw(c, s.imgs[this.i]);
+      const d = s.durations[Math.min(this.i, s.durations.length - 1)];
+      this.timer = setTimeout(() => {
+        this.i++;
+        if (this.i < s.imgs.length) return this._tick();
+        if (s.loop) { this.i = 0; return this._tick(); }
+        this.seg++;
+        if (this.seg < this.sequence.length) { this.i = 0; return this._tick(); }
+        this.running = false;
+        if (this.onstop) this.onstop();
+      }, d);
+    }
+  };
+  return p;
+}
+
+const players = [];
+let allStills = [];
+
+// ---- head motion comparison ---------------------------------------------
+const cmpPairs = [];
+function buildComparisons() {
+  const list = document.getElementById("cmpList");
+  for (const cmp of PACK.head_motion) {
+    const row = document.createElement("div");
+    row.className = "panel cmp";
+    const who = document.createElement("div");
+    who.className = "who";
+    who.innerHTML = '<div class="name">' + cmp.name + '.gif</div>' +
+      '<div class="meta">baseline vs revised</div>';
+    const btn = document.createElement("button");
+    btn.textContent = "Replay both";
+    btn.style.width = "100%";
+    who.appendChild(btn);
+    row.appendChild(who);
+
+    const mk = (label, cls) => {
+      const box = document.createElement("div");
+      box.className = "box";
+      const st = document.createElement("div");
+      st.className = "stage";
+      const cv = document.createElement("canvas");
+      cv.className = cls; cv.width = 128; cv.height = 192;
+      st.appendChild(cv);
+      const lab = document.createElement("div");
+      lab.className = "lab"; lab.textContent = label;
+      box.append(st, lab);
+      return { box, cv };
+    };
+    const b48 = mk("baseline 48 px", "v48");
+    const a48 = mk("revised 48 px", "v48");
+    const b96 = mk("baseline 96 px", "v96");
+    const a96 = mk("revised 96 px", "v96");
+    row.append(b48.box, a48.box, b96.box, a96.box);
+    list.appendChild(row);
+
+    const pBefore = makePlayer([b48.cv, b96.cv], [seq(cmp.before, false)]);
+    const pAfter = makePlayer([a48.cv, a96.cv], [seq(cmp.after, false)]);
+    const run = () => { pBefore.play(); pAfter.play(); };
+    btn.onclick = run;
+    cmpPairs.push({ run, pBefore, pAfter });
+    allStills.push(() => { pBefore.still(); pAfter.still(); });
+  }
+}
+document.getElementById("cmpAll").onclick = () => {
+  for (const other of players) other.player.stop();
+  for (const c of cmpPairs) c.run();
+};
+
+// ---- reusable head pose still strip --------------------------------------
+function buildPoses() {
+  const stripEl = document.getElementById("poseStrip");
+  for (const p of PACK.poses) {
+    const wrap = document.createElement("div");
+    wrap.className = "p";
+    const st = document.createElement("div");
+    st.className = "stage";
+    const im = document.createElement("img");
+    im.className = "v96"; im.src = p.file; im.alt = p.id;
+    st.appendChild(im);
+    const lab = document.createElement("div");
+    lab.className = "lab"; lab.textContent = p.label;
+    wrap.append(st, lab);
+    stripEl.appendChild(wrap);
+  }
+}
+
+// ---- pupil-pinned diagnostic ---------------------------------------------
+const dSeq = [seq(PACK.diagnostic, true)];
+const diagPlayer = makePlayer([document.getElementById("diagC"), document.getElementById("diagCs")], dSeq);
+document.getElementById("diagPlay").onclick = () => diagPlayer.play();
+document.getElementById("diagReplay").onclick = () => diagPlayer.play();
+allStills.push(() => diagPlayer.still());
+
+// ---- 32 animation cards --------------------------------------------------
+function buildCards() {
+  const groups = document.getElementById("groups");
+  const order = [];
+  for (const a of MANIFEST.animations) {
+    if (!order.includes(a.category)) order.push(a.category);
+  }
+  for (const cat of order) {
+    const sec = document.createElement("section");
+    sec.innerHTML = "<h2>" + cat + "</h2>";
+    const grid = document.createElement("div");
+    grid.className = "grid";
+    for (const a of MANIFEST.animations.filter(x => x.category === cat)) {
+      const card = document.createElement("div");
+      card.className = "card";
+      const stage = document.createElement("div");
+      stage.className = "stage";
+      const cv = document.createElement("canvas");
+      cv.className = "sprite"; cv.width = 128; cv.height = 192;
+      stage.appendChild(cv);
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      meta.textContent = (a.behavior === "loop" ? "loop" : "one-shot") +
+        " \u00b7 " + (a.total_ms / 1000).toFixed(1) + " s \u00b7 " + a.frames.length + " frames";
+      const nm = document.createElement("div");
+      nm.className = "name"; nm.textContent = a.name + ".gif";
+      const row = document.createElement("div");
+      row.className = "row";
+      const bPlay = document.createElement("button");
+      bPlay.textContent = "Play";
+      const bRep = document.createElement("button");
+      bRep.textContent = "Replay";
+      row.append(bPlay, bRep);
+      card.append(stage, nm, meta, row);
+      grid.appendChild(card);
+
+      const player = makePlayer([cv], [seq(a, a.behavior === "loop")]);
+      player.onstop = () => card.classList.remove("playing");
+      const run = () => {
+        for (const other of players) other.player.stop();
+        for (const c of cmpPairs) { c.pBefore.stop(); c.pAfter.stop(); }
+        card.classList.add("playing");
+        player.play();
+      };
+      bPlay.onclick = run;
+      bRep.onclick = run;
+      players.push({ card, player, anim: a });
+      allStills.push(() => player.still());
+    }
+    sec.appendChild(grid);
+    groups.appendChild(sec);
+  }
+}
+
+// ---- power-down -> wake-up transition ------------------------------------
+const tPlayer = makePlayer([document.getElementById("tCanvas")], [
+  seq(byName["power-down"], false),
+  seq(byName["wake-up"], false),
+]);
+document.getElementById("tPlay").onclick = () => {
+  for (const other of players) other.player.stop();
+  tPlayer.play();
+};
+document.getElementById("tReplay").onclick = () => tPlayer.play();
+allStills.push(() => tPlayer.still());
+
+function startStill() {
+  if (started) return;
+  started = true;
+  for (const f of allStills) f();
+}
+
+// ---- display controls ----------------------------------------------------
+document.getElementById("sizeSeg").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  document.body.classList.toggle("s48", b.dataset.size === "48");
+  for (const x of e.currentTarget.children) x.classList.toggle("on", x === b);
+});
+document.getElementById("bgSeg").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  document.body.classList.toggle("dark", b.dataset.bg === "dark");
+  for (const x of e.currentTarget.children) x.classList.toggle("on", x === b);
+});
+
+buildComparisons();
+buildPoses();
+buildCards();
+// preload every sequence actually used
+for (const a of MANIFEST.animations) seq(a, false);
+for (const c of PACK.head_motion) { seq(c.before, false); seq(c.after, false); }
+seq(PACK.diagnostic, false);
+seq(byName["power-down"], false); seq(byName["wake-up"], false);
+if (pending === 0) startStill();
+</script>
+</body>
+</html>
