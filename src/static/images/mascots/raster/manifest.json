@@ -519,6 +519,7 @@
  "body_height": 90,
  "frame_height": 96,
  "frame_width": 90,
+ "ground_offset": 2,
  "id": "raster",
  "name": "Raster"
 }

@@ -828,269 +828,62 @@ h2, .section-title {
     flex-wrap: wrap;
 }
 
-/* ===== ROBOT MASCOT ===== */
+/* ===== MASCOT ===== */
+
 /*
- * Sprite-sheet player: the mascot is a <div> with a CSS background-image
- * pointing at a 1-row sprite sheet (e.g. mascot-idle-sprite.png).  The
- * sheet is N × 759 px wide (one frame per 759px slice).  CSS steps()
- * animation slides background-position across the sheet.
+ * Sprite player: the mascot is a <div class="mascot-sprite"> whose
+ * background-image is a 1-row sheet of --mascot-frame-w-wide frames.
+ * The player in mascot.js steps background-position frame by frame,
+ * holding each frame for its own manifest duration -- CSS step timing
+ * cannot vary per-frame timing, and the old keyframe approach never
+ * showed the final frame. The sheets are pre-scaled, so desktop draws
+ * at 1:1.
  *
- * Each state sets its own --mascot-frames / --mascot-ms AND its own
- * @keyframes rule.  We can't use a single shared keyframe with var()
- * inside steps() because CSS var() substitution inside timing functions
- * is not reliably supported — if steps() fails to parse the browser
- * falls back to linear easing, producing a "conveyor belt" slide
- * instead of frame-stepping.  So each state gets a literal keyframe.
+ * The box is sized from the active mascot's manifest via
+ * --mascot-frame-w / --mascot-frame-h (set inline in _mascot.html) and
+ * anchored bottom-centre on one fixed axis, so the feet sit in the same
+ * spot whichever mascot is active (docs/MASCOTS.md section 3).
  */
-#robot-mascot {
+/* Floor line: the footer's top border is where the feet stand.
+   mascot.js measures .az-footer and overrides --mascot-floor on the
+   root element (at load and on resize); the fallback covers pages
+   without a footer. --mascot-ground comes from the manifest's
+   ground_offset (empty rows under the feet inside the frame). */
+:root {
+    --mascot-floor: 45px;
+}
+
+#mascot {
     position: fixed;
-    bottom: 30px;
-    right: 30px;
-    width: 120px;
-    height: 120px;
+    /* The feet (ground offset above the frame edge) land exactly on
+       the floor line, and every mascot's frame centre lands 75px from
+       the right edge. */
+    bottom: calc(var(--mascot-floor) - var(--mascot-ground, 0px));
+    right: calc(75px - (var(--mascot-frame-w, 90px) / 2));
+    width: var(--mascot-frame-w, 90px);
+    height: var(--mascot-frame-h, 96px);
     z-index: 1000;
     cursor: pointer;
     image-rendering: pixelated;
     background-repeat: no-repeat;
-    background-size: auto 120px;
-    animation-iteration-count: infinite;
-    animation-timing-function: steps(1, end);
+    /* Soft glow behind every mascot: Pip's and Trace's dark navy
+       outlines would otherwise vanish into the dark theme. */
     filter: drop-shadow(0 10px 20px rgba(0, 180, 216, 0.4));
 }
 
-/*
- * Per-state sprite sheets.  Each state sets:
- *   --mascot-ms      per-frame duration
- *   animation-name   a state-specific @keyframes (literal frame count)
- * The sheet is N × 759 px; background-size: auto 120px keeps each
- * frame at 759px source width, and the keyframe jumps background-position
- * in 759px steps.  steps(1, end) ensures each keyframe key is held (no
- * interpolation between the 0% and 100% keys).
- */
-
-/* Per-state sprite sheets + tuning (frame count + per-frame ms).
-   Each state has its own @keyframes with a LITERAL frame count in the
-   background-position end value — no var() inside steps() or calc()
-   for the position, because var() in timing functions is unreliable. */
-.mascot-sprite.mascot-state-idle {
-    --mascot-ms: 250ms;
-    background-image: url("../images/mascots/idle/mascot-idle-sprite.png");
-    animation-name: mascot-idle;
-    animation-duration: 3.5s;  /* 14 × 250ms */
-}
-.mascot-sprite.mascot-state-busy {
-    --mascot-ms: 150ms;
-    background-image: url("../images/mascots/busy/mascot-busy-sprite.png");
-    animation-name: mascot-busy;
-    animation-duration: 2.1s;  /* 14 × 150ms */
-}
-.mascot-sprite.mascot-state-busyB {
-    --mascot-ms: 150ms;
-    background-image: url("../images/mascots/busyB/mascot-busyB-sprite.png");
-    animation-name: mascot-busyB;
-    animation-duration: 2.1s;
-}
-.mascot-sprite.mascot-state-busyC {
-    --mascot-ms: 150ms;
-    background-image: url("../images/mascots/busyC/mascot-busyC-sprite.png");
-    animation-name: mascot-busyC;
-    animation-duration: 2.1s;
-}
-.mascot-sprite.mascot-state-happy {
-    --mascot-ms: 220ms;
-    background-image: url("../images/mascots/happy/mascot-happy-sprite.png");
-    animation-name: mascot-happy;
-    animation-duration: 3.08s;  /* 14 × 220ms */
-}
-.mascot-sprite.mascot-state-error {
-    --mascot-ms: 220ms;
-    background-image: url("../images/mascots/error/mascot-error-sprite.png");
-    animation-name: mascot-error;
-    animation-duration: 3.08s;
-}
-.mascot-sprite.mascot-state-talk {
-    --mascot-ms: 110ms;
-    background-image: url("../images/mascots/talk/mascot-talk-sprite.png");
-    animation-name: mascot-talk;
-    animation-duration: 1.32s;  /* 12 × 110ms */
-}
-.mascot-sprite.mascot-state-wave {
-    --mascot-ms: 140ms;
-    background-image: url("../images/mascots/wave/mascot-wave-sprite.png");
-    animation-name: mascot-wave;
-    animation-duration: 2.24s;  /* 16 × 140ms */
-    animation-iteration-count: 1;  /* one-shot greeting */
-    animation-fill-mode: forwards;
-}
-
-/* Per-state keyframes: background-size: auto 120px scales the sheet so
-   each frame is 120px wide in the background.  Steps must be -120px
-   (the SCALED frame width), NOT -759px (the source frame width). */
-@keyframes mascot-idle {
-    0%    { background-position: 0 0; }
-    7.14% { background-position: -120px 0; }
-    14.28% { background-position: -240px 0; }
-    21.42% { background-position: -360px 0; }
-    28.57% { background-position: -480px 0; }
-    35.71% { background-position: -600px 0; }
-    42.85% { background-position: -720px 0; }
-    50%    { background-position: -840px 0; }
-    57.14% { background-position: -960px 0; }
-    64.28% { background-position: -1080px 0; }
-    71.42% { background-position: -1200px 0; }
-    78.57% { background-position: -1320px 0; }
-    85.71% { background-position: -1440px 0; }
-    100%   { background-position: -1560px 0; }
-}
-
-@keyframes mascot-busy {
-    0%    { background-position: 0 0; }
-    7.14% { background-position: -120px 0; }
-    14.28% { background-position: -240px 0; }
-    21.42% { background-position: -360px 0; }
-    28.57% { background-position: -480px 0; }
-    35.71% { background-position: -600px 0; }
-    42.85% { background-position: -720px 0; }
-    50%    { background-position: -840px 0; }
-    57.14% { background-position: -960px 0; }
-    64.28% { background-position: -1080px 0; }
-    71.42% { background-position: -1200px 0; }
-    78.57% { background-position: -1320px 0; }
-    85.71% { background-position: -1440px 0; }
-    100%   { background-position: -1560px 0; }
-}
-
-@keyframes mascot-busyB {
-    0%    { background-position: 0 0; }
-    7.14% { background-position: -120px 0; }
-    14.28% { background-position: -240px 0; }
-    21.42% { background-position: -360px 0; }
-    28.57% { background-position: -480px 0; }
-    35.71% { background-position: -600px 0; }
-    42.85% { background-position: -720px 0; }
-    50%    { background-position: -840px 0; }
-    57.14% { background-position: -960px 0; }
-    64.28% { background-position: -1080px 0; }
-    71.42% { background-position: -1200px 0; }
-    78.57% { background-position: -1320px 0; }
-    85.71% { background-position: -1440px 0; }
-    100%   { background-position: -1560px 0; }
-}
-
-@keyframes mascot-busyC {
-    0%    { background-position: 0 0; }
-    7.14% { background-position: -120px 0; }
-    14.28% { background-position: -240px 0; }
-    21.42% { background-position: -360px 0; }
-    28.57% { background-position: -480px 0; }
-    35.71% { background-position: -600px 0; }
-    42.85% { background-position: -720px 0; }
-    50%    { background-position: -840px 0; }
-    57.14% { background-position: -960px 0; }
-    64.28% { background-position: -1080px 0; }
-    71.42% { background-position: -1200px 0; }
-    78.57% { background-position: -1320px 0; }
-    85.71% { background-position: -1440px 0; }
-    100%   { background-position: -1560px 0; }
-}
-
-@keyframes mascot-happy {
-    0%    { background-position: 0 0; }
-    7.14% { background-position: -120px 0; }
-    14.28% { background-position: -240px 0; }
-    21.42% { background-position: -360px 0; }
-    28.57% { background-position: -480px 0; }
-    35.71% { background-position: -600px 0; }
-    42.85% { background-position: -720px 0; }
-    50%    { background-position: -840px 0; }
-    57.14% { background-position: -960px 0; }
-    64.28% { background-position: -1080px 0; }
-    71.42% { background-position: -1200px 0; }
-    78.57% { background-position: -1320px 0; }
-    85.71% { background-position: -1440px 0; }
-    100%   { background-position: -1560px 0; }
-}
-
-@keyframes mascot-error {
-    0%    { background-position: 0 0; }
-    7.14% { background-position: -120px 0; }
-    14.28% { background-position: -240px 0; }
-    21.42% { background-position: -360px 0; }
-    28.57% { background-position: -480px 0; }
-    35.71% { background-position: -600px 0; }
-    42.85% { background-position: -720px 0; }
-    50%    { background-position: -840px 0; }
-    57.14% { background-position: -960px 0; }
-    64.28% { background-position: -1080px 0; }
-    71.42% { background-position: -1200px 0; }
-    78.57% { background-position: -1320px 0; }
-    85.71% { background-position: -1440px 0; }
-    100%   { background-position: -1560px 0; }
-}
-
-/* talk has 12 frames */
-@keyframes mascot-talk {
-    0%    { background-position: 0 0; }
-    8.33% { background-position: -120px 0; }
-    16.66% { background-position: -240px 0; }
-    25%    { background-position: -360px 0; }
-    33.33% { background-position: -480px 0; }
-    41.66% { background-position: -600px 0; }
-    50%    { background-position: -720px 0; }
-    58.33% { background-position: -840px 0; }
-    66.66% { background-position: -960px 0; }
-    75%    { background-position: -1080px 0; }
-    83.33% { background-position: -1200px 0; }
-    100%   { background-position: -1320px 0; }
-}
-
-/* wave has 16 frames */
-@keyframes mascot-wave {
-    0%    { background-position: 0 0; }
-    6.25% { background-position: -120px 0; }
-    12.5% { background-position: -240px 0; }
-    18.75% { background-position: -360px 0; }
-    25%    { background-position: -480px 0; }
-    31.25% { background-position: -600px 0; }
-    37.5%  { background-position: -720px 0; }
-    43.75% { background-position: -840px 0; }
-    50%    { background-position: -960px 0; }
-    56.25% { background-position: -1080px 0; }
-    62.5%  { background-position: -1200px 0; }
-    68.75% { background-position: -1320px 0; }
-    75%    { background-position: -1440px 0; }
-    81.25% { background-position: -1560px 0; }
-    87.5%  { background-position: -1680px 0; }
-    100%   { background-position: -1800px 0; }
-}
-
-/* State-based glow tints so users can see when the mascot is
-   idle vs processing vs celebrating vs in an error state. */
-#robot-mascot.mascot-state-busy,
-#robot-mascot.mascot-state-busyB,
-#robot-mascot.mascot-state-busyC {
-    filter: drop-shadow(0 10px 22px rgba(0, 180, 216, 0.65))
-            drop-shadow(0 0 8px rgba(0, 180, 216, 0.45));
-}
-
-#robot-mascot.mascot-state-happy {
-    filter: drop-shadow(0 10px 22px rgba(126, 231, 135, 0.6))
-            drop-shadow(0 0 10px rgba(126, 231, 135, 0.4));
-}
-
-#robot-mascot.mascot-state-error {
+/* Glows key off the playing animation (data-anim, set by the sprite
+   player). The error glow stays up over the held error pose so the
+   failure remains visible while the bubble shows the message. */
+#mascot[data-anim="error"],
+#mascot[data-anim="warning"] {
     filter: drop-shadow(0 10px 22px rgba(255, 70, 80, 0.65))
             drop-shadow(0 0 10px rgba(255, 130, 60, 0.45));
 }
 
-#robot-mascot.mascot-state-talk,
-#robot-mascot.mascot-state-wave {
-    filter: drop-shadow(0 10px 22px rgba(0, 180, 216, 0.55))
-            drop-shadow(0 0 9px rgba(144, 224, 239, 0.4));
-}
-
-#robot-mascot.mascot-state-idle {
-    filter: drop-shadow(0 10px 20px rgba(0, 180, 216, 0.4));
+#mascot[data-anim="success"],
+#mascot[data-anim="celebrate"] {
+    filter: drop-shadow(0 10px 22px rgba(126, 231, 135, 0.6))
+            drop-shadow(0 0 10px rgba(126, 231, 135, 0.4));
 }
 
 #speech-bubble {
@@ -1106,8 +899,13 @@ h2, .section-title {
     --crt-text-max-lines: 5;    /* 5 full lines of text must be visible */
 
     position: fixed;
-    bottom: 175px;
-    right: 80px;
+    /* Tail points at the mascot: its centre sits 30px inside the
+       bubble's right edge, on the same 75px axis as #mascot. The bubble
+       rides the same floor-based offset as the sprite box (top edge of
+       the box plus 25px), so the floor moves both together. */
+    bottom: calc(var(--mascot-floor) - var(--mascot-ground, 0px)
+                 + var(--mascot-frame-h, 96px) + 25px);
+    right: 45px;
     width: 200px;
     aspect-ratio: 4 / 3;
     background: var(--crt-bezel);
@@ -1257,16 +1055,22 @@ h2, .section-title {
 }
 
 @media (max-width: 768px) {
-    #robot-mascot {
-        width: 80px;
-        height: 80px;
-        bottom: 16px;
-        right: 16px;
+    #mascot {
+        /* Same floor rule at two-thirds scale: the ground rows shrink
+           with the scale, so the feet still meet the line. */
+        bottom: calc(var(--mascot-floor) - var(--mascot-ground, 0px) * 0.667);
+        right: calc(50px - (var(--mascot-frame-w, 90px) / 2));
+        /* Phones show the mascot at two-thirds size, scaled by the
+           browser with the feet (bottom centre) anchored in place. */
+        transform: scale(0.667);
+        transform-origin: bottom center;
     }
     #speech-bubble {
         width: 170px;
-        bottom: 120px;
-        right: 44px;
+        /* Tail stays on the mascot's axis: 50px from the right edge. */
+        bottom: calc(var(--mascot-floor) - var(--mascot-ground, 0px) * 0.667
+                     + var(--mascot-frame-h, 96px) * 0.667 + 24px);
+        right: 20px;
         padding: 10px;
         font-size: 8px;
         --crt-screen-inset: 8px;

@@ -1,0 +1,183 @@
+"""Mascot registry: ids, manifests and behaviour parameters.
+
+This is the one server-side place to tune *when* each mascot moves
+(docs/MASCOTS.md sections 5-7). The client reads the rendered config and
+holds no mascot ids or timings of its own, so per-user mascot choice
+(Task 3) only has to change :func:`active_mascot_id`.
+"""
+import json
+from functools import lru_cache
+from pathlib import Path
+
+MASCOT_IDS = ('raster', 'pip', 'trace')
+DEFAULT_MASCOT = 'raster'
+
+# Display names and picker one-liners (docs/MASCOTS.md section 2).
+DISPLAY = {
+    'raster': {
+        'name': 'Raster',
+        'tagline': 'Talkative co-pilot. Explains everything.',
+    },
+    'pip': {
+        'name': 'Pip',
+        'tagline': 'Tiny T. rex. Huge feelings.',
+    },
+    'trace': {
+        'name': 'Trace',
+        'tagline': 'Quiet paperclip. Notices everything.',
+    },
+}
+
+_GLANCE_ANIMS = ['look-up', 'look-left', 'look-right', 'look-down', 'notice']
+
+# Behaviour parameters per mascot (docs/MASCOTS.md sections 5-7). Gaps and
+# sleep timings are milliseconds; "cursor-glance" in an idle pool resolves
+# to the look-* pointing at the pointer when the pick is drawn.
+BEHAVIOUR = {
+    'raster': {
+        'idle_gap_ms': [10000, 20000],
+        'idle_pool': [
+            {'anim': 'idle-double-blink', 'weight': 3},
+            {'anim': 'idle-look-around', 'weight': 3},
+            {'anim': 'idle-antenna-settle', 'weight': 3},
+            {'anim': 'cursor-glance', 'weight': 2},
+            {'anim': 'curious', 'weight': 1},
+            {'anim': 'look-up', 'weight': 1},
+            {'anim': 'look-left', 'weight': 1},
+            {'anim': 'look-right', 'weight': 1},
+            {'anim': 'look-down', 'weight': 1},
+        ],
+        'hover_anims': ['curious'],
+        'hover_delay_ms': 500,
+        'sleepy_after_ms': 5 * 60 * 1000,
+        'power_down_after_ms': 15 * 60 * 1000,
+        'error_hold_ms': 8000,
+        'click_talk_every': 4,
+        'click_reactions': ['acknowledge', 'curious',
+                            'idle-antenna-settle', 'look-up'],
+        'chatter_enabled': True,
+        'chatter_gap_ms': 180000,
+        'chatter_jitter_ms': 30000,
+        'talk_anim': 'speaking',
+        'work_typing_anim': 'typing',
+        'greeting_line': True,
+        'page_glance_anims': list(_GLANCE_ANIMS),
+    },
+    'pip': {
+        'idle_gap_ms': [5000, 10000],
+        'idle_pool': [
+            {'anim': 'idle-tail-sway', 'weight': 4},
+            {'anim': 'idle-look-around', 'weight': 3},
+            {'anim': 'idle-double-blink', 'weight': 2},
+            {'anim': 'curious', 'weight': 2},
+            {'anim': 'cursor-glance', 'weight': 2},
+            {'anim': 'notice', 'weight': 1},
+            {'anim': 'look-up', 'weight': 1},
+            {'anim': 'look-left', 'weight': 1},
+            {'anim': 'look-right', 'weight': 1},
+            {'anim': 'look-down', 'weight': 1},
+        ],
+        'hover_anims': ['curious', 'idle-tail-sway'],
+        'hover_delay_ms': 500,
+        'sleepy_after_ms': 3 * 60 * 1000,
+        'power_down_after_ms': 10 * 60 * 1000,
+        'error_hold_ms': 8000,
+        'click_talk_every': 6,
+        'click_reactions': ['celebrate', 'curious',
+                            'idle-tail-sway', 'acknowledge'],
+        'chatter_enabled': False,
+        'chatter_gap_ms': 180000,
+        'chatter_jitter_ms': 30000,
+        'talk_anim': 'speaking',
+        'work_typing_anim': 'typing',
+        'greeting_line': True,
+        'page_glance_anims': list(_GLANCE_ANIMS),
+    },
+    'trace': {
+        'idle_gap_ms': [20000, 40000],
+        'idle_pool': [
+            {'anim': 'cursor-glance', 'weight': 3},
+            {'anim': 'idle-look-around', 'weight': 3},
+            {'anim': 'idle-sway', 'weight': 3},
+            {'anim': 'idle-double-blink', 'weight': 2},
+            {'anim': 'curious', 'weight': 2},
+            {'anim': 'look-up', 'weight': 1},
+            {'anim': 'look-left', 'weight': 1},
+            {'anim': 'look-right', 'weight': 1},
+            {'anim': 'look-down', 'weight': 1},
+        ],
+        'hover_anims': ['curious'],
+        'hover_delay_ms': 500,
+        'sleepy_after_ms': 5 * 60 * 1000,
+        'power_down_after_ms': 15 * 60 * 1000,
+        'error_hold_ms': 8000,
+        'click_talk_every': 6,
+        'click_reactions': ['curious', 'unsure', 'acknowledge', 'notice'],
+        'chatter_enabled': False,
+        'chatter_gap_ms': 180000,
+        'chatter_jitter_ms': 30000,
+        'talk_anim': 'writing',
+        'work_typing_anim': 'writing',
+        'greeting_line': False,
+        'page_glance_anims': list(_GLANCE_ANIMS),
+    },
+}
+
+_MASCOTS_DIR = (Path(__file__).resolve().parent.parent
+                / 'static' / 'images' / 'mascots')
+
+
+@lru_cache(maxsize=4)
+def load_manifest(mascot_id: str) -> dict:
+    """Read one mascot's manifest.json once and cache it.
+
+    The manifest carries the frame size and every animation (sheet,
+    per-frame durations, loop flag); it is regenerated by
+    tools/mascots/build_web_assets.py and never changes at runtime.
+    """
+    with (_MASCOTS_DIR / mascot_id / 'manifest.json').open(encoding='utf-8') as fh:
+        return json.load(fh)
+
+
+def get_mascot(mascot_id: str | None) -> dict:
+    """Return the mascot record for *mascot_id*; unknown ids get the default."""
+    if mascot_id not in MASCOT_IDS:
+        mascot_id = DEFAULT_MASCOT
+    return {
+        'id': mascot_id,
+        'name': DISPLAY[mascot_id]['name'],
+        'tagline': DISPLAY[mascot_id]['tagline'],
+        'manifest': load_manifest(mascot_id),
+    }
+
+
+def active_mascot_id() -> str:
+    """The mascot for the current learner.
+
+    Always the default for now (Raster shows everywhere); Task 3 switches
+    this to the learner's Settings choice.
+    """
+    return DEFAULT_MASCOT
+
+
+def build_mascot_config(mascot_id: str | None = None,
+                        asset_base: str | None = None) -> dict:
+    """Build the config the sprite player reads from inline JSON."""
+    mascot = get_mascot(mascot_id or active_mascot_id())
+    mid = mascot['id']
+    manifest = mascot['manifest']
+    return {
+        'id': mid,
+        'name': mascot['name'],
+        'tagline': mascot['tagline'],
+        'asset_base': asset_base or f'/static/images/mascots/{mid}/',
+        'still': 'still.png',
+        'frame_width': manifest['frame_width'],
+        'frame_height': manifest['frame_height'],
+        'body_height': manifest['body_height'],
+        # Empty rows under the feet: CSS subtracts this from the floor
+        # offset so the feet, not the frame edge, land on the floor line.
+        'ground_offset': manifest['ground_offset'],
+        'animations': manifest['animations'],
+        'behaviour': BEHAVIOUR[mid],
+    }

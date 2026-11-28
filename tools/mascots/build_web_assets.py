@@ -6,7 +6,8 @@ Run from the repository root:
 
 Reads tools/mascots/<id>-animations/ and writes src/static/images/mascots/<id>/
 for raster, pip and trace: one horizontal sprite sheet per animation, a neutral
-still, two preview GIFs for the Settings picker and a normalized manifest.json.
+still, two preview GIFs for the Settings picker and a normalized manifest.json
+(frame geometry, including ground_offset: the empty rows under the feet).
 
 Every mascot is scaled so its neutral body height (the alpha bounding box of
 idle-blink frame 0) is 90 px, the shared baseline from docs/MASCOTS.md section 3.
@@ -246,6 +247,10 @@ def build_mascot(out_root, mid):
     still.save(out_dir / 'still.png')
     still_box = content_bbox(still)
     body_height = still_box[3] - still_box[1]
+    # Empty rows between the frame's bottom edge and the lowest opaque
+    # pixel of still.png. The sprite player subtracts these so the feet,
+    # not the frame edge, land on the floor line (the footer's top border).
+    ground_offset = frame_h - still_box[3]
 
     preview_idle = PREVIEW_IDLE[mid]
     idle = anims[preview_idle]
@@ -269,6 +274,7 @@ def build_mascot(out_root, mid):
         'frame_width': frame_w,
         'frame_height': frame_h,
         'body_height': body_height,
+        'ground_offset': ground_offset,
         'animations': manifest_anims,
     }
     with open(out_dir / 'manifest.json', 'w', encoding='utf-8', newline='\n') as f:
@@ -277,7 +283,8 @@ def build_mascot(out_root, mid):
 
     label = method or 'untouched'
     print(f'{mid}: {len(anims)} animations, frame {frame_w}x{frame_h}, '
-          f'scale {scale:.4f} ({label}), body {body_height}px')
+          f'scale {scale:.4f} ({label}), body {body_height}px, '
+          f'ground {ground_offset}px')
 
 
 def main():

@@ -419,22 +419,16 @@ class TestStaticAssetLayout:
                 f'Missing avatar-{i}.png in {self.AVATAR_DIR}'
             )
 
-    def test_mascots_directory_has_state_subdirs(self):
-        for state in ('idle', 'busy', 'happy', 'error'):
-            assert (self.MASCOTS_DIR / state).is_dir(), (
-                f'Missing {self.MASCOTS_DIR / state}'
+    def test_mascots_directory_has_per_mascot_dirs(self):
+        for mid in ('raster', 'pip', 'trace'):
+            assert (self.MASCOTS_DIR / mid).is_dir(), (
+                f'Missing {self.MASCOTS_DIR / mid}'
             )
 
-    def test_mascot_base_assets_at_state_subdir_root(self):
-        assert (self.MASCOTS_DIR / 'mascot-robot.png').is_file()
-        assert (self.MASCOTS_DIR / 'mascot-robot-static.png').is_file()
-
-    def test_each_state_has_gif_and_sprite(self):
-        for state in ('idle', 'busy', 'happy', 'error'):
-            gif = self.MASCOTS_DIR / state / f'mascot-{state}.gif'
-            sprite = self.MASCOTS_DIR / state / f'mascot-{state}-sprite.png'
-            assert gif.is_file(), f'Missing {gif}'
-            assert sprite.is_file(), f'Missing {sprite}'
+    def test_each_mascot_has_manifest_and_still(self):
+        for mid in ('raster', 'pip', 'trace'):
+            assert (self.MASCOTS_DIR / mid / 'manifest.json').is_file()
+            assert (self.MASCOTS_DIR / mid / 'still.png').is_file()
 
 
 # ── TTS voice memory (slice 3) ─────────────────────────────────────────────

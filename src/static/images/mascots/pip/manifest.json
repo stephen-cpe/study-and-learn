@@ -505,6 +505,7 @@
  "body_height": 90,
  "frame_height": 100,
  "frame_width": 68,
+ "ground_offset": 2,
  "id": "pip",
  "name": "Pip"
 }

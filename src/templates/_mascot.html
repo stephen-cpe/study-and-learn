@@ -1,12 +1,10 @@
-<div class="mascot-wrapper" data-mascot-state="idle">
-    <div id="robot-mascot"
-         class="mascot-img mascot-sprite mascot-state-idle"
-         data-fallback-src="{{ url_for('static', filename='images/mascots/mascot-robot.png') }}"
+<div class="mascot-wrapper"
+     style="--mascot-frame-w: {{ mascot_config.frame_width }}px; --mascot-frame-h: {{ mascot_config.frame_height }}px; --mascot-ground: {{ mascot_config.ground_offset }}px;">
+    <div id="mascot"
+         class="mascot-sprite"
          role="img"
-         aria-label="Study Robot Mascot"
-         tabindex="0"
-         onclick="window._mascotTalk &amp;&amp; window._mascotTalk()">
-    </div>
+         aria-label="{{ mascot_config.name }} mascot"
+         tabindex="0"></div>
     <div id="speech-bubble">
         <span id="bubble-text">Booting neural link...</span>
         <div id="bubble-progress" class="bubble-progress" style="display:none;">
@@ -15,3 +13,4 @@
         <div class="bubble-tail" aria-hidden="true"></div>
     </div>
 </div>
+<script type="application/json" id="mascot-config">{{ mascot_config | tojson }}</script>

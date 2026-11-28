@@ -514,6 +514,7 @@
  "body_height": 90,
  "frame_height": 103,
  "frame_width": 49,
+ "ground_offset": 3,
  "id": "trace",
  "name": "Trace"
 }

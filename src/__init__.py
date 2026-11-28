@@ -5,7 +5,7 @@ import logging
 import os
 
 from cachelib import FileSystemCache
-from flask import Flask
+from flask import Flask, url_for
 from flask_login import LoginManager
 from flask_migrate import Migrate
 
@@ -103,6 +103,21 @@ def create_app():
 
     from src import routes
     app.register_blueprint(routes.bp)
+
+    # ── Mascot config for _mascot.html ───────────────────────────────────
+    # The sprite player reads this as inline JSON: frame size, animation
+    # sheets with per-frame durations, and the behaviour parameters from
+    # docs/MASCOTS.md sections 5-7. Built here so templates and JS hold no
+    # mascot ids or timings (src/services/mascot_registry.py owns those).
+    @app.context_processor
+    def _inject_mascot_config():
+        from src.services.mascot_registry import (
+            active_mascot_id,
+            build_mascot_config,
+        )
+        mid = active_mascot_id()
+        asset_base = url_for('static', filename=f'images/mascots/{mid}/')
+        return {'mascot_config': build_mascot_config(mid, asset_base=asset_base)}
 
     # ── Sweep orphaned background tasks ─────────────────────────────────
     # Rows left 'running' by a previous process (Ctrl+C, restart, redeploy)

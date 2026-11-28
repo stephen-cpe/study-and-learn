@@ -80,6 +80,30 @@ def test_uniform_body_height():
         assert abs(body - 90) <= 1, f'{mid}: body_height {body}px is off the 90 px target'
 
 
+def test_ground_offset_marks_the_feet():
+    """ground_offset is the empty-row count between the frame's bottom
+    edge and the lowest opaque pixel of still.png. The sprite player
+    subtracts it so the feet, not the frame edge, land on the floor line
+    (the footer's top border)."""
+    for mid in MASCOTS:
+        man = _web_manifest(mid)
+        ground = man.get('ground_offset')
+        assert isinstance(ground, int) and not isinstance(ground, bool), (
+            f'{mid}: ground_offset must be an integer, got {ground!r}'
+        )
+        assert ground >= 0, f'{mid}: ground_offset must be >= 0'
+        with Image.open(WEB_DIR / mid / 'still.png') as img:
+            assert img.size == (man['frame_width'], man['frame_height'])
+            alpha = img.getchannel('A').point(lambda v: 255 if v >= 128 else 0)
+            bbox = alpha.getbbox()
+            assert bbox is not None, f'{mid}: still.png is fully transparent'
+            measured = man['frame_height'] - bbox[3]
+        assert ground == measured, (
+            f'{mid}: ground_offset {ground} but still.png leaves {measured} '
+            f'empty rows under the feet'
+        )
+
+
 def test_auxiliary_files_exist():
     """still.png and both Settings-picker previews exist for every mascot."""
     for mid in MASCOTS:

@@ -133,7 +133,7 @@ Tests use SQLite in-memory via a per-fixture config override (`app.config['SQLAL
 Lint (the same command CI runs; install once with `pip install ruff`):
 
 ```bash
-ruff check src/ tests/ app.py config.py gunicorn.conf.py generate_mascot_anim.py
+ruff check src/ tests/ app.py config.py gunicorn.conf.py
 ```
 
 ## Using Ollama Cloud (Optional)

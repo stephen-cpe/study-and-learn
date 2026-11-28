@@ -35,7 +35,7 @@ jobs:
           pip install ruff
 
       - name: Lint (ruff)
-        run: ruff check src/ tests/ app.py config.py gunicorn.conf.py generate_mascot_anim.py
+        run: ruff check src/ tests/ app.py config.py gunicorn.conf.py
 
       - name: Run tests
         env:

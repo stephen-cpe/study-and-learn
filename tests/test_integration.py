@@ -276,7 +276,7 @@ def test_process_non_blocking_no_overlay(client):
     assert response.status_code == 200
     assert b'loadingOverlay' not in response.data
     assert b'spinner-overlay' not in response.data
-    assert b'robot-mascot' in response.data
+    assert b'id="mascot"' in response.data
     assert b'speech-bubble' in response.data
     assert b'bubble-progress' in response.data
 
