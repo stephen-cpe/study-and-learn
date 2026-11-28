@@ -23,6 +23,7 @@ CREATE TABLE users (
      is_admin               BOOLEAN      NOT NULL DEFAULT FALSE,
      can_generate_lessons   BOOLEAN      NOT NULL DEFAULT FALSE,
      avatar                 VARCHAR(32)  NOT NULL DEFAULT 'avatar-0.png',
+     mascot                 VARCHAR(16)  NOT NULL DEFAULT 'raster',
      tts_enabled            BOOLEAN      NOT NULL DEFAULT FALSE,
      tts_speaker            VARCHAR(16)  NOT NULL DEFAULT 'Ava',
      lesson_difficulty      VARCHAR(8)   NOT NULL DEFAULT 'Normal',

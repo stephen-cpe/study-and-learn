@@ -2,8 +2,8 @@
 
 This is the one server-side place to tune *when* each mascot moves
 (docs/MASCOTS.md sections 5-7). The client reads the rendered config and
-holds no mascot ids or timings of its own, so per-user mascot choice
-(Task 3) only has to change :func:`active_mascot_id`.
+holds no mascot ids or timings of its own, so per-user mascot choice only
+has to flow through :func:`active_mascot_id`.
 """
 import json
 from functools import lru_cache
@@ -152,12 +152,38 @@ def get_mascot(mascot_id: str | None) -> dict:
 
 
 def active_mascot_id() -> str:
-    """The mascot for the current learner.
+    """The mascot chosen by the current learner, or the default.
 
-    Always the default for now (Raster shows everywhere); Task 3 switches
-    this to the learner's Settings choice.
+    Anonymous visitors and calls outside a request always get Raster. The
+    lookup is deliberately fail-safe: this runs in the context processor on
+    every page, including error pages, where a database outage could
+    otherwise break the error response itself.
     """
-    return DEFAULT_MASCOT
+    from flask import has_request_context
+    from flask_login import current_user
+
+    try:
+        if not has_request_context() or not current_user.is_authenticated:
+            return DEFAULT_MASCOT
+        mascot_id = current_user.mascot
+    except Exception:
+        return DEFAULT_MASCOT
+    return mascot_id if mascot_id in MASCOT_IDS else DEFAULT_MASCOT
+
+
+def picker_options() -> list[dict]:
+    """Settings picker entries: display data plus the hello preview length."""
+    options = []
+    for mascot_id in MASCOT_IDS:
+        display = DISPLAY[mascot_id]
+        options.append({
+            'id': mascot_id,
+            'name': display['name'],
+            'tagline': display['tagline'],
+            'hello_ms': load_manifest(mascot_id)['animations']['hello'][
+                'total_ms'],
+        })
+    return options
 
 
 def build_mascot_config(mascot_id: str | None = None,

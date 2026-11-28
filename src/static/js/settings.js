@@ -5,60 +5,133 @@
 
   const DIFFICULTY_LABELS = ['Easy', 'Normal', 'Hard'];
 
-  // ── Avatar modal ─────────────────────────────────────────────────
-  const modal = document.getElementById('avatar-modal');
-  const openBtn = document.getElementById('open-avatar-modal');
-  const closeBtn = document.getElementById('close-avatar-modal');
-  const confirmBtn = document.getElementById('confirm-avatar');
-  const grid = document.getElementById('avatar-grid');
-  const avatarInput = document.getElementById('avatar-input');
-  const currentImg = document.getElementById('current-avatar-img');
-  const form = document.getElementById('settings-form');
-  const difficultyInput = document.getElementById('difficulty-input');
+  // ── Shared grid picker (avatar and mascot) ───────────────────────
+  // Both modals use the same overlay, header, grid and footer markup.
+  // They differ only in the selected value, the image to update, and
+  // (for mascots) a hello preview before the form submits.
+  function setupPicker(config) {
+    const modal = document.getElementById(config.modalId);
+    const openBtn = document.getElementById(config.openId);
+    const closeBtn = document.getElementById(config.closeId);
+    const confirmBtn = document.getElementById(config.confirmId);
+    const grid = document.getElementById(config.gridId);
+    const input = document.getElementById(config.inputId);
+    const form = document.getElementById('settings-form');
 
-  let pendingAvatar = null;
+    if (!openBtn || !modal || !input) return;
 
-  if (openBtn && modal) {
+    let pending = null;
+    let busy = false;
+
+    const close = () => {
+      if (!busy) modal.hidden = true;
+    };
+
     openBtn.addEventListener('click', () => {
       modal.hidden = false;
-      pendingAvatar = avatarInput.value;
+      pending = input.value;
     });
 
-    closeBtn.addEventListener('click', () => {
-      modal.hidden = true;
-    });
+    if (closeBtn) closeBtn.addEventListener('click', close);
 
     modal.addEventListener('click', (event) => {
-      if (event.target === modal) modal.hidden = true;
+      if (event.target === modal) close();
     });
 
     document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && !modal.hidden) modal.hidden = true;
+      if (event.key === 'Escape' && !modal.hidden) close();
     });
 
     if (grid) {
       grid.addEventListener('click', (event) => {
-        const cell = event.target.closest('.avatar-cell');
+        if (busy) return;
+        const cell = event.target.closest(config.cellSelector);
         if (!cell) return;
-        grid.querySelectorAll('.avatar-cell').forEach((c) => c.classList.remove('is-selected'));
+        grid.querySelectorAll(config.cellSelector).forEach((item) => {
+          item.classList.remove('is-selected');
+        });
         cell.classList.add('is-selected');
-        pendingAvatar = cell.dataset.avatar;
+        pending = cell.dataset[config.dataKey];
       });
     }
 
     if (confirmBtn) {
       confirmBtn.addEventListener('click', () => {
-        if (pendingAvatar && pendingAvatar !== avatarInput.value) {
-          avatarInput.value = pendingAvatar;
-          if (currentImg) {
-            currentImg.src = currentImg.src.replace(/[^/]*$/, pendingAvatar);
-          }
+        if (busy) return;
+
+        const changed = pending && pending !== input.value;
+        if (changed) {
+          input.value = pending;
+          if (config.onChange) config.onChange(pending);
         }
+
+        const selectedCell = grid
+          ? grid.querySelector(config.cellSelector + '.is-selected')
+          : null;
+        const waitMs = changed && config.beforeSubmit
+          ? config.beforeSubmit(pending, selectedCell) || 0
+          : 0;
+
+        if (waitMs > 0) {
+          // Keep the modal open for the preview. Ignore close attempts so
+          // a stray click cannot cancel halfway or submit twice.
+          busy = true;
+          confirmBtn.disabled = true;
+          modal.setAttribute('aria-busy', 'true');
+          setTimeout(() => {
+            modal.hidden = true;
+            if (form) form.submit();
+          }, waitMs);
+          return;
+        }
+
         modal.hidden = true;
         if (form) form.submit();
       });
     }
   }
+
+  const currentAvatar = document.getElementById('current-avatar-img');
+  setupPicker({
+    modalId: 'avatar-modal',
+    openId: 'open-avatar-modal',
+    closeId: 'close-avatar-modal',
+    confirmId: 'confirm-avatar',
+    gridId: 'avatar-grid',
+    inputId: 'avatar-input',
+    cellSelector: '.avatar-cell',
+    dataKey: 'avatar',
+    onChange: (avatar) => {
+      if (currentAvatar) {
+        currentAvatar.src = currentAvatar.src.replace(/[^/]*$/, avatar);
+      }
+    },
+  });
+
+  setupPicker({
+    modalId: 'mascot-modal',
+    openId: 'open-mascot-modal',
+    closeId: 'close-mascot-modal',
+    confirmId: 'confirm-mascot',
+    gridId: 'mascot-grid',
+    inputId: 'mascot-input',
+    cellSelector: '.mascot-cell',
+    dataKey: 'mascot',
+    beforeSubmit: (mascotId, cell) => {
+      if (!cell) return 0;
+      const preview = cell.querySelector('img');
+      if (preview) {
+        // Cache-bust so an already-loaded GIF replays instead of showing
+        // its final frame.
+        preview.src = preview.src.replace(
+          /preview-idle\.gif.*$/,
+          'preview-hello.gif?t=' + Date.now()
+        );
+      }
+      const totalMs = parseInt(cell.dataset.helloMs, 10) || 0;
+      return Math.min(totalMs, 3500);
+    },
+  });
 
   // ── TTS toggle → enable/disable speaker dropdown ─────────────────
   const ttsToggle = document.getElementById('tts-toggle');
@@ -76,6 +149,7 @@
   // ── Difficulty slider → update label, current value display, and hidden input ───
   const difficultySlider = document.getElementById('difficulty-slider');
   const difficultyValue = document.getElementById('difficulty-current-value');
+  const difficultyInput = document.getElementById('difficulty-input');
 
   if (difficultySlider && difficultyValue && difficultyInput) {
     const sync = () => {

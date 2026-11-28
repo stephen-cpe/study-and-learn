@@ -2,13 +2,15 @@
 User settings service — validates and applies user preference changes.
 
 Used by the /settings route to guard the User model against arbitrary
-input. Centralizes the allowed-value lists for avatars, TTS speakers, and
-lesson difficulty so the route, template, and tests can all share one
-source of truth.
+input. Centralizes the allowed-value lists for avatars, mascots, TTS
+speakers, and lesson difficulty so the route, template, and tests can all
+share one source of truth.
 """
 from __future__ import annotations
 
 from typing import Tuple
+
+from src.services.mascot_registry import DEFAULT_MASCOT, DISPLAY, MASCOT_IDS
 
 ALLOWED_AVATARS = [
     'avatar-0.png',
@@ -84,13 +86,19 @@ def validate_tts_speaker(value) -> str:
     return DEFAULT_TTS_SPEAKER
 
 
+def validate_mascot(value) -> str:
+    if value in MASCOT_IDS:
+        return value
+    return DEFAULT_MASCOT
+
+
 def validate_difficulty(value) -> str:
     if value in DIFFICULTY_LEVELS:
         return value
     return DEFAULT_DIFFICULTY
 
 
-def apply_settings(user, *, avatar=None, tts_enabled=None,
+def apply_settings(user, *, avatar=None, mascot=None, tts_enabled=None,
                    tts_speaker=None, lesson_difficulty=None,
                    nickname=None, full_name=None) -> Tuple[bool, str]:
     """Apply validated settings to *user* in place.
@@ -108,6 +116,13 @@ def apply_settings(user, *, avatar=None, tts_enabled=None,
             user.avatar = new_avatar
             changed = True
             messages.append('Avatar updated.')
+
+    if mascot is not None:
+        new_mascot = validate_mascot(mascot)
+        if new_mascot != user.mascot:
+            user.mascot = new_mascot
+            changed = True
+            messages.append(f'Mascot set to {DISPLAY[new_mascot]["name"]}.')
 
     if tts_enabled is not None:
         new_enabled = _coerce_bool(tts_enabled)

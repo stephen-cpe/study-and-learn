@@ -23,6 +23,34 @@ def test_default_mascot_is_raster():
     assert mascot_registry.active_mascot_id() == 'raster'
 
 
+def test_active_mascot_fails_safe_when_the_lookup_raises(client, monkeypatch):
+    """The context processor runs on every page, including error pages; a
+    database failure while reading the learner's choice must not break them."""
+    import flask_login
+
+    class BrokenUser:
+        is_authenticated = True
+
+        @property
+        def mascot(self):
+            raise RuntimeError('database is down')
+
+    monkeypatch.setattr(flask_login, 'current_user', BrokenUser())
+    with client.application.test_request_context('/'):
+        assert mascot_registry.active_mascot_id() == 'raster'
+
+
+def test_picker_options_match_the_display_registry():
+    options = mascot_registry.picker_options()
+    assert [option['id'] for option in options] == ['raster', 'pip', 'trace']
+    for option in options:
+        display = mascot_registry.DISPLAY[option['id']]
+        assert option['name'] == display['name']
+        assert option['tagline'] == display['tagline']
+        assert option['hello_ms'] == mascot_registry.load_manifest(
+            option['id'])['animations']['hello']['total_ms']
+
+
 def test_unknown_mascot_id_falls_back_to_default():
     assert mascot_registry.get_mascot('nope')['id'] == 'raster'
     assert mascot_registry.get_mascot(None)['id'] == 'raster'

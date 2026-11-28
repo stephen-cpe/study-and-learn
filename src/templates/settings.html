@@ -13,6 +13,7 @@
     <form method="POST" action="{{ url_for('main.settings') }}" id="settings-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="avatar" id="avatar-input" value="{{ current_user.avatar }}">
+        <input type="hidden" name="mascot" id="mascot-input" value="{{ mascot_id }}">
 
         <!-- ── Profile Name ──────────────────────────────────────── -->
         <section class="settings-card">
@@ -45,6 +46,20 @@
                      id="current-avatar-img">
                 </button>
                 <span class="profile-hint">Click your avatar to choose a new one</span>
+            </div>
+        </section>
+
+        <!-- ── Mascot ──────────────────────────────────────────────── -->
+        <section class="settings-card">
+            <h2 class="settings-heading">Change Mascot</h2>
+            <div class="profile-row">
+                <button type="button" id="open-mascot-modal" class="avatar-button mascot-button" aria-label="Change mascot">
+                    <img src="{{ url_for('static', filename='images/mascots/' ~ mascot_id ~ '/preview-idle.gif') }}"
+                         alt="Current mascot: {{ mascot_name }}"
+                         class="profile-mascot"
+                         id="current-mascot-img">
+                </button>
+                <span class="profile-hint">Click your mascot to choose a new one</span>
             </div>
         </section>
 
@@ -109,11 +124,11 @@
     <!-- ── Mascot Memory ──────────────────────────────────────────── -->
     <section class="settings-card">
         <h2 class="settings-heading">Mascot Memory</h2>
-        <p class="settings-note">The study robot remembers your preferences and milestones to personalize its lines and narration. Forgetting wipes every memorized detail and starts fresh — your lessons and progress are untouched.</p>
+        <p class="settings-note">{{ mascot_name }} remembers your preferences and milestones to personalize its lines and narration. Forgetting wipes every memorized detail and starts fresh — your lessons and progress are untouched.</p>
         <form method="POST" action="{{ url_for('main.forget_memories') }}"
               data-confirm="true"
               data-confirm-title="Forget everything memorized?"
-              data-confirm-body="The mascot will no longer remember your name preferences, difficulty, or milestones."
+              data-confirm-body="{{ mascot_name }} will no longer remember your name preferences, difficulty, or milestones."
               data-confirm-action="Forget Everything"
               data-confirm-variant="danger">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -141,6 +156,32 @@
         </div>
         <div class="avatar-modal-footer">
             <button type="button" class="retro-button" id="confirm-avatar">Select</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Mascot Selection Modal ─────────────────────────────────────── -->
+<div class="avatar-modal-overlay" id="mascot-modal" hidden>
+    <div class="avatar-modal" role="dialog" aria-modal="true" aria-labelledby="mascot-modal-title">
+        <div class="avatar-modal-header">
+            <h3 id="mascot-modal-title">Select Your Mascot</h3>
+            <button type="button" class="avatar-modal-close" id="close-mascot-modal" aria-label="Close">×</button>
+        </div>
+        <div class="avatar-grid mascot-grid" id="mascot-grid">
+            {% for mascot in mascots %}
+                <button type="button"
+                        class="avatar-cell mascot-cell {% if mascot.id == mascot_id %}is-selected{% endif %}"
+                        data-mascot="{{ mascot.id }}"
+                        data-hello-ms="{{ mascot.hello_ms }}"
+                        aria-label="Select {{ mascot.name }}">
+                    <img src="{{ url_for('static', filename='images/mascots/' ~ mascot.id ~ '/preview-idle.gif') }}" alt="">
+                    <span class="mascot-cell-name">{{ mascot.name }}</span>
+                    <span class="mascot-cell-tagline">{{ mascot.tagline }}</span>
+                </button>
+            {% endfor %}
+        </div>
+        <div class="avatar-modal-footer">
+            <button type="button" class="retro-button" id="confirm-mascot">Select</button>
         </div>
     </div>
 </div>

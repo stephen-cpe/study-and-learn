@@ -9,12 +9,14 @@ from flask_login import current_user, login_required, login_user, logout_user
 from src import db
 from src.models import User
 from src.routes import bp
+from src.services.mascot_registry import DISPLAY, picker_options
 from src.services.settings_service import (
     ALLOWED_AVATARS,
     DEFAULT_DIFFICULTY,
     DIFFICULTY_LEVELS,
     TTS_SPEAKERS,
     apply_settings,
+    validate_mascot,
 )
 
 
@@ -133,9 +135,11 @@ def settings():
         old_nick = current_user.nickname
         old_diff = current_user.lesson_difficulty
         old_speaker = current_user.tts_speaker
+        old_mascot = current_user.mascot
         _, message = apply_settings(
             current_user,
             avatar=request.form.get('avatar'),
+            mascot=request.form.get('mascot'),
             tts_enabled=request.form.get('tts_enabled', False),
             tts_speaker=request.form.get('tts_speaker'),
             lesson_difficulty=request.form.get('lesson_difficulty'),
@@ -155,14 +159,21 @@ def settings():
         if current_user.tts_speaker != old_speaker:
             _sm(current_user.id, 'procedural',
                 f"Prefers TTS voice {current_user.tts_speaker}")
+        if current_user.mascot != old_mascot:
+            _sm(current_user.id, 'procedural',
+                f"Chose {DISPLAY[current_user.mascot]['name']} as study buddy")
 
         flash(message, 'success')
         return redirect(url_for('main.settings'))
 
+    mascot_id = validate_mascot(current_user.mascot)
     return render_template(
         'settings.html',
         avatars=ALLOWED_AVATARS,
         speakers=TTS_SPEAKERS,
+        mascots=picker_options(),
+        mascot_id=mascot_id,
+        mascot_name=DISPLAY[mascot_id]['name'],
         difficulty_index=DIFFICULTY_LEVELS.index(current_user.lesson_difficulty)
         if current_user.lesson_difficulty in DIFFICULTY_LEVELS
         else DIFFICULTY_LEVELS.index(DEFAULT_DIFFICULTY),

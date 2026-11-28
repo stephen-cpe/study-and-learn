@@ -78,6 +78,26 @@
     opacity: 0.85;
 }
 
+.mascot-button {
+    border-radius: 14px;
+}
+
+/* Keep previews at their natural size: these GIFs are pre-scaled sheets,
+   so any fractional scale would soften their pixels. */
+.profile-mascot {
+    display: block;
+    width: auto;
+    height: auto;
+    border: 3px solid var(--az-cyan);
+    border-radius: 12px;
+    box-shadow: 0 0 16px var(--az-glow);
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+/* No fractional hover scale on the preview: it would soften the pixels. */
+.mascot-button:hover { transform: none; }
+
 /* ── Settings rows / labels / notes ─────────────────────────────── */
 .settings-row {
     display: flex;
@@ -361,4 +381,47 @@ input:checked + .slider::before {
     display: flex;
     justify-content: flex-end;
     margin-top: 0.5rem;
+}
+
+/* ── Mascot cells (same modal as avatars) ───────────────────────── */
+.mascot-cell {
+    aspect-ratio: auto;
+    min-height: 210px;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.75rem 0.4rem;
+    text-align: center;
+}
+
+.mascot-cell img {
+    width: auto;
+    height: auto;
+    flex: 0 0 auto;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+.mascot-cell-name {
+    color: var(--az-cyan);
+    font-family: 'Retrograde Bold', 'PressStart2P', monospace;
+    font-size: 0.85rem;
+    letter-spacing: 0.04em;
+}
+
+.mascot-cell-tagline {
+    color: var(--az-silver);
+    font-family: 'BoldPixels', monospace;
+    font-size: 0.7rem;
+    line-height: 1.3;
+    opacity: 0.8;
+}
+
+@media (max-width: 420px) {
+    .mascot-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .mascot-cell {
+        min-height: 0;
+    }
 }

@@ -2,12 +2,16 @@
 Tests for the user Settings page and persistence of user preferences.
 
 Covers:
-  - User model defaults (avatar, tts_enabled, tts_speaker, lesson_difficulty)
+  - User model defaults (avatar, mascot, tts_enabled, tts_speaker,
+    lesson_difficulty)
   - settings_service validators (reject junk, fall back to defaults)
   - /settings GET/POST route (login required, form persistence)
+  - Mascot picker markup, selection, memory and per-user active config
   - Navbar avatar in base.html renders the user's avatar, not avatar-0.png
   - Avatar assets exist on disk in the new images/avatars/ subdirectory
 """
+import json
+import re
 import tempfile
 from pathlib import Path
 
@@ -16,6 +20,7 @@ from cachelib import FileSystemCache
 
 from src import create_app, db
 from src.models import User
+from src.services.mascot_registry import DEFAULT_MASCOT
 from src.services.settings_service import (
     ALLOWED_AVATARS,
     DEFAULT_AVATAR,
@@ -27,6 +32,7 @@ from src.services.settings_service import (
     validate_avatar,
     validate_difficulty,
     validate_full_name,
+    validate_mascot,
     validate_nickname,
     validate_tts_speaker,
 )
@@ -90,6 +96,29 @@ def _login(client, username='tester', password='testpass1'):
     )
 
 
+def _rendered_mascot_config(body):
+    match = re.search(
+        r'<script type="application/json" id="mascot-config">(.*?)</script>',
+        body,
+        re.S,
+    )
+    assert match, 'page must render the mascot config JSON block'
+    return json.loads(match.group(1))
+
+
+def _settings_data(**overrides):
+    data = {
+        'avatar': 'avatar-0.png',
+        'tts_enabled': '',
+        'tts_speaker': 'Ava',
+        'lesson_difficulty': 'Normal',
+        'nickname': '',
+        'full_name': '',
+    }
+    data.update(overrides)
+    return data
+
+
 # ── Validator unit tests ───────────────────────────────────────────────────
 
 
@@ -108,6 +137,16 @@ class TestSettingsServiceValidators:
     def test_unknown_speaker_falls_back_to_default(self):
         assert validate_tts_speaker('Zelda') == DEFAULT_TTS_SPEAKER
         assert validate_tts_speaker('') == DEFAULT_TTS_SPEAKER
+
+    def test_known_mascots_are_kept(self):
+        for mascot_id in ('raster', 'pip', 'trace'):
+            assert validate_mascot(mascot_id) == mascot_id
+
+    def test_unknown_mascot_falls_back_to_default(self):
+        assert validate_mascot('') == DEFAULT_MASCOT
+        assert validate_mascot(None) == DEFAULT_MASCOT
+        assert validate_mascot('robot') == DEFAULT_MASCOT
+        assert validate_mascot('<script>') == DEFAULT_MASCOT
 
     def test_known_difficulty_kept(self):
         assert validate_difficulty('Easy') == 'Easy'
@@ -199,6 +238,7 @@ class TestUserModelDefaults:
         with app.app_context():
             user = db.session.get(User, uid)
             assert user.avatar == 'avatar-0.png'
+            assert user.mascot == 'raster'
             assert user.tts_enabled is False
             assert user.tts_speaker == 'Ava'
             assert user.lesson_difficulty == 'Normal'
@@ -238,6 +278,49 @@ class TestSettingsRoute:
         # All 9 avatar cells should be rendered in the modal markup
         for av in ALLOWED_AVATARS:
             assert f'images/avatars/{av}' in body
+
+    def test_mascot_picker_is_below_profile_picture(self, app, client, make_user):
+        make_user()
+        _login(client)
+        body = client.get('/settings').get_data(as_text=True)
+        assert body.index('Change Profile Picture') < body.index('Change Mascot')
+        assert body.index('Change Mascot') < body.index('Text to Speech')
+        assert 'name="mascot"' in body
+        assert 'Select Your Mascot' in body
+        grid = re.search(r'id="mascot-grid"(.*?)</div>', body, re.S).group(1)
+        assert grid.count('data-mascot=') == 3
+        assert grid.count('aria-label="Select ') == 3
+        for mascot_id in ('raster', 'pip', 'trace'):
+            assert f'images/mascots/{mascot_id}/preview-idle.gif' in grid
+
+    def test_current_mascot_cell_is_preselected(self, app, client, make_user):
+        uid = make_user()
+        with app.app_context():
+            user = db.session.get(User, uid)
+            user.mascot = 'trace'
+            db.session.commit()
+        _login(client)
+        body = client.get('/settings').get_data(as_text=True)
+        grid = re.search(r'id="mascot-grid"(.*?)</div>', body, re.S).group(1)
+        selected = [
+            tag for tag in re.findall(r'<button[^>]*>', grid)
+            if 'is-selected' in tag
+        ]
+        assert len(selected) == 1
+        assert 'data-mascot="trace"' in selected[0]
+
+    def test_mascot_memory_copy_uses_current_mascot_name(self, app, client, make_user):
+        uid = make_user()
+        with app.app_context():
+            user = db.session.get(User, uid)
+            user.mascot = 'trace'
+            db.session.commit()
+        _login(client)
+        body = client.get('/settings').get_data(as_text=True)
+        assert 'Trace remembers your preferences' in body
+        assert 'Trace will no longer remember' in body
+        assert 'The study robot remembers' not in body
+        assert 'The mascot will no longer remember' not in body
 
     def test_post_persists_avatar(self, app, client, make_user):
         make_user()
@@ -474,3 +557,109 @@ class TestTtsVoiceMemory:
             from src.models import MascotMemory
             rows = MascotMemory.query.filter_by(memory_type='procedural').all()
             assert all('TTS voice' not in (r.content or '') for r in rows)
+
+
+# ── Settings picker JS (static contract) ───────────────────────────────────
+
+
+class TestSettingsPickerScript:
+    SETTINGS_JS = Path(__file__).resolve().parent.parent / 'src' / 'static' / 'js' / 'settings.js'
+
+    def test_both_pickers_share_one_helper(self):
+        js = self.SETTINGS_JS.read_text(encoding='utf-8')
+        assert js.count('function setupPicker(config)') == 1
+        assert js.count('setupPicker({') == 2
+
+    def test_mascot_hello_preview_is_cache_busted_and_capped(self):
+        js = self.SETTINGS_JS.read_text(encoding='utf-8')
+        assert 'preview-hello.gif?t=' in js
+        assert 'Math.min(totalMs, 3500)' in js
+        assert 'confirmBtn.disabled = true' in js
+
+
+# ── Mascot choice (Task 3) ─────────────────────────────────────────────────
+
+
+class TestMascotSelection:
+    def test_post_persists_mascot_and_stores_procedural_memory(
+            self, app, client, make_user):
+        uid = make_user()
+        _login(client)
+        resp = client.post(
+            '/settings',
+            data=_settings_data(mascot='pip'),
+            follow_redirects=False,
+        )
+        assert resp.status_code in (302, 303)
+        with app.app_context():
+            user = db.session.get(User, uid)
+            assert user.mascot == 'pip'
+            from src.models import MascotMemory
+            rows = MascotMemory.query.filter_by(memory_type='procedural').all()
+            assert len(rows) == 1
+            assert rows[0].content == 'Chose Pip as study buddy'
+
+    def test_mascot_change_flashes_display_name(self, app, client, make_user):
+        make_user()
+        _login(client)
+        body = client.post(
+            '/settings',
+            data=_settings_data(mascot='pip'),
+            follow_redirects=True,
+        ).get_data(as_text=True)
+        assert body.count('Mascot set to Pip.') == 1
+
+    def test_invalid_mascot_saves_the_default(self, app, client, make_user):
+        uid = make_user()
+        with app.app_context():
+            user = db.session.get(User, uid)
+            user.mascot = 'pip'
+            db.session.commit()
+        _login(client)
+        client.post(
+            '/settings',
+            data=_settings_data(mascot='<script>'),
+            follow_redirects=False,
+        )
+        with app.app_context():
+            assert db.session.get(User, uid).mascot == 'raster'
+
+    def test_missing_mascot_leaves_the_current_value(self, app, client, make_user):
+        uid = make_user()
+        with app.app_context():
+            user = db.session.get(User, uid)
+            user.mascot = 'trace'
+            db.session.commit()
+        _login(client)
+        client.post('/settings', data=_settings_data(), follow_redirects=False)
+        with app.app_context():
+            assert db.session.get(User, uid).mascot == 'trace'
+            from src.models import MascotMemory
+            rows = MascotMemory.query.filter_by(memory_type='procedural').all()
+            assert all('study buddy' not in (r.content or '') for r in rows)
+
+    def test_logged_in_user_sees_their_mascot_config(self, app, client, make_user):
+        uid = make_user()
+        with app.app_context():
+            user = db.session.get(User, uid)
+            user.mascot = 'trace'
+            db.session.commit()
+        _login(client)
+        body = client.get('/').get_data(as_text=True)
+        cfg = _rendered_mascot_config(body)
+        assert cfg['id'] == 'trace'
+        assert cfg['name'] == 'Trace'
+
+    def test_anonymous_visitor_sees_raster_config(self, client):
+        body = client.get('/').get_data(as_text=True)
+        cfg = _rendered_mascot_config(body)
+        assert cfg['id'] == 'raster'
+        assert cfg['name'] == 'Raster'
+
+    def test_init_db_defines_mascot_column_with_default(self):
+        sql = (Path(__file__).resolve().parent.parent / 'init_db.sql').read_text(
+            encoding='utf-8'
+        )
+        assert re.search(
+            r"mascot\s+VARCHAR\(16\)\s+NOT NULL DEFAULT 'raster'", sql
+        )

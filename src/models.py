@@ -9,6 +9,7 @@ from sqlalchemy import Boolean, DateTime, Integer, String, Text
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from src import db
+from src.services.mascot_registry import DEFAULT_MASCOT
 from src.services.settings_service import (
     DEFAULT_DIFFICULTY,
     DEFAULT_TTS_SPEAKER,
@@ -42,6 +43,7 @@ class User(db.Model, UserMixin):
     is_admin = db.Column(Boolean, default=False, nullable=False)
     can_generate_lessons = db.Column(Boolean, default=False, nullable=False)
     avatar = db.Column(String(32), nullable=False, default='avatar-0.png')
+    mascot = db.Column(String(16), nullable=False, default=DEFAULT_MASCOT)
     tts_enabled = db.Column(Boolean, nullable=False, default=False)
     tts_speaker = db.Column(String(16), nullable=False, default=DEFAULT_TTS_SPEAKER)
     lesson_difficulty = db.Column(String(8), nullable=False, default=DEFAULT_DIFFICULTY)
